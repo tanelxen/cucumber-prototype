@@ -40,6 +40,9 @@ set(SRC_COMMON
         src/DebugRenderer.h
         src/Cube.cpp
         src/Cube.h
+        
+        src/Viewport.cpp
+        src/Viewport.h
 )
 
 set(SRC_IMGUI

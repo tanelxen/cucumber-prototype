@@ -23,6 +23,8 @@
 
 #include "Application.h"
 
+#include "Viewport.h"
+
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -121,14 +123,26 @@ void Application::run()
         int width, height;
         glfwGetFramebufferSize(m_pWindow, &width, &height);
 
-        m_pCamera->setAspectRatio((float)width / (float)height);
         m_pScene->update(elapsedTime);
+        m_pScene->draw();
         
         glViewport(0, 0, width, height);
         
-        m_pScene->draw();
+        glEnable(GL_DEPTH_TEST);
         
-        imgui_draw();
+        glClearColor(0.0, 0.0, 0.0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        
+        m_pScene->m_pMainView->renderUI("3D View");
+        
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        
+        
 
         glfwSwapBuffers(m_pWindow);
         

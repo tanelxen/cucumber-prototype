@@ -22,7 +22,7 @@ CameraController::CameraController(Camera *camera) : m_pCamera(camera)
 
 void CameraController::update(float dt)
 {
-    if (Input::isLeftMouseButtonPressed())
+    if (Input::isRightMouseButtonPressed())
     {
         Application::setCursorEnabled(false);
         

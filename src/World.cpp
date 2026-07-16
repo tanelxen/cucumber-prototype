@@ -13,6 +13,8 @@
 #include "Cube.h"
 #include "Grid.h"
 
+#include "Viewport.h"
+
 #include <glad/glad.h>
 
 static ShadedCube g_shadedCube;
@@ -28,6 +30,10 @@ WorldScene::WorldScene(Camera *camera) : m_pCamera(camera)
     g_shadedCube.position = { 0, 0, -64 };
     
     g_grid.init();
+    
+    m_pMainView = new Viewport();
+    m_pMainView->setCamera(camera);
+    m_pMainView->init();
 }
 
 WorldScene::~WorldScene() = default;
@@ -45,6 +51,8 @@ void WorldScene::draw()
 {
     if (m_pCamera == nullptr) return;
     
+    m_pMainView->bind();
+    
     glEnable(GL_DEPTH_TEST);
     
     glClearColor(0.1, 0.1, 0.1, 1);
@@ -54,4 +62,6 @@ void WorldScene::draw()
 
     g_grid.draw(viewProj);
     g_shadedCube.draw(viewProj);
+    
+    m_pMainView->unbind();
 }

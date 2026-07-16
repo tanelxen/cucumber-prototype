@@ -11,6 +11,11 @@
 //    glm::vec3 rotation;
 //};
 
+Camera::Camera()
+{
+    setAspectRatio(1);
+}
+
 void Camera::setAspectRatio(float aspectRatio)
 {
     float worldFOV = glm::radians(55.0f);

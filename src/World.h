@@ -12,6 +12,7 @@
 #include <memory>
 
 class Camera;
+class Viewport;
 
 class WorldScene
 {
@@ -22,6 +23,8 @@ public:
     void loadMap(const std::string &filename);
     void update(float dt);
     void draw();
+    
+    Viewport* m_pMainView;
     
 private:
     Camera* m_pCamera;

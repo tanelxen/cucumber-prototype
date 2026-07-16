@@ -20,6 +20,8 @@
 class Camera
 {
 public:
+    Camera();
+    
     void setTransform(const glm::vec3& position, const glm::vec3& forward, const glm::vec3& right, const glm::vec3& up);
     void setAspectRatio(float aspectRatio);
     
