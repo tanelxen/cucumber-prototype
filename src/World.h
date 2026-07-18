@@ -12,6 +12,8 @@
 #include <memory>
 
 class Camera;
+
+class ViewportPanel;
 class Viewport;
 
 class WorldScene
@@ -25,6 +27,7 @@ public:
     void draw();
     
     Viewport* m_pMainView;
+    ViewportPanel* m_pScenePanel;
     
 private:
     Camera* m_pCamera;

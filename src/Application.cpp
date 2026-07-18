@@ -23,7 +23,7 @@
 
 #include "Application.h"
 
-#include "Viewport.h"
+#include "ViewportPanel.h"
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
@@ -104,8 +104,6 @@ void Application::run()
     
 //    glfwSetInputMode(m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
-    glEnable(GL_FRAMEBUFFER_SRGB);
-    
     while (!glfwWindowShouldClose(m_pWindow))
     {
         double currTime = glfwGetTime();
@@ -129,20 +127,21 @@ void Application::run()
         glViewport(0, 0, width, height);
         
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_FRAMEBUFFER_SRGB);
         
         glClearColor(0.0, 0.0, 0.0, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        // ####################### IMGUI #######################
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
-        m_pScene->m_pMainView->renderUI("3D View");
+        m_pScene->m_pScenePanel->draw();
         
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        
-        
+        // ####################### IMGUI #######################
 
         glfwSwapBuffers(m_pWindow);
         
@@ -213,22 +212,4 @@ void imgui_init(GLFWwindow* window)
     ImGui_ImplOpenGL3_Init("#version 150");
     
     //    setImGuiStyle();
-}
-
-void imgui_draw()
-{
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    
-//    {
-//        static float f = 0.0f;
-//        ImGui::Text("Hello, world!");
-//        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-////        ImGui::ColorEdit3("clear color", (float*)&clear_color);
-//        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-//    }
-    
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

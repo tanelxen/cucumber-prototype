@@ -14,6 +14,7 @@
 #include "Grid.h"
 
 #include "Viewport.h"
+#include "ViewportPanel.h"
 
 #include <glad/glad.h>
 
@@ -34,6 +35,9 @@ WorldScene::WorldScene(Camera *camera) : m_pCamera(camera)
     m_pMainView = new Viewport();
     m_pMainView->setCamera(camera);
     m_pMainView->init();
+    
+    m_pScenePanel = new ViewportPanel("Perspective");
+    m_pScenePanel->setViewport(m_pMainView);
 }
 
 WorldScene::~WorldScene() = default;

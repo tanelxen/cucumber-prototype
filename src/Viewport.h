@@ -21,16 +21,18 @@ public:
     
     void bind();
     void unbind();
-    void renderUI(const char* windowName);
     
-    unsigned int m_texture = 0;
-    
-    int m_width = 1;
-    int m_height = 1;
+    int getWidth() { return m_width; }
+    int getHeight() { return m_height; }
+    int getTexture() { return m_texture; }
     
 private:
     unsigned int m_fbo = 0;
     unsigned int m_rbo = 0;
+    unsigned int m_texture = 0;
+    
+    int m_width = 1;
+    int m_height = 1;
     
     Camera* m_camera;
 };
