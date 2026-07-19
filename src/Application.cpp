@@ -24,6 +24,9 @@
 #include "Application.h"
 
 #include "ViewportPanel.h"
+#include "ScenePanel.h"
+#include "InspectorPanel.h"
+#include "AssetsPanel.h"
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
@@ -36,7 +39,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 Application* Application::currentInstance = nullptr;
 
 void imgui_init(GLFWwindow* window);
-void imgui_draw();
+void imgui_renderMenuBar();
 
 Application::Application()
 {
@@ -137,7 +140,35 @@ void Application::run()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
+        
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        
+        ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoNavFocus |
+        ImGuiWindowFlags_MenuBar;
+        
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ImGui::Begin("DockSpace", nullptr, flags);
+        ImGui::PopStyleVar();
+        ImGui::DockSpace(ImGui::GetID("MainDockSpace"));
+        
+        imgui_renderMenuBar();
+        
+        ImGui::End();
+        
+        m_pScene->m_pViewportPanel->draw();
         m_pScene->m_pScenePanel->draw();
+        m_pScene->m_pInspectorPanel->draw();
+        m_pScene->m_pAssetsPanel->draw();
         
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -207,9 +238,132 @@ void imgui_init(GLFWwindow* window)
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
     
-    //    setImGuiStyle();
+    // Rounding
+    ImGui::GetStyle().WindowRounding = 4.0;
+    ImGui::GetStyle().ChildRounding = 4.0;
+    ImGui::GetStyle().FrameRounding = 4.0;
+    ImGui::GetStyle().TabRounding = 0.0;
+    ImGui::GetStyle().PopupRounding = 4.0;
+    ImGui::GetStyle().GrabRounding = 3.0;
+    
+    // Padding
+    ImGui::GetStyle().FramePadding = ImVec2(6, 3);
+    
+    // Size
+    ImGui::GetStyle().GrabMinSize = 11.0;
+    
+    // Show/Hide
+    ImGui::GetStyle().WindowMenuButtonPosition = ImGuiDir::ImGuiDir_None;
+    
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    
+    colors[ImGuiCol_WindowBg]            = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_PopupBg]             = ImVec4(0.15, 0.15, 0.15, 0.95);
+    colors[ImGuiCol_Text]                = ImVec4(0.90, 0.90, 0.90, 1.0);
+    
+    // Follow Main Theme Color
+    colors[ImGuiCol_DockingPreview]      = ImVec4(0.84, 0.65, 0.19, 1.0);
+    colors[ImGuiCol_CheckMark]           = ImVec4(0.84, 0.65, 0.19, 1.0);
+    colors[ImGuiCol_SliderGrab]          = ImVec4(0.84, 0.65, 0.19, 1.0);
+    colors[ImGuiCol_SliderGrabActive]    = ImVec4(0.84, 0.65, 0.19, 1.0);
+    colors[ImGuiCol_ResizeGrip]          = ImVec4(0.84, 0.65, 0.19, 1.0);
+    
+    // Headers
+    colors[ImGuiCol_Header]              = ImVec4(0.20, 0.21, 0.21, 1.0);
+    colors[ImGuiCol_HeaderHovered]       = ImVec4(0.30, 0.30, 0.30, 1.0);
+    colors[ImGuiCol_HeaderActive]        = ImVec4(0.15, 0.15, 0.15, 1.0);
+    
+    // Buttons
+    colors[ImGuiCol_Button]              = ImVec4(0.20, 0.21, 0.21, 1.0);
+    colors[ImGuiCol_ButtonHovered]       = ImVec4(0.30, 0.30, 0.30, 1.0);
+    colors[ImGuiCol_ButtonActive]        = ImVec4(0.15, 0.15, 0.15, 1.0);
+
+    // Frame BG
+    colors[ImGuiCol_FrameBg]             = ImVec4(0.20, 0.21, 0.21, 1.0);
+    colors[ImGuiCol_FrameBgHovered]      = ImVec4(0.30, 0.30, 0.30, 1.0);
+    colors[ImGuiCol_FrameBgActive]       = ImVec4(0.15, 0.15, 0.15, 1.0);
+    
+    // Tabs
+    colors[ImGuiCol_Tab]                 = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_TabHovered]          = ImVec4(0.38, 0.38, 0.38, 1.0);
+    colors[ImGuiCol_TabActive]           = ImVec4(0.28, 0.28, 0.28, 1.0);
+    colors[ImGuiCol_TabUnfocused]        = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_TabUnfocusedActive]  = ImVec4(0.20, 0.21, 0.21, 1.0);
+    
+    // Title
+    colors[ImGuiCol_TitleBg]             = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_TitleBgActive]       = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_TitleBgCollapsed]    = ImVec4(0.15, 0.15, 0.15, 1.0);
+    
+    // Separator
+    colors[ImGuiCol_Separator]           = ImVec4(0.23, 0.23, 0.23, 0.5);
+    colors[ImGuiCol_SeparatorHovered]    = ImVec4(0.23, 0.23, 0.23, 0.8);
+    colors[ImGuiCol_SeparatorActive]     = ImVec4(0.23, 0.23, 0.23, 0.8);
+
+//    // ScrollBar
+    colors[ImGuiCol_ScrollbarBg]         = ImVec4(0.15, 0.15, 0.15, 1.0);
 }
+
+void imgui_renderMenuBar()
+{
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {};
+            
+            if (ImGui::MenuItem("Load Scene", "Ctrl+L")) {};
+            ImGui::Separator();
+            
+            if (ImGui::MenuItem("Reload Scripts", "Ctrl+R")) {};
+            ImGui::EndMenu();
+        }
+        
+        if (ImGui::BeginMenu("Edit"))
+        {
+            if (ImGui::MenuItem("Undo", "Ctrl+Z")) {}
+            if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {} // Disabled item
+            
+            ImGui::Separator();
+            
+            if (ImGui::MenuItem("Cut", "Ctrl+X")) {}
+            if (ImGui::MenuItem("Copy", "Ctrl+C")) {}
+            if (ImGui::MenuItem("Paste", "Ctrl+V")) {}
+            ImGui::EndMenu();
+        }
+        
+//        if (ImGui::BeginMenu("GameObject"))
+//        {
+//            if (ImGui::MenuItem("Cube")) {
+//                _createCubeCallback();
+//            }
+//            ImGui::EndMenu();
+//        }
+//        
+//        if (ImGui::BeginMenu("Run")) {
+//            if (ImGui::MenuItem("Compile + Play")) {
+//                auto path = sceneM().activeScene()->getPath();
+//                sceneM().saveActiveScene(path);
+//                editor().projectBuilder()->build();
+//                launchRuntime(sceneM().activeScene()->getPath());
+//            }
+//            
+//            if (ImGui::MenuItem("Compile")) {
+//                editor().projectBuilder()->build();
+//            }
+//            
+//            if (ImGui::MenuItem("Play")) {
+//                launchRuntime(sceneM().activeScene()->getPath());
+//            }
+//            
+//            ImGui::EndMenu();
+//        }
+        
+        ImGui::EndMainMenuBar();
+    }
+    }

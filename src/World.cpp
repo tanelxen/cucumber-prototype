@@ -14,7 +14,11 @@
 #include "Grid.h"
 
 #include "Viewport.h"
+
 #include "ViewportPanel.h"
+#include "ScenePanel.h"
+#include "InspectorPanel.h"
+#include "AssetsPanel.h"
 
 #include <glad/glad.h>
 
@@ -36,8 +40,14 @@ WorldScene::WorldScene(Camera *camera) : m_pCamera(camera)
     m_pMainView->setCamera(camera);
     m_pMainView->init();
     
-    m_pScenePanel = new ViewportPanel("Perspective");
-    m_pScenePanel->setViewport(m_pMainView);
+    m_pViewportPanel = new ViewportPanel("Perspective");
+    m_pViewportPanel->setViewport(m_pMainView);
+    
+    m_pScenePanel = new ScenePanel();
+    m_pScenePanel->setScene(this);
+    
+    m_pInspectorPanel = new InspectorPanel();
+    m_pAssetsPanel = new AssetsPanel();
 }
 
 WorldScene::~WorldScene() = default;

@@ -14,6 +14,10 @@
 class Camera;
 
 class ViewportPanel;
+class ScenePanel;
+class InspectorPanel;
+class AssetsPanel;
+
 class Viewport;
 
 class WorldScene
@@ -27,7 +31,11 @@ public:
     void draw();
     
     Viewport* m_pMainView;
-    ViewportPanel* m_pScenePanel;
+    
+    ViewportPanel* m_pViewportPanel;
+    ScenePanel* m_pScenePanel;
+    InspectorPanel* m_pInspectorPanel;
+    AssetsPanel* m_pAssetsPanel;
     
 private:
     Camera* m_pCamera;

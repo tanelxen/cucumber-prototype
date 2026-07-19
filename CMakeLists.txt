@@ -43,6 +43,15 @@ set(SRC_COMMON
         
         src/Viewport.cpp
         src/Viewport.h
+        
+        src/ViewportPanel.cpp
+        src/ViewportPanel.h
+        src/ScenePanel.cpp
+        src/ScenePanel.h
+        src/InspectorPanel.cpp
+        src/InspectorPanel.h
+        src/AssetsPanel.cpp
+        src/AssetsPanel.h
 )
 
 set(SRC_IMGUI
