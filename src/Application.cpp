@@ -243,6 +243,8 @@ void imgui_init(GLFWwindow* window)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
     
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f, NULL, NULL);
+    
     // Rounding
     ImGui::GetStyle().WindowRounding = 4.0;
     ImGui::GetStyle().ChildRounding = 4.0;
