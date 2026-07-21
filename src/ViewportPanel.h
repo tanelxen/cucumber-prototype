@@ -18,9 +18,19 @@ public:
 //    ~Viewport();
     
     void setViewport(Viewport* viewport);
+    
+    void update(float dt);
     void draw();
+    
+public:
+    inline bool isHovered() { return m_isHovered; }
     
 private:
     std::string m_name;
     Viewport* m_viewport;
+    
+    class Camera* m_pCamera;
+    class CameraController* m_pCameraController;
+    
+    bool m_isHovered;
 };

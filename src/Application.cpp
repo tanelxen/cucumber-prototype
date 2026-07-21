@@ -17,8 +17,6 @@
 
 #include "World.h"
 
-#include "Camera.h"
-
 #include "Input.h"
 
 #include "Application.h"
@@ -32,8 +30,8 @@ static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+//    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+//        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
 Application* Application::currentInstance = nullptr;
@@ -82,8 +80,7 @@ Application::Application()
     
     imgui_init(m_pWindow);
     
-    m_pCamera = new Camera();
-    m_pScene = new WorldScene(m_pCamera);
+    m_pScene = new WorldScene();
     
     glfwSwapInterval(0);
     glFrontFace(GL_CCW);
@@ -94,7 +91,6 @@ Application::Application()
 Application::~Application()
 {
     delete m_pScene;
-    delete m_pCamera;
     
     glfwDestroyWindow(m_pWindow);
     glfwTerminate();

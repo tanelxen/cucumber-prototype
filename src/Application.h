@@ -18,8 +18,6 @@ struct Application
     
 private:
     struct GLFWwindow* m_pWindow;
-    
-    class Camera* m_pCamera;
     class WorldScene* m_pScene;
     
     void updateInputState();

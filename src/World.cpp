@@ -7,7 +7,7 @@
 
 #include "World.h"
 
-#include "CameraController.h"
+//#include "CameraController.h"
 #include "Camera.h"
 
 #include "Cube.h"
@@ -25,11 +25,8 @@
 static ShadedCube g_shadedCube;
 static Grid g_grid;
 
-WorldScene::WorldScene(Camera *camera) : m_pCamera(camera)
+WorldScene::WorldScene()
 {
-    m_pPlayer = std::make_unique<CameraController>(camera);
-    m_pPlayer->position = {0, 128, 128};
-    
     g_shadedCube.init();
     g_shadedCube.scale = { 64, 64, 64 };
     g_shadedCube.position = { 0, 0, -64 };
@@ -37,7 +34,6 @@ WorldScene::WorldScene(Camera *camera) : m_pCamera(camera)
     g_grid.init();
     
     m_pMainView = new Viewport();
-    m_pMainView->setCamera(camera);
     m_pMainView->init();
     
     m_pViewportPanel = new ViewportPanel("Perspective");
@@ -56,23 +52,20 @@ WorldScene::~WorldScene() = default;
 
 void WorldScene::update(float dt)
 {
-    if (m_pCamera == nullptr) return;
-    
-    m_pPlayer->update(dt);
+    m_pViewportPanel->update(dt);
 }
 
 void WorldScene::draw()
 {
-    if (m_pCamera == nullptr) return;
-    
     m_pMainView->bind();
     
     glEnable(GL_DEPTH_TEST);
     
-    glClearColor(0.1, 0.1, 0.1, 1);
+    glClearColor(0.0, 0.0, 0.0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glm::mat4x4 viewProj = m_pCamera->projection * m_pCamera->view;
+    auto camera = m_pMainView->getCamera();
+    glm::mat4x4 viewProj = camera->projection * camera->view;
 
     g_grid.draw(viewProj);
     g_shadedCube.draw(viewProj);

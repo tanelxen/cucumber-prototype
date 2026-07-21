@@ -11,7 +11,7 @@
 #include <vector>
 #include <memory>
 
-class Camera;
+//class Camera;
 
 class ViewportPanel;
 class ScenePanel;
@@ -23,7 +23,7 @@ class Viewport;
 class WorldScene
 {
 public:
-    WorldScene(Camera* camera);
+    WorldScene();
     ~WorldScene();
     
     void loadMap(const std::string &filename);
@@ -38,9 +38,4 @@ public:
     AssetsPanel* m_pAssetsPanel;
     
 private:
-    Camera* m_pCamera;
-    
-    std::unique_ptr<class CameraController> m_pPlayer;
-    
-    
 };
