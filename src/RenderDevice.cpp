@@ -247,29 +247,39 @@ namespace RenderDevice {
         }
     }
     
-    void commit(Camera* camera)
+    void startFrame()
     {
-        if (camera == nullptr) return;
-        
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         
-//        glCullFace(GL_FRONT);
+        //        glCullFace(GL_FRONT);
         glCullFace(GL_BACK);
         
         glClearColor(0.01, 0.01, 0.01, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+//        opaquePass.clear();
+//        transparentPass.clear();
+    }
+    
+    void commit(Camera* camera)
+    {
+        if (camera == nullptr) return;
+        
         glm::mat4x4 viewProj = camera->projection * camera->view;
         
         glDepthMask(GL_TRUE);
         draw(viewProj, opaquePass);
-        opaquePass.clear();
         
         glDepthMask(GL_FALSE);
         draw(viewProj, transparentPass);
-        transparentPass.clear();
         
         glDepthMask(GL_TRUE);
+    }
+    
+    void endFrame()
+    {
+        opaquePass.clear();
+        transparentPass.clear();
     }
 }

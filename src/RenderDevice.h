@@ -29,8 +29,10 @@ namespace RenderDevice {
     handle_t makeVertexArray(handle_t vertexBuffer, handle_t indexBuffer, const VertexLayout& layout);
     handle_t makeVertexArray(handle_t posBuffer, const int posLayout, handle_t nrmBuffer, const int nrmLayout, handle_t indexBuffer);
     
+    void startFrame();
     void submit(RenderCommand cmd);
     void commit(Camera* camera);
+    void endFrame();
 }
 
 enum PassType

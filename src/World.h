@@ -31,8 +31,10 @@ public:
     void draw();
     
     Viewport* m_pMainView;
+    Viewport* m_pMainView2;
     
     ViewportPanel* m_pViewportPanel;
+    ViewportPanel* m_pViewportPanel2;
     ScenePanel* m_pScenePanel;
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;

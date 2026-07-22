@@ -62,6 +62,7 @@ Application::Application()
 #endif
 
     glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+//    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 //    glfwWindowHint(GLFW_SAMPLES, 8);
 
     const int window_width = 1440;
@@ -112,19 +113,10 @@ void Application::run()
         
         lastTime = currTime;
 
-        int width, height;
-        glfwGetFramebufferSize(m_pWindow, &width, &height);
-
         m_pScene->update(elapsedTime);
         m_pScene->draw();
         
-        glViewport(0, 0, width, height);
-        
-        glEnable(GL_DEPTH_TEST);
         glEnable(GL_FRAMEBUFFER_SRGB);
-        
-        glClearColor(0.0, 0.0, 0.0, 1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // ####################### IMGUI #######################
         ImGui_ImplOpenGL3_NewFrame();
@@ -157,6 +149,8 @@ void Application::run()
         ImGui::End();
         
         m_pScene->m_pViewportPanel->draw();
+        m_pScene->m_pViewportPanel2->draw();
+        
         m_pScene->m_pScenePanel->draw();
         m_pScene->m_pInspectorPanel->draw();
         m_pScene->m_pAssetsPanel->draw();
@@ -222,6 +216,15 @@ void Application::setCursorEnabled(bool state)
     }
 }
 
+ImVec4 ColorFromHexStr(const char* hex)
+{
+    int r, g, b;
+    // Skip '#' if present
+    if (hex[0] == '#') hex++;
+    std::sscanf(hex, "%02x%02x%02x", &r, &g, &b);
+    return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
+}
+
 void imgui_init(GLFWwindow* window)
 {
     // Setup Dear ImGui context
@@ -255,9 +258,9 @@ void imgui_init(GLFWwindow* window)
     
     ImVec4* colors = ImGui::GetStyle().Colors;
     
-    colors[ImGuiCol_WindowBg]            = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_WindowBg]            = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
     colors[ImGuiCol_PopupBg]             = ImVec4(0.15, 0.15, 0.15, 0.95);
-    colors[ImGuiCol_Text]                = ImVec4(0.90, 0.90, 0.90, 1.0);
+    colors[ImGuiCol_Text]                = ImVec4(250.0f/255, 250.0f/255, 250.0f/255, 1.0);
     
     // Follow Main Theme Color
     colors[ImGuiCol_DockingPreview]      = ImVec4(0.84, 0.65, 0.19, 1.0);
@@ -282,21 +285,21 @@ void imgui_init(GLFWwindow* window)
     colors[ImGuiCol_FrameBgActive]       = ImVec4(0.15, 0.15, 0.15, 1.0);
     
     // Tabs
-    colors[ImGuiCol_Tab]                 = ImVec4(0.15, 0.15, 0.15, 1.0);
-    colors[ImGuiCol_TabHovered]          = ImVec4(0.38, 0.38, 0.38, 1.0);
-    colors[ImGuiCol_TabActive]           = ImVec4(0.28, 0.28, 0.28, 1.0);
-    colors[ImGuiCol_TabUnfocused]        = ImVec4(0.15, 0.15, 0.15, 1.0);
-    colors[ImGuiCol_TabUnfocusedActive]  = ImVec4(0.20, 0.21, 0.21, 1.0);
+    colors[ImGuiCol_Tab]                 = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
+    colors[ImGuiCol_TabHovered]          = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
+    colors[ImGuiCol_TabActive]           = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
+    colors[ImGuiCol_TabUnfocused]        = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
+    colors[ImGuiCol_TabUnfocusedActive]  = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
     
     // Title
-    colors[ImGuiCol_TitleBg]             = ImVec4(0.15, 0.15, 0.15, 1.0);
-    colors[ImGuiCol_TitleBgActive]       = ImVec4(0.15, 0.15, 0.15, 1.0);
-    colors[ImGuiCol_TitleBgCollapsed]    = ImVec4(0.15, 0.15, 0.15, 1.0);
+    colors[ImGuiCol_TitleBg]             = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
+    colors[ImGuiCol_TitleBgActive]       = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
+    colors[ImGuiCol_TitleBgCollapsed]    = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
     
     // Separator
-    colors[ImGuiCol_Separator]           = ImVec4(0.23, 0.23, 0.23, 0.5);
-    colors[ImGuiCol_SeparatorHovered]    = ImVec4(0.23, 0.23, 0.23, 0.8);
-    colors[ImGuiCol_SeparatorActive]     = ImVec4(0.23, 0.23, 0.23, 0.8);
+    colors[ImGuiCol_Separator]           = ImVec4(63.0f/255, 68.0f/255, 81.0f/255, 1.0);
+    colors[ImGuiCol_SeparatorHovered]    = ImVec4(63.0f/255, 68.0f/255, 81.0f/255, 1.0);
+    colors[ImGuiCol_SeparatorActive]     = ImVec4(63.0f/255, 68.0f/255, 81.0f/255, 1.0);
 
 //    // ScrollBar
     colors[ImGuiCol_ScrollbarBg]         = ImVec4(0.15, 0.15, 0.15, 1.0);

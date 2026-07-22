@@ -38,6 +38,15 @@ WorldScene::WorldScene()
     m_pViewportPanel = new ViewportPanel("Perspective");
     m_pViewportPanel->setViewport(m_pMainView);
     
+    
+    m_pMainView2 = new Viewport();
+    m_pMainView2->init();
+    
+    m_pViewportPanel2 = new ViewportPanel("Perspective 2");
+    m_pViewportPanel2->setViewport(m_pMainView2);
+    
+    
+    
     m_pScenePanel = new ScenePanel();
     m_pScenePanel->setScene(this);
     
@@ -52,19 +61,23 @@ WorldScene::~WorldScene() = default;
 void WorldScene::update(float dt)
 {
     m_pViewportPanel->update(dt);
+    m_pViewportPanel2->update(dt);
 }
 
 void WorldScene::draw()
 {
-    m_pMainView->bind();
+    RenderDevice::startFrame();
     
-    auto camera = m_pMainView->getCamera();
-    glm::mat4x4 viewProj = camera->projection * camera->view;
-
     g_grid.draw();
     g_shadedCube.draw();
     
-    RenderDevice::commit(camera);
-    
+    m_pMainView->bind();
+    RenderDevice::commit(m_pMainView->getCamera());
     m_pMainView->unbind();
+    
+    m_pMainView2->bind();
+    RenderDevice::commit(m_pMainView2->getCamera());
+    m_pMainView2->unbind();
+    
+    RenderDevice::endFrame();
 }

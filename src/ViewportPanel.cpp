@@ -30,7 +30,10 @@ void ViewportPanel::setViewport(Viewport *viewport)
 
 void ViewportPanel::update(float dt)
 {
-    m_pCameraController->update(dt);
+    if (m_isHovered)
+    {
+        m_pCameraController->update(dt);
+    }
 }
 
 void ViewportPanel::draw()
@@ -51,8 +54,10 @@ void ViewportPanel::draw()
         m_viewport->updateBounds(minX, minY, maxX, maxY);
     }
     
+    ImVec2 current_avail_size = ImGui::GetContentRegionAvail();
+    
     ImGui::Image((ImTextureID)(intptr_t)m_viewport->getTexture(),
-                 ImVec2(m_viewport->getWidth(), m_viewport->getHeight()),
+                 current_avail_size,
                  ImVec2(0, 1),
                  ImVec2(1, 0)
                  );
