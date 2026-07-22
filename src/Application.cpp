@@ -26,6 +26,8 @@
 #include "InspectorPanel.h"
 #include "AssetsPanel.h"
 
+#include "RenderDevice.h"
+
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -70,20 +72,13 @@ Application::Application()
 
     glfwMakeContextCurrent(m_pWindow);
 
-    gladLoadGL();
-
-    const unsigned char* version = glGetString(GL_VERSION);
-    printf("version: %s\n", version);
-    
-    const unsigned char* device = glGetString(GL_RENDERER);
-    printf("device: %s\n", device);
+    RenderDevice::init();
     
     imgui_init(m_pWindow);
     
     m_pScene = new WorldScene();
     
     glfwSwapInterval(0);
-    glFrontFace(GL_CCW);
     
     currentInstance = this;
 }

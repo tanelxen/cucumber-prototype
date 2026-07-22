@@ -48,17 +48,17 @@ public:
 
 class ShadedCube
 {
-    unsigned int pbo;
-    unsigned int nbo;
-    unsigned int ibo;
-    unsigned int vao;
-    Shader shader;
-    
 public:
     void init();
-    void draw(const glm::mat4x4 &viewProjection) const;
+    void draw() const;
     
     glm::vec3 position;
     glm::vec3 scale;
     glm::vec4 color;
+    
+private:
+    unsigned int pbo;
+    unsigned int nbo;
+    unsigned int ibo;
+    unsigned int vao;
 };

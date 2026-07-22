@@ -26,15 +26,12 @@ public:
     void setAspectRatio(float aspectRatio);
     
     glm::vec3 getPosition() const;
-    
 //    Ray getMousePosInWorld() const;
     
     glm::vec3 getForward() const { return m_forward; }
 
     glm::mat4x4 projection;
     glm::mat4x4 view;
-    
-    glm::mat4x4 weaponProjection;
 
 private:
     glm::vec3 m_position;

@@ -44,6 +44,11 @@ set(SRC_COMMON
         src/Viewport.cpp
         src/Viewport.h
         
+        src/RenderDevice.cpp
+        src/RenderDevice.h
+)
+
+set(SRC_PANELS
         src/ViewportPanel.cpp
         src/ViewportPanel.h
         src/ScenePanel.cpp
@@ -62,11 +67,13 @@ set(SRC_IMGUI
 
 add_executable( ${PROJECT_NAME}
         ${SRC_COMMON}
+        ${SRC_PANELS}
         ${SRC_SOURCE}
         ${SRC_IMGUI}
 )
 
 source_group("Common" FILES ${SRC_COMMON})
+source_group("Panels" FILES ${SRC_PANELS})
 source_group("imgui" FILES ${SRC_IMGUI})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)

@@ -5,8 +5,8 @@
 //  Created by Fedor Artemenkov on 20.07.24.
 //
 
-#include <glad/glad.h>
 #include "Grid.h"
+#include "RenderDevice.h"
 
 void Grid::init()
 {
@@ -14,35 +14,33 @@ void Grid::init()
        -512.0f, 0.0f, -512.0f,
        -512.0f, 0.0f,  512.0f,
         512.0f, 0.0f,  512.0f,
-        512.0f, 0.0f,  512.0f,
         512.0f, 0.0f, -512.0f,
-       -512.0f, 0.0f, -512.0f
     };
     
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 3, vertices, GL_STATIC_DRAW);
-
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    int indices[] = {
+        0, 1, 2,
+        2, 3, 0
+    };
     
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    vbo = RenderDevice::makeVertexBuffer(sizeof(vertices), (void*)vertices);
+    ibo = RenderDevice::makeIndexBuffer(sizeof(indices), (void*)indices);
     
-    shader.init("assets/shaders/grid.glsl");
+    VertexLayout layout;
+    layout.add<float>(3);
+    
+    vao = RenderDevice::makeVertexArray(vbo, ibo, layout);
 }
 
-void Grid::draw(const glm::mat4x4 &viewProjection) const
+void Grid::draw() const
 {
-    shader.bind();
-    shader.setUniform("MVP", viewProjection);
+    RenderCommand cmd = {
+        .vao = vao,
+        .start = 0,
+        .count = 6,
+        
+        .pipeline = PipelineType::Grid,
+        .blendMode = BlendMode::Transparent,
+    };
     
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    RenderDevice::submit(cmd);
 }
