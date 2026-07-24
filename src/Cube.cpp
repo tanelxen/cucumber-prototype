@@ -267,7 +267,7 @@ void ShadedCube::draw() const
         
         .pipeline = PipelineType::FlatShaded,
         .blendMode = BlendMode::Opaque,
-        .color = { 0.5, 0.0, 0.5, 1.0 },
+        .color = color,
         
         .transform = model,
     };

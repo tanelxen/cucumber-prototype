@@ -33,4 +33,8 @@ private:
     class CameraController* m_pCameraController;
     
     bool m_isHovered;
+    
+    float m_pendingWidth = 0;
+    float m_pendingHeight = 0;
+    bool m_isResizing = false;
 };

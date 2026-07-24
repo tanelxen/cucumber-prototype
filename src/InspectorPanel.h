@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <string>
+class ShadedCube;
 
 class InspectorPanel
 {
@@ -15,9 +15,9 @@ public:
     InspectorPanel() = default;
     ~InspectorPanel() = default;
     
-//    void setEntity(Entity* entity);
+    void setEntity(ShadedCube* entity);
     void draw();
     
 private:
-//    Entity* m_entity;
+    ShadedCube* m_entity;
 };

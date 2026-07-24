@@ -27,7 +27,10 @@ public:
     
     float pitch = -0.5;
     float yaw = -1.57;
+    
+    bool isFlyMode() { return m_isFlyMode; }
 
 private:
     Camera* m_pCamera;
+    bool m_isFlyMode = false;
 };

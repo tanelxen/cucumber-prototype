@@ -26,8 +26,6 @@ set(SRC_COMMON
         src/Camera.h
         src/CameraController.cpp
         src/CameraController.h
-        src/World.cpp
-        src/World.h
         src/Grid.cpp
         src/Grid.h
         
@@ -46,6 +44,11 @@ set(SRC_COMMON
         
         src/RenderDevice.cpp
         src/RenderDevice.h
+        
+        src/World.cpp
+        src/World.h
+        src/Entity.cpp
+        src/Entity.h
 )
 
 set(SRC_PANELS

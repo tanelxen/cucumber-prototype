@@ -7,8 +7,9 @@
 
 #pragma once
 
-#include <glm/glm.hpp>
 #include "Shader.h"
+#include <glm/glm.hpp>
+#include <string>
 
 class Camera;
 
@@ -53,8 +54,11 @@ public:
     void draw() const;
     
     glm::vec3 position;
+    glm::vec3 rotation;
     glm::vec3 scale;
     glm::vec4 color;
+    
+    std::string m_name;
     
 private:
     unsigned int pbo;

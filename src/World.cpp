@@ -39,19 +39,22 @@ WorldScene::WorldScene()
     m_pViewportPanel->setViewport(m_pMainView);
     
     
-    m_pMainView2 = new Viewport();
-    m_pMainView2->init();
+//    m_pMainView2 = new Viewport();
+//    m_pMainView2->init();
     
-    m_pViewportPanel2 = new ViewportPanel("Perspective 2");
-    m_pViewportPanel2->setViewport(m_pMainView2);
+//    m_pViewportPanel2 = new ViewportPanel("Perspective 2");
+//    m_pViewportPanel2->setViewport(m_pMainView2);
     
-    
+    g_shadedCube.m_name = "Shaded Cube";
+    g_shadedCube.color = { 0.5, 0.0, 0.5, 1.0 };
     
     m_pScenePanel = new ScenePanel();
     m_pScenePanel->setScene(this);
     
     m_pInspectorPanel = new InspectorPanel();
     m_pAssetsPanel = new AssetsPanel();
+    
+    m_pInspectorPanel->setEntity(&g_shadedCube);
 }
 
 WorldScene::~WorldScene() = default;
@@ -61,7 +64,7 @@ WorldScene::~WorldScene() = default;
 void WorldScene::update(float dt)
 {
     m_pViewportPanel->update(dt);
-    m_pViewportPanel2->update(dt);
+//    m_pViewportPanel2->update(dt);
 }
 
 void WorldScene::draw()
@@ -75,9 +78,9 @@ void WorldScene::draw()
     RenderDevice::commit(m_pMainView->getCamera());
     m_pMainView->unbind();
     
-    m_pMainView2->bind();
-    RenderDevice::commit(m_pMainView2->getCamera());
-    m_pMainView2->unbind();
+//    m_pMainView2->bind();
+//    RenderDevice::commit(m_pMainView2->getCamera());
+//    m_pMainView2->unbind();
     
     RenderDevice::endFrame();
 }

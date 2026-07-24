@@ -28,10 +28,13 @@ void CameraController::update(float dt)
         
         yaw += Input::getMouseOffsetX() * kMouseSense * dt;
         pitch -= Input::getMouseOffsetY() * kMouseSense * dt;
+        
+        m_isFlyMode = true;
     }
     else
     {
         Application::setCursorEnabled(true);
+        m_isFlyMode = false;
     }
     
     if (pitch > 1.5) pitch = 1.5;

@@ -149,7 +149,7 @@ void Application::run()
         ImGui::End();
         
         m_pScene->m_pViewportPanel->draw();
-        m_pScene->m_pViewportPanel2->draw();
+//        m_pScene->m_pViewportPanel2->draw();
         
         m_pScene->m_pScenePanel->draw();
         m_pScene->m_pInspectorPanel->draw();
@@ -225,6 +225,13 @@ ImVec4 ColorFromHexStr(const char* hex)
     return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
 }
 
+
+//static ImFont* fontLarge;
+
+namespace ImGUIFonts {
+    ImFont* fontSmall;
+}
+
 void imgui_init(GLFWwindow* window)
 {
     // Setup Dear ImGui context
@@ -237,7 +244,10 @@ void imgui_init(GLFWwindow* window)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
     
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f, NULL, NULL);
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f);
+    
+    ImGUIFonts::fontSmall = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Regular.ttf", 14.0f);
+//    fontLarge = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Bold.ttf", 16.0f);
     
     // Rounding
     ImGui::GetStyle().WindowRounding = 4.0;
@@ -246,6 +256,8 @@ void imgui_init(GLFWwindow* window)
     ImGui::GetStyle().TabRounding = 0.0;
     ImGui::GetStyle().PopupRounding = 4.0;
     ImGui::GetStyle().GrabRounding = 3.0;
+    
+    ImGui::GetStyle().SeparatorTextBorderSize = 1.0f;
     
     // Padding
     ImGui::GetStyle().FramePadding = ImVec2(6, 3);
@@ -260,7 +272,7 @@ void imgui_init(GLFWwindow* window)
     
     colors[ImGuiCol_WindowBg]            = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
     colors[ImGuiCol_PopupBg]             = ImVec4(0.15, 0.15, 0.15, 0.95);
-    colors[ImGuiCol_Text]                = ImVec4(250.0f/255, 250.0f/255, 250.0f/255, 1.0);
+    colors[ImGuiCol_Text]                = ImVec4(250.0f/255, 250.0f/255, 250.0f/255, 0.6);
     
     // Follow Main Theme Color
     colors[ImGuiCol_DockingPreview]      = ImVec4(0.84, 0.65, 0.19, 1.0);
