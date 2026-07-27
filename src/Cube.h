@@ -8,44 +8,48 @@
 #pragma once
 
 #include "Shader.h"
+
 #include <glm/glm.hpp>
 #include <string>
 
 class Camera;
+class VertexBuffer;
+class VertexArray;
+class IndexBuffer;
 
-class Cube
-{
-    unsigned int vbo;
-    unsigned int ibo;
-    unsigned int vao;
-    Shader shader;
-    
-public:
-    void init();
-    void draw(const Camera& camera) const;
-    
-    glm::vec3 position;
-    glm::vec3 scale;
-    glm::vec4 color;
-};
-
-class WiredCube
-{
-    unsigned int vbo;
-    unsigned int ibo;
-    unsigned int vao;
-    Shader shader;
-    
-public:
-    void init();
-    void draw(const Camera& camera) const;
-    
-    glm::vec3 position;
-    glm::vec3 scale;
-    float yaw;
-    
-    glm::vec4 color;
-};
+//class Cube
+//{
+//    unsigned int vbo;
+//    unsigned int ibo;
+//    unsigned int vao;
+//    Shader shader;
+//    
+//public:
+//    void init();
+//    void draw(const Camera& camera) const;
+//    
+//    glm::vec3 position;
+//    glm::vec3 scale;
+//    glm::vec4 color;
+//};
+//
+//class WiredCube
+//{
+//    unsigned int vbo;
+//    unsigned int ibo;
+//    unsigned int vao;
+//    Shader shader;
+//    
+//public:
+//    void init();
+//    void draw(const Camera& camera) const;
+//    
+//    glm::vec3 position;
+//    glm::vec3 scale;
+//    float yaw;
+//    
+//    glm::vec4 color;
+//};
 
 class ShadedCube
 {
@@ -61,8 +65,8 @@ public:
     std::string m_name;
     
 private:
-    unsigned int pbo;
-    unsigned int nbo;
-    unsigned int ibo;
-    unsigned int vao;
+    VertexBuffer* posBuffer;
+    VertexBuffer* nrmBuffer;
+    IndexBuffer* indexBuffer;
+    VertexArray* vertexArray;
 };

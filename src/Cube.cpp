@@ -15,6 +15,10 @@
 
 #include "RenderDevice.h"
 
+#include "VertexBuffer.h"
+#include "VertexArray.h"
+#include "IndexBuffer.h"
+
 /*
 void Cube::init()
 {
@@ -239,7 +243,7 @@ void ShadedCube::init()
          0.0f, -1.0f,  0.0f,
     };
 
-    const int indices[] = {
+    const uint32_t indices[] = {
         0, 1, 2, 2, 3, 0,    // Передняя грань
         4, 7, 6, 6, 5, 4,    // Задняя грань
         8, 9, 10, 10, 11, 8, // Левая грань
@@ -248,10 +252,18 @@ void ShadedCube::init()
         20, 23, 22, 22, 21, 20  // Нижняя грань
     };
     
-    pbo = RenderDevice::makeVertexBuffer(sizeof(positions), (void*)positions);
-    nbo = RenderDevice::makeVertexBuffer(sizeof(normals), (void*)normals);
-    ibo = RenderDevice::makeIndexBuffer(sizeof(indices), (void*)indices);
-    vao = RenderDevice::makeVertexArray(pbo, 0, nbo, 1, ibo);
+    vertexArray = new VertexArray();
+    
+    posBuffer = new VertexBuffer(positions, sizeof(positions));
+    posBuffer->setLayout({ { VertexAttributeLocation::Position, ShaderDataType::Float3 } });
+    vertexArray->setVertexBuffer(posBuffer);
+    
+    nrmBuffer = new VertexBuffer(normals, sizeof(normals));
+    nrmBuffer->setLayout({ { VertexAttributeLocation::Normal, ShaderDataType::Float3 } });
+    vertexArray->setVertexBuffer(nrmBuffer);
+    
+    indexBuffer = new IndexBuffer(indices, 36);
+    vertexArray->setIndexBuffer(indexBuffer);
 }
 
 void ShadedCube::draw() const
@@ -261,9 +273,9 @@ void ShadedCube::draw() const
     model = glm::scale(model, scale);
     
     RenderCommand cmd = {
-        .vao = vao,
+        .vao = vertexArray->getID(),
         .start = 0,
-        .count = 36,
+        .count = indexBuffer->getCount(),
         
         .pipeline = PipelineType::FlatShaded,
         .blendMode = BlendMode::Opaque,

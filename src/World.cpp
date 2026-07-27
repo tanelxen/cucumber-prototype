@@ -29,6 +29,8 @@ WorldScene::WorldScene()
     g_shadedCube.init();
     g_shadedCube.scale = { 64, 64, 64 };
     g_shadedCube.position = { 0, 0, -64 };
+    g_shadedCube.color = { 0.5, 0.0, 0.5, 1.0 };
+    g_shadedCube.m_name = "Shaded Cube";
     
     g_grid.init();
     
@@ -45,8 +47,7 @@ WorldScene::WorldScene()
 //    m_pViewportPanel2 = new ViewportPanel("Perspective 2");
 //    m_pViewportPanel2->setViewport(m_pMainView2);
     
-    g_shadedCube.m_name = "Shaded Cube";
-    g_shadedCube.color = { 0.5, 0.0, 0.5, 1.0 };
+
     
     m_pScenePanel = new ScenePanel();
     m_pScenePanel->setScene(this);

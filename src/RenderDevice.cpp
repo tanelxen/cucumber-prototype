@@ -96,55 +96,6 @@ namespace RenderDevice {
         return id;
     }
     
-    handle_t makeVertexArray(handle_t vertexBuffer, handle_t indexBuffer, const VertexLayout& layout)
-    {
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-        
-        GLuint id;
-        glGenVertexArrays(1, &id);
-        glBindVertexArray(id);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-        
-        for (int i = 0; i < layout.attributes.size(); i++)
-        {
-            auto& attribute = layout.attributes[i];
-            
-            glEnableVertexAttribArray(i);
-            glVertexAttribPointer(i, attribute.count, attribute.type, attribute.normalized, layout.stride, (void*)attribute.offset);
-        }
-        
-        glBindVertexArray(0);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        
-        return id;
-    }
-    
-    handle_t makeVertexArray(handle_t posBuffer, const int posLayout, handle_t nrmBuffer, const int nrmLayout, handle_t indexBuffer)
-    {
-        GLuint id;
-        glGenVertexArrays(1, &id);
-        glBindVertexArray(id);
-        
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, posBuffer);
-        glEnableVertexAttribArray(posLayout);
-        glVertexAttribPointer(posLayout, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, nrmBuffer);
-        glVertexAttribPointer(nrmLayout, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(nrmLayout);
-        
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-        
-        return id;
-    }
-    
     void submit(RenderCommand cmd)
     {
         if (cmd.blendMode == BlendMode::Transparent || cmd.blendMode == BlendMode::Add)

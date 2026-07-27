@@ -7,20 +7,18 @@
 
 #pragma once
 
-#include "Shader.h"
-
-class Camera;
+class VertexBuffer;
+class VertexArray;
+class IndexBuffer;
 
 class Grid
 {
-    unsigned int vbo;
-    unsigned int ibo;
-    unsigned int vao;
-    
 public:
-//    Grid();
-//    ~Grid();
-    
     void init();
     void draw() const;
+    
+private:
+    VertexBuffer* posBuffer;
+    IndexBuffer* indexBuffer;
+    VertexArray* vertexArray;
 };

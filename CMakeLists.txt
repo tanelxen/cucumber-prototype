@@ -20,8 +20,7 @@ add_subdirectory( vendor/imgui )
 
 set(SRC_COMMON
         src/main.cpp
-        src/Shader.cpp
-        src/Shader.h
+
         src/Camera.cpp
         src/Camera.h
         src/CameraController.cpp
@@ -42,13 +41,25 @@ set(SRC_COMMON
         src/Viewport.cpp
         src/Viewport.h
         
-        src/RenderDevice.cpp
-        src/RenderDevice.h
-        
         src/World.cpp
         src/World.h
         src/Entity.cpp
         src/Entity.h
+)
+
+set(SRC_RENDERER
+        src/RenderDevice.cpp
+        src/RenderDevice.h
+        src/VertexArray.cpp
+        src/VertexArray.h
+        src/VertexBuffer.cpp
+        src/VertexBuffer.h
+        src/VertexLayout.cpp
+        src/VertexLayout.h
+        src/IndexBuffer.cpp
+        src/IndexBuffer.h
+        src/Shader.cpp
+        src/Shader.h
 )
 
 set(SRC_PANELS
@@ -70,12 +81,13 @@ set(SRC_IMGUI
 
 add_executable( ${PROJECT_NAME}
         ${SRC_COMMON}
+        ${SRC_RENDERER}
         ${SRC_PANELS}
-        ${SRC_SOURCE}
         ${SRC_IMGUI}
 )
 
 source_group("Common" FILES ${SRC_COMMON})
+source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
 source_group("imgui" FILES ${SRC_IMGUI})
 

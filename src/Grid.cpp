@@ -7,36 +7,40 @@
 
 #include "Grid.h"
 #include "RenderDevice.h"
+#include "VertexBuffer.h"
+#include "VertexArray.h"
+#include "IndexBuffer.h"
 
 void Grid::init()
 {
-    float vertices[] = {
+    float positions[] = {
        -512.0f, 0.0f, -512.0f,
        -512.0f, 0.0f,  512.0f,
         512.0f, 0.0f,  512.0f,
         512.0f, 0.0f, -512.0f,
     };
     
-    int indices[] = {
+    uint32_t indices[] = {
         0, 1, 2,
         2, 3, 0
     };
     
-    vbo = RenderDevice::makeVertexBuffer(sizeof(vertices), (void*)vertices);
-    ibo = RenderDevice::makeIndexBuffer(sizeof(indices), (void*)indices);
+    vertexArray = new VertexArray();
     
-    VertexLayout layout;
-    layout.add<float>(3);
+    posBuffer = new VertexBuffer(positions, sizeof(positions));
+    posBuffer->setLayout({ { VertexAttributeLocation::Position, ShaderDataType::Float3 } });
+    vertexArray->setVertexBuffer(posBuffer);
     
-    vao = RenderDevice::makeVertexArray(vbo, ibo, layout);
+    indexBuffer = new IndexBuffer(indices, 6);
+    vertexArray->setIndexBuffer(indexBuffer);
 }
 
 void Grid::draw() const
 {
     RenderCommand cmd = {
-        .vao = vao,
+        .vao = vertexArray->getID(),
         .start = 0,
-        .count = 6,
+        .count = indexBuffer->getCount(),
         
         .pipeline = PipelineType::Grid,
         .blendMode = BlendMode::Transparent,
