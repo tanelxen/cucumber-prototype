@@ -6,13 +6,17 @@
 //
 
 #include "InspectorPanel.h"
+
 #include "Mesh.h"
+#include "ModelLoader.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 
 #include <stdio.h>
 #include <iostream>
+
+#include "../vendor/tinyfiledialogs.h"
 
 void InspectorPanel::setEntity(Mesh *entity)
 {
@@ -62,6 +66,17 @@ void InspectorPanel::draw()
     if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ImGui::ColorEdit3("Color", &m_entity->color.x);
+    }
+    
+    if (ImGui::Button("Add Mesh"))
+    {
+        char const * filter[1] = { "*.obj" };
+        const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/", 1, filter, NULL, 0);
+        
+        if (path != nullptr)
+        {
+            ModelLoader::LoadOBJ(path, *m_entity);
+        }
     }
     
     

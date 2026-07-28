@@ -142,17 +142,22 @@ void Mesh::draw() const
     model = glm::translate(model, position);
     model = glm::scale(model, scale);
     
-    RenderCommand cmd = {
-        .vao = vertexArray->getID(),
-        .start = 0,
-        .count = indexBuffer->getCount(),
+    for (const auto& surface : m_surfaces)
+    {
+//        auto& material = m_textures[surface.textureNum];
         
-        .pipeline = PipelineType::FlatShaded,
-        .blendMode = BlendMode::Opaque,
-        .color = color,
+        RenderCommand cmd = {
+            .vao = vertexArray->getID(),
+            .start = surface.IndexStart,
+            .count = surface.IndexCount,
+            
+            .pipeline = PipelineType::FlatShaded,
+            .blendMode = BlendMode::Opaque,
+            .color = color,
+            
+            .transform = model,
+        };
         
-        .transform = model,
-    };
-    
-    RenderDevice::submit(cmd);
+        RenderDevice::submit(cmd);
+    }
 }

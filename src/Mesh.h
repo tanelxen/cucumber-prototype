@@ -14,6 +14,12 @@ class VertexBuffer;
 class VertexArray;
 class IndexBuffer;
 
+struct Surface {
+    uint32_t MaterialIndex;   // Индекс материала в векторе материалов модели
+    uint32_t IndexStart;      // Смещение в индексном буфере (в штуках индексов, НЕ байтах)
+    uint32_t IndexCount;      // Сколько индексов рисовать для этой поверхности
+};
+
 class Mesh
 {
 public:
@@ -21,6 +27,8 @@ public:
     
     void init(const std::vector<glm::vec3>& positions, const std::vector<glm::vec3>& normals, const std::vector<uint32_t>& indices);
     void init(const std::vector<float>& positions, const std::vector<float>& normals, const std::vector<uint32_t>& indices);
+    
+    void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
     void draw() const;
     
@@ -36,4 +44,6 @@ private:
     VertexBuffer* nrmBuffer;
     IndexBuffer* indexBuffer;
     VertexArray* vertexArray;
+    
+    std::vector<Surface> m_surfaces;
 };

@@ -35,9 +35,9 @@ WorldScene::WorldScene()
     g_shadedCube.color = { 0.5, 0.0, 0.5, 1.0 };
     g_shadedCube.m_name = "Shaded Cube";
     
-    ModelLoader::LoadOBJ("assets/meshes/cube-tex.obj", g_mesh);
-    g_mesh.scale = { 64, 64, 64 };
-    g_mesh.position = { 0, 0, -64 };
+//    ModelLoader::LoadOBJ("assets/meshes/spider.obj", g_mesh);
+    g_mesh.scale = { 1, 1, 1 };
+    g_mesh.position = { 0, 0, 0 };
     g_mesh.color = { 0.5, 0.0, 0.5, 1.0 };
     g_mesh.m_name = "cube.obj";
     

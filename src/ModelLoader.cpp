@@ -73,13 +73,27 @@ namespace ModelLoader {
         std::vector<glm::vec2> out_texCoords;
         std::vector<uint32_t> indices;
         
+        std::vector<Surface> surfaces;
+        
         // Карта для отслеживания уже добавленных уникальных вершин
         std::unordered_map<Vertex, uint32_t> uniqueVertices;
         
-        int index = 0;
-        
         for (const auto& shape : shapes)
         {
+            Surface surface{};
+            
+            // Фиксируем, где в глобальном буфере индексов начнется этот Surface
+            surface.IndexStart = static_cast<uint32_t>(indices.size());
+            
+            // По спецификации OBJ материал привязан к граням.
+            // Берем материал первой грани этого shape (для простоты считаем, что у shape один материал)
+            if (!shape.mesh.material_ids.empty() && shape.mesh.material_ids[0] >= 0) {
+                surface.MaterialIndex = static_cast<uint32_t>(shape.mesh.material_ids[0]);
+            } else {
+                surface.MaterialIndex = 0; // Дефолтный материал, если не назначен
+            }
+            
+            
             size_t index_offset = 0;
             
             for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
@@ -127,10 +141,21 @@ namespace ModelLoader {
                     
                     indices.push_back(uniqueVertices[vertex]);
                 }
+                
                 index_offset += 3;
+            }
+            
+            
+            // Вычисляем, сколько индексов занял этот Surface
+            surface.IndexCount = static_cast<uint32_t>(indices.size()) - surface.IndexStart;
+            
+            // Если у поверхности есть геометрия, сохраняем её
+            if (surface.IndexCount > 0) {
+                surfaces.push_back(surface);
             }
         }
         
         mesh.init(positions, normals, indices);
+        mesh.setSurfaces(surfaces);
     }
 }

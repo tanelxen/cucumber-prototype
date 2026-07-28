@@ -50,6 +50,8 @@ set(SRC_COMMON
         src/World.h
         src/Entity.cpp
         src/Entity.h
+        
+        vendor/tinyfiledialogs.c
 )
 
 set(SRC_RENDERER
