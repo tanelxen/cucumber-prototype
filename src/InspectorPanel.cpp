@@ -6,7 +6,7 @@
 //
 
 #include "InspectorPanel.h"
-#include "Cube.h"
+#include "Mesh.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <iostream>
 
-void InspectorPanel::setEntity(ShadedCube *entity)
+void InspectorPanel::setEntity(Mesh *entity)
 {
     m_entity = entity;
 }
@@ -22,17 +22,17 @@ void InspectorPanel::setEntity(ShadedCube *entity)
 bool DrawVector3Control(const char* label, float* values, float resetValue, float speed);
 void DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth);
 
-void DrawTransformComponent(ShadedCube& entity)
+void DrawTransformComponent(Mesh& entity)
 {
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        DrawVector3Control("Position", &entity.position.x, 0.0f, 0.05f);
+//        DrawVector3Control("Position", &entity.position.x, 0.0f, 0.05f);
 //        DrawVector3Control("Rotation", &entity.rotation.x, 0.0f, 0.1f);
 //        DrawVector3Control("Scale", &entity.scale.x, 1.0f, 0.01f);
         
-//        DrawVec3Control("Position", entity.position, 0, 100);
-//        DrawVec3Control("Rotation", entity.rotation, 0, 100);
-//        DrawVec3Control("Scale", entity.scale, 64, 100);
+        DrawVec3Control("Position", entity.position, 0, 100);
+        DrawVec3Control("Rotation", entity.rotation, 0, 100);
+        DrawVec3Control("Scale", entity.scale, 64, 100);
     }
 }
 

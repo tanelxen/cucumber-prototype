@@ -7,7 +7,7 @@
 
 #pragma once
 
-class ShadedCube;
+class Mesh;
 
 class InspectorPanel
 {
@@ -15,9 +15,9 @@ public:
     InspectorPanel() = default;
     ~InspectorPanel() = default;
     
-    void setEntity(ShadedCube* entity);
+    void setEntity(Mesh* entity);
     void draw();
     
 private:
-    ShadedCube* m_entity;
+    Mesh* m_entity;
 };

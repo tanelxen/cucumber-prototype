@@ -38,6 +38,11 @@ set(SRC_COMMON
         src/Cube.cpp
         src/Cube.h
         
+        src/Mesh.cpp
+        src/Mesh.h
+        src/ModelLoader.cpp
+        src/ModelLoader.h
+        
         src/Viewport.cpp
         src/Viewport.h
         

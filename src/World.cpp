@@ -10,7 +10,9 @@
 #include "Camera.h"
 
 #include "Cube.h"
+#include "Mesh.h"
 #include "Grid.h"
+#include "ModelLoader.h"
 
 #include "Viewport.h"
 
@@ -22,6 +24,7 @@
 #include "RenderDevice.h"
 
 static ShadedCube g_shadedCube;
+static Mesh g_mesh;
 static Grid g_grid;
 
 WorldScene::WorldScene()
@@ -31,6 +34,12 @@ WorldScene::WorldScene()
     g_shadedCube.position = { 0, 0, -64 };
     g_shadedCube.color = { 0.5, 0.0, 0.5, 1.0 };
     g_shadedCube.m_name = "Shaded Cube";
+    
+    ModelLoader::LoadOBJ("assets/meshes/cube-tex.obj", g_mesh);
+    g_mesh.scale = { 64, 64, 64 };
+    g_mesh.position = { 0, 0, -64 };
+    g_mesh.color = { 0.5, 0.0, 0.5, 1.0 };
+    g_mesh.m_name = "cube.obj";
     
     g_grid.init();
     
@@ -55,7 +64,7 @@ WorldScene::WorldScene()
     m_pInspectorPanel = new InspectorPanel();
     m_pAssetsPanel = new AssetsPanel();
     
-    m_pInspectorPanel->setEntity(&g_shadedCube);
+    m_pInspectorPanel->setEntity(&g_mesh);
 }
 
 WorldScene::~WorldScene() = default;
@@ -73,7 +82,8 @@ void WorldScene::draw()
     RenderDevice::startFrame();
     
     g_grid.draw();
-    g_shadedCube.draw();
+    g_mesh.draw();
+//    g_shadedCube.draw();
     
     m_pMainView->bind();
     RenderDevice::commit(m_pMainView->getCamera());
