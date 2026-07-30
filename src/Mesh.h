@@ -30,12 +30,7 @@ public:
     
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
-    void draw() const;
-    
-    glm::vec3 position;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-    glm::vec4 color;
+    void draw(glm::mat4& transform, glm::vec4 tintColor) const;
     
     std::string m_name;
     

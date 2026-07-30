@@ -7,6 +7,7 @@
 
 #include "ScenePanel.h"
 #include "World.h"
+#include "Entity.h"
 
 #include <glad/glad.h>
 #include <imgui.h>
@@ -63,6 +64,54 @@ void DrawSceneNode(Node* node)
         }
         ImGui::TreePop(); // Закрываем область видимости текущего уровня дерева
     }
+}
+
+static Entity* selectedEntity = nullptr;
+
+void DrawEntity(Entity* entity)
+{
+    // Настройки флагов для текущего узла дерева
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_DrawLinesToNodes;
+    
+    // Если у узла нет детей, делаем его "листом" (убираем стрелочку раскрытия)
+//    if (node->children.empty()) {
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Bullet;
+//    }
+    
+    if (selectedEntity == entity) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+    
+    // Отображаем узел дерева. Идентификатором (ID) делаем указатель на объект node
+    bool isNodeOpen = ImGui::TreeNodeEx((void*)entity, flags, "%s", entity->m_name.c_str());
+    
+    // Обработка клика мыши для выбора узла
+    if (ImGui::IsItemClicked()) {
+        selectedEntity = entity;
+    }
+    
+    if (ImGui::BeginPopupContextItem())
+    {
+        selectedEntity = entity;
+        
+        if (ImGui::MenuItem("Удалить объект")) {
+            // Логика удаления
+        }
+        
+        if (ImGui::MenuItem("Создать дочерний объект")) {
+            // Логика создания
+        }
+        
+        ImGui::EndPopup();
+    }
+    
+//    // Если узел раскрыт и у него есть дети, рекурсивно рисуем их
+//    if (isNodeOpen && !node->children.empty()) {
+//        for (const auto& child : node->children) {
+//            DrawSceneNode(child.get());
+//        }
+//        ImGui::TreePop(); // Закрываем область видимости текущего уровня дерева
+//    }
 }
 
 // Главная функция вызова в вашем цикле рендеринга ImGui
@@ -127,5 +176,29 @@ void ScenePanel::draw()
 //    ImGui::End();
 //    ImGui::PopStyleVar();
     
-    DrawSceneTree(&root);
+//    DrawSceneTree(&root);
+    
+    
+    ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoCollapse);
+    
+    if (ImGui::Button("+"))
+    {
+        auto count = m_scene->m_entities.size();
+        auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
+        entity->addComponent<TransformComponent>();
+        entity->addComponent<MeshComponent>();
+        
+        m_scene->m_entities.push_back(std::move(entity));
+        m_scene->selectEntityAtIndex(count);
+    }
+    
+    for (int i = 0; i < m_scene->m_entities.size(); ++i)
+    {
+        if (ImGui::Selectable(m_scene->m_entities[i]->m_name.c_str()))
+        {
+            m_scene->selectEntityAtIndex(i);
+        }
+    }
+    
+    ImGui::End();
 }

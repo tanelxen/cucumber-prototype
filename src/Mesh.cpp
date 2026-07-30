@@ -136,12 +136,8 @@ void Mesh::init(const std::vector<float>& positions, const std::vector<float>& n
     vertexArray->setIndexBuffer(indexBuffer);
 }
 
-void Mesh::draw() const
+void Mesh::draw(glm::mat4& transform, glm::vec4 tintColor) const
 {
-    glm::mat4 model(1.0f);
-    model = glm::translate(model, position);
-    model = glm::scale(model, scale);
-    
     for (const auto& surface : m_surfaces)
     {
 //        auto& material = m_textures[surface.textureNum];
@@ -153,9 +149,9 @@ void Mesh::draw() const
             
             .pipeline = PipelineType::FlatShaded,
             .blendMode = BlendMode::Opaque,
-            .color = color,
+            .color = tintColor,
             
-            .transform = model,
+            .transform = transform,
         };
         
         RenderDevice::submit(cmd);

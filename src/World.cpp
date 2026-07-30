@@ -14,6 +14,8 @@
 #include "Grid.h"
 #include "ModelLoader.h"
 
+#include "Entity.h"
+
 #include "Viewport.h"
 
 #include "ViewportPanel.h"
@@ -23,24 +25,16 @@
 
 #include "RenderDevice.h"
 
+#include "glm/gtc/matrix_transform.hpp"
+
 static ShadedCube g_shadedCube;
 static Mesh g_mesh;
 static Grid g_grid;
 
+//static Entity g_entity("My Entity");
+
 WorldScene::WorldScene()
 {
-    g_shadedCube.init();
-    g_shadedCube.scale = { 64, 64, 64 };
-    g_shadedCube.position = { 0, 0, -64 };
-    g_shadedCube.color = { 0.5, 0.0, 0.5, 1.0 };
-    g_shadedCube.m_name = "Shaded Cube";
-    
-//    ModelLoader::LoadOBJ("assets/meshes/spider.obj", g_mesh);
-    g_mesh.scale = { 1, 1, 1 };
-    g_mesh.position = { 0, 0, 0 };
-    g_mesh.color = { 0.5, 0.0, 0.5, 1.0 };
-    g_mesh.m_name = "cube.obj";
-    
     g_grid.init();
     
     m_pMainView = new Viewport();
@@ -56,15 +50,13 @@ WorldScene::WorldScene()
 //    m_pViewportPanel2 = new ViewportPanel("Perspective 2");
 //    m_pViewportPanel2->setViewport(m_pMainView2);
     
-
-    
     m_pScenePanel = new ScenePanel();
     m_pScenePanel->setScene(this);
     
     m_pInspectorPanel = new InspectorPanel();
     m_pAssetsPanel = new AssetsPanel();
     
-    m_pInspectorPanel->setEntity(&g_mesh);
+//    m_pInspectorPanel->setEntity(m_entities[0].get());
 }
 
 WorldScene::~WorldScene() = default;
@@ -82,8 +74,21 @@ void WorldScene::draw()
     RenderDevice::startFrame();
     
     g_grid.draw();
-    g_mesh.draw();
-//    g_shadedCube.draw();
+    
+    for (auto& entity : m_entities)
+    {
+        auto transformComp = entity->getComponent<TransformComponent>();
+        auto meshComp = entity->getComponent<MeshComponent>();
+        
+        if (transformComp && meshComp)
+        {
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, transformComp->position);
+            model = glm::scale(model, transformComp->scale);
+            
+            meshComp->mesh.draw(model, meshComp->tintColor);
+        }
+    }
     
     m_pMainView->bind();
     RenderDevice::commit(m_pMainView->getCamera());
@@ -94,4 +99,13 @@ void WorldScene::draw()
 //    m_pMainView2->unbind();
     
     RenderDevice::endFrame();
+}
+
+void WorldScene::selectEntityAtIndex(int index)
+{
+    if (index < m_entities.size())
+    {
+        Entity* rawPtr = m_entities[index].get();
+        m_pInspectorPanel->setEntity(rawPtr);
+    }
 }

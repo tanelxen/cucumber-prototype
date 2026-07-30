@@ -18,6 +18,8 @@ class AssetsPanel;
 
 class Viewport;
 
+class Entity;
+
 class WorldScene
 {
 public:
@@ -28,6 +30,8 @@ public:
     void update(float dt);
     void draw();
     
+    void selectEntityAtIndex(int index);
+    
     Viewport* m_pMainView;
 //    Viewport* m_pMainView2;
     
@@ -36,6 +40,9 @@ public:
     ScenePanel* m_pScenePanel;
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
+    
+//    std::vector<std::unique_ptr<Entity>> m_entities;
+    std::vector<std::unique_ptr<Entity>> m_entities;
     
 private:
 };

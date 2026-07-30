@@ -10,17 +10,27 @@
 #include "Mesh.h"
 #include "ModelLoader.h"
 
+#include "Entity.h"
+
 #include <imgui.h>
 #include <imgui_internal.h>
 
 #include <stdio.h>
 #include <iostream>
+#include <filesystem>
+
+#include <unordered_map>
+#include <typeindex>
+#include <functional>
 
 #include "../vendor/tinyfiledialogs.h"
 
-void InspectorPanel::setEntity(Mesh *entity)
+void RegisterUI();
+
+void InspectorPanel::setEntity(Entity *entity)
 {
     m_entity = entity;
+    RegisterUI();
 }
 
 bool DrawVector3Control(const char* label, float* values, float resetValue, float speed);
@@ -34,18 +44,96 @@ void DrawTransformComponent(Mesh& entity)
 //        DrawVector3Control("Rotation", &entity.rotation.x, 0.0f, 0.1f);
 //        DrawVector3Control("Scale", &entity.scale.x, 1.0f, 0.01f);
         
-        DrawVec3Control("Position", entity.position, 0, 100);
-        DrawVec3Control("Rotation", entity.rotation, 0, 100);
-        DrawVec3Control("Scale", entity.scale, 64, 100);
+//        DrawVec3Control("Position", entity.position, 0, 100);
+//        DrawVec3Control("Rotation", entity.rotation, 0, 100);
+//        DrawVec3Control("Scale", entity.scale, 64, 100);
     }
 }
 
 
+std::unordered_map<std::type_index, std::function<void(Component*)>> uiRegistry;
+
+void RegisterUI()
+{
+    uiRegistry[typeid(TransformComponent)] = [](Component* c) {
+        auto* comp = static_cast<TransformComponent*>(c);
+        
+        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            DrawVec3Control("Position", comp->position, 0, 100);
+            DrawVec3Control("Rotation", comp->rotation, 0, 100);
+            DrawVec3Control("Scale", comp->scale, 1, 100);
+        }
+    };
+    
+    uiRegistry[typeid(MeshComponent)] = [](Component* c) {
+        auto* comp = static_cast<MeshComponent*>(c);
+        
+        if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::ColorEdit4("Tint Color", &(comp->tintColor.x));
+            
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
+            
+            ImGui::TextUnformatted(comp->path.c_str());
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x * 0.3f);
+            
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 5);
+            
+            if (ImGui::Button("Add Mesh"))
+            {
+                char const * filter[1] = { "*.obj" };
+                const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/", 1, filter, NULL, 0);
+                
+                if (path != nullptr)
+                {
+                    ModelLoader::LoadOBJ(path, comp->mesh);
+                    
+                    std::filesystem::path p(path);
+                    comp->path = p.filename();
+                }
+            }
+        }
+    };
+}
+
+void drawComponentUi(std::type_index typeIdx, Component* comp)
+{
+    auto it = uiRegistry.find(typeIdx);
+    
+    if (it != uiRegistry.end())
+    {
+//        const auto& uiInfo = it->second;
+        
+//        // Используем ImGui::TreeNodeEx для создания выпадающего меню компонента
+//        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth;
+//        
+//        if (ImGui::TreeNodeEx(uiInfo.displayName.c_str(), flags)) {
+//            
+//            // Вызываем кастомный UI для этого компонента
+//            uiInfo.renderUiFunc(comp);
+//            
+//            ImGui::TreePop();
+//        }
+//        
+//        ImGui::Separator();
+        
+        const auto& uiInfo = it->second;
+        uiInfo(comp);
+    }
+}
 
 void InspectorPanel::draw()
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
     ImGui::Begin("Inspector");
+    
+    if (!m_entity)
+    {
+        ImGui::End();
+        ImGui::PopStyleVar();
+        return;
+    }
     
     ImGui::SeparatorText("Entity");
     
@@ -61,24 +149,10 @@ void InspectorPanel::draw()
     
     ImGui::SeparatorText("Components");
     
-    DrawTransformComponent(*m_entity);
-    
-    if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
+    for (auto& [typeIdx, comp] : m_entity->m_components)
     {
-        ImGui::ColorEdit3("Color", &m_entity->color.x);
+        drawComponentUi(typeIdx, comp.get());
     }
-    
-    if (ImGui::Button("Add Mesh"))
-    {
-        char const * filter[1] = { "*.obj" };
-        const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/", 1, filter, NULL, 0);
-        
-        if (path != nullptr)
-        {
-            ModelLoader::LoadOBJ(path, *m_entity);
-        }
-    }
-    
     
     if (ImGui::Button("Add Component"))
     {

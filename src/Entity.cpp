@@ -6,15 +6,23 @@
 //
 
 #include "Entity.h"
-#include "Cube.h"
 
 Entity::Entity(const std::string &name) : m_name(name)
 {
-    m_mesh = std::make_unique<ShadedCube>();
-    m_mesh->init();
 }
 
-Entity::~Entity()
-{
-    
-}
+//template<typename T, typename... Args>
+//void Entity::addComponent(Args&&... args)
+//{
+//    m_components[typeid(T)] = std::make_unique<T>(std::forward<Args>(args)...);
+//}
+
+//template<typename T>
+//T* Entity::getComponent()
+//{
+//    auto it = m_components.find(typeid(T));
+//    if (it != m_components.end()) {
+//        return static_cast<T*>(it->second.get());
+//    }
+//    return nullptr;
+//}
