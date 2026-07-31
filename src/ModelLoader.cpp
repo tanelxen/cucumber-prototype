@@ -14,6 +14,8 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
+#include "../vendor/stb_image.h"
+
 #include <glm/glm.hpp>
 
 #include <unordered_map>
@@ -66,17 +68,19 @@ namespace ModelLoader {
         
         auto& attrib = reader.GetAttrib();
         auto& shapes = reader.GetShapes();
-        //    auto& materials = reader.GetMaterials();
+        auto& materials = reader.GetMaterials();
         
         std::vector<glm::vec3> positions;
         std::vector<glm::vec3> normals;
-        std::vector<glm::vec2> out_texCoords;
+        std::vector<glm::vec2> texCoords;
         std::vector<uint32_t> indices;
         
         std::vector<Surface> surfaces;
         
         // Карта для отслеживания уже добавленных уникальных вершин
         std::unordered_map<Vertex, uint32_t> uniqueVertices;
+        
+        int maxMatIndex = -1;
         
         for (const auto& shape : shapes)
         {
@@ -92,7 +96,10 @@ namespace ModelLoader {
             } else {
                 surface.MaterialIndex = 0; // Дефолтный материал, если не назначен
             }
-            
+
+            if (int(surface.MaterialIndex) > maxMatIndex) {
+                maxMatIndex = surface.MaterialIndex;
+            }
             
             size_t index_offset = 0;
             
@@ -136,7 +143,7 @@ namespace ModelLoader {
                         
                         positions.push_back(vertex.pos);
                         normals.push_back(vertex.normal);
-                        out_texCoords.push_back(vertex.texCoord); // Сохраняем UV координату
+                        texCoords.push_back(vertex.texCoord);
                     }
                     
                     indices.push_back(uniqueVertices[vertex]);
@@ -155,7 +162,14 @@ namespace ModelLoader {
             }
         }
         
-        mesh.init(positions, normals, indices);
+        mesh.init(positions, normals, texCoords, indices);
         mesh.setSurfaces(surfaces);
+        
+        mesh.m_materials.resize(maxMatIndex + 1);
+        
+//        for (auto& mat : materials)
+//        {
+//            
+//        }
     }
 }

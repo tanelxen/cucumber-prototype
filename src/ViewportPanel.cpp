@@ -35,10 +35,10 @@ void ViewportPanel::update(float dt)
 //        m_pCameraController->update(dt);
 //    }
     
-    if (m_isHovered)
-    {
+//    if (m_isHovered)
+//    {
         m_pCameraController->update(dt);
-    }
+//    }
 }
 
 void ViewportPanel::draw()

@@ -100,11 +100,11 @@ void Mesh::initCube()
         20, 23, 22, 22, 21, 20  // Нижняя грань
     };
     
-    init(positions, normals, indices);
+//    init(positions, normals, indices);
     m_name = "Cube";
 }
 
-void Mesh::init(const std::vector<glm::vec3>& positions, const std::vector<glm::vec3>& normals, const std::vector<uint32_t>& indices)
+void Mesh::init(const std::vector<glm::vec3>& positions, const std::vector<glm::vec3>& normals, const std::vector<glm::vec2>& texCoords, const std::vector<uint32_t>& indices)
 {
     vertexArray = new VertexArray();
     
@@ -116,11 +116,15 @@ void Mesh::init(const std::vector<glm::vec3>& positions, const std::vector<glm::
     nrmBuffer->setLayout({ { VertexAttributeLocation::Normal, ShaderDataType::Float3 } });
     vertexArray->setVertexBuffer(nrmBuffer);
     
+    texBuffer = new VertexBuffer(texCoords.data(), sizeof(glm::vec2) * (uint32_t)texCoords.size());
+    texBuffer->setLayout({ { VertexAttributeLocation::TexCoord, ShaderDataType::Float2 } });
+    vertexArray->setVertexBuffer(texBuffer);
+    
     indexBuffer = new IndexBuffer(indices.data(), (uint32_t)indices.size());
     vertexArray->setIndexBuffer(indexBuffer);
 }
 
-void Mesh::init(const std::vector<float>& positions, const std::vector<float>& normals, const std::vector<uint32_t>& indices)
+void Mesh::init(const std::vector<float>& positions, const std::vector<float>& normals, const std::vector<float>& texCoords, const std::vector<uint32_t>& indices)
 {
     vertexArray = new VertexArray();
     
@@ -132,6 +136,10 @@ void Mesh::init(const std::vector<float>& positions, const std::vector<float>& n
     nrmBuffer->setLayout({ { VertexAttributeLocation::Normal, ShaderDataType::Float3 } });
     vertexArray->setVertexBuffer(nrmBuffer);
     
+    texBuffer = new VertexBuffer(texCoords.data(), sizeof(float) * (uint32_t)texCoords.size());
+    texBuffer->setLayout({ { VertexAttributeLocation::TexCoord, ShaderDataType::Float2 } });
+    vertexArray->setVertexBuffer(texBuffer);
+    
     indexBuffer = new IndexBuffer(indices.data(), (uint32_t)indices.size());
     vertexArray->setIndexBuffer(indexBuffer);
 }
@@ -140,16 +148,17 @@ void Mesh::draw(glm::mat4& transform, glm::vec4 tintColor) const
 {
     for (const auto& surface : m_surfaces)
     {
-//        auto& material = m_textures[surface.textureNum];
+        auto& material = m_materials[surface.MaterialIndex];
         
         RenderCommand cmd = {
             .vao = vertexArray->getID(),
             .start = surface.IndexStart,
             .count = surface.IndexCount,
             
-            .pipeline = PipelineType::FlatShaded,
+            .pipeline = PipelineType::Generic,
             .blendMode = BlendMode::Opaque,
-            .color = tintColor,
+            .baseTexture = material.albedoMap,
+            .color = material.tintColor,
             
             .transform = transform,
         };

@@ -25,6 +25,11 @@
 
 #include "../vendor/tinyfiledialogs.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../vendor/stb_image.h"
+
+#include "RenderDevice.h"
+
 void RegisterUI();
 
 void InspectorPanel::setEntity(Entity *entity)
@@ -71,8 +76,6 @@ void RegisterUI()
         
         if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::ColorEdit4("Tint Color", &(comp->tintColor.x));
-            
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
             
             ImGui::TextUnformatted(comp->path.c_str());
@@ -83,7 +86,7 @@ void RegisterUI()
             if (ImGui::Button("Add Mesh"))
             {
                 char const * filter[1] = { "*.obj" };
-                const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/", 1, filter, NULL, 0);
+                const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/obj/", 1, filter, NULL, 0);
                 
                 if (path != nullptr)
                 {
@@ -92,6 +95,42 @@ void RegisterUI()
                     std::filesystem::path p(path);
                     comp->path = p.filename();
                 }
+            }
+            
+            if (ImGui::TreeNode("Surfaces"))
+            {
+                for (int i = 0; i < comp->mesh.m_surfaces.size(); i++)
+                {
+                    if (ImGui::TreeNode((void*)(intptr_t)i, "Surface %i", i))
+                    {
+                        auto& surface = comp->mesh.m_surfaces[i];
+                        ImGui::Text("%s: %i tris, %i material", surface.m_name.c_str(), surface.IndexCount / 3, surface.MaterialIndex);
+                        
+                        auto& material = comp->mesh.m_materials[surface.MaterialIndex];
+                        
+                        ImGui::ColorEdit4("Tint Color", &(material.tintColor.x), ImGuiColorEditFlags_NoInputs);
+                        
+                        if (ImGui::Button("Add Texture"))
+                        {
+                            char const * filter[1] = { "*.png" };
+                            const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/obj/", 1, filter, NULL, 0);
+                            
+                            if (path != nullptr)
+                            {
+                                int width, height;
+                                int num_channels = 3;
+                                
+                                unsigned char* image = stbi_load(path, &width, &height, &num_channels, 3);
+                                material.albedoMap = RenderDevice::makeTexture(width, height, false, true, image);
+                                stbi_image_free(image);
+                            }
+                        }
+                        
+                        ImGui::TreePop();
+                    }
+                }
+                
+                ImGui::TreePop();
             }
         }
     };
@@ -136,6 +175,11 @@ void InspectorPanel::draw()
     }
     
     ImGui::SeparatorText("Entity");
+    
+    static bool active = true;
+    ImGui::Checkbox("##active", &active);
+    
+    ImGui::SameLine();
     
     char buffer[256] = "";
     snprintf(buffer, sizeof(buffer), "%s", m_entity->m_name.c_str());

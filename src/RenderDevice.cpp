@@ -38,7 +38,7 @@ namespace RenderDevice {
 //        glEnable(GL_FRAMEBUFFER_SRGB);
         glFrontFace(GL_CCW);
         
-        generic_shader.init("assets/shaders/cube.glsl");
+        generic_shader.init("assets/shaders/generic.glsl");
         flat_shader.init("assets/shaders/cube_shaded.glsl");
         grid_shader.init("assets/shaders/grid.glsl");
     }
