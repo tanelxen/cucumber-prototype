@@ -26,6 +26,8 @@ namespace RenderDevice {
     handle_t makeVertexBuffer(long size, void* data);
     handle_t makeIndexBuffer(long size, void* data);
     
+    handle_t getWhiteTexture();
+    
 //    handle_t makeVertexArray(handle_t vertexBuffer, handle_t indexBuffer, const VertexLayout& layout);
 //    handle_t makeVertexArray(handle_t posBuffer, const int posLayout, handle_t nrmBuffer, const int nrmLayout, handle_t indexBuffer);
     

@@ -8,6 +8,8 @@
 #include "ModelLoader.h"
 #include "Mesh.h"
 
+#include "RenderDevice.h"
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "../vendor/tiny_obj_loader.h"
 
@@ -84,7 +86,7 @@ namespace ModelLoader {
         
         for (const auto& shape : shapes)
         {
-            Surface surface{};
+            Surface surface { .m_name = shape.name };
             
             // Фиксируем, где в глобальном буфере индексов начнется этот Surface
             surface.IndexStart = static_cast<uint32_t>(indices.size());
@@ -166,10 +168,5 @@ namespace ModelLoader {
         mesh.setSurfaces(surfaces);
         
         mesh.m_materials.resize(maxMatIndex + 1);
-        
-//        for (auto& mat : materials)
-//        {
-//            
-//        }
     }
 }

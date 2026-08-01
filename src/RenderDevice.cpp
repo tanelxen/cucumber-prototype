@@ -25,6 +25,8 @@ namespace RenderDevice {
     static Shader flat_shader;
     static Shader grid_shader;
     
+    handle_t whiteTextureId;
+    
     void init()
     {
         gladLoadGL();
@@ -41,7 +43,12 @@ namespace RenderDevice {
         generic_shader.init("assets/shaders/generic.glsl");
         flat_shader.init("assets/shaders/cube_shaded.glsl");
         grid_shader.init("assets/shaders/grid.glsl");
+        
+        unsigned char pixels[4] = { 255, 255, 255, 255 };
+        whiteTextureId = makeTexture(1, 1, true, true, pixels);
     }
+    
+    handle_t getWhiteTexture() { return whiteTextureId; }
     
     handle_t makeTexture(int width, int height, bool hasAlpha, bool standard, const void* data)
     {
@@ -174,12 +181,19 @@ namespace RenderDevice {
                     break;
             }
             
-            if (lastBaseTexture != cmd.baseTexture)
+            auto baseTexture = cmd.baseTexture;
+            
+            if (baseTexture == 0)
+            {
+                baseTexture = whiteTextureId;
+            }
+            
+            if (lastBaseTexture != baseTexture)
             {
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, cmd.baseTexture);
+                glBindTexture(GL_TEXTURE_2D, baseTexture);
                 
-                lastBaseTexture = cmd.baseTexture;
+                lastBaseTexture = baseTexture;
             }
             
             if (cmd.pipeline != PipelineType::Grid)
