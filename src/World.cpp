@@ -27,6 +27,10 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "../vendor/json.hpp"
+
+#include <iostream>
+
 static ShadedCube g_shadedCube;
 static Mesh g_mesh;
 static Grid g_grid;
@@ -82,11 +86,8 @@ void WorldScene::draw()
         
         if (transformComp && meshComp)
         {
-            glm::mat4 model(1.0f);
-            model = glm::translate(model, transformComp->position);
-            model = glm::scale(model, transformComp->scale);
-            
-            meshComp->mesh.draw(model, meshComp->tintColor);
+            auto model = transformComp->toMat4();
+            meshComp->mesh.draw(model);
         }
     }
     
@@ -108,4 +109,33 @@ void WorldScene::selectEntityAtIndex(int index)
         Entity* rawPtr = m_entities[index].get();
         m_pInspectorPanel->setEntity(rawPtr);
     }
+}
+
+using json = nlohmann::json;
+
+void to_json(json& j, const Entity& t)
+{
+    j = json{ {"name", t.m_name} };
+}
+
+void WorldScene::save()
+{
+    // Создаем пустой JSON-массив для объектов
+    json entitiesArray = json::array();
+    
+    // Вручную разыменовываем каждый unique_ptr
+    for (const auto& entityPtr : m_entities)
+    {
+        if (entityPtr) { // Проверяем на nullptr на всякий случай
+            // Записываем сам объект (*entityPtr), библиотека вызовет to_json(json&, const Entity&)
+            entitiesArray.push_back(*entityPtr);
+        }
+    }
+    
+    auto j = json {
+        { "scene_name", "test" },
+        { "objects", entitiesArray }
+    };
+    
+    std::cout << j.dump(4) << "\n\n";
 }

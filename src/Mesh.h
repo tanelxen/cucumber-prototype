@@ -36,7 +36,7 @@ public:
     
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
-    void draw(glm::mat4& transform, glm::vec4 tintColor) const;
+    void draw(glm::mat4& transform) const;
     
     std::string m_name;
     std::vector<Surface> m_surfaces;

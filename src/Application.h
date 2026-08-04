@@ -16,7 +16,7 @@ struct Application
     
     static void setCursorEnabled(bool state);
     
-private:
+//private:
     struct GLFWwindow* m_pWindow;
     class WorldScene* m_pScene;
     

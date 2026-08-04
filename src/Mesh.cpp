@@ -144,7 +144,7 @@ void Mesh::init(const std::vector<float>& positions, const std::vector<float>& n
     vertexArray->setIndexBuffer(indexBuffer);
 }
 
-void Mesh::draw(glm::mat4& transform, glm::vec4 tintColor) const
+void Mesh::draw(glm::mat4& transform) const
 {
     for (const auto& surface : m_surfaces)
     {

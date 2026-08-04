@@ -323,7 +323,10 @@ void imgui_renderMenuBar()
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {};
+            if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
+            {
+                Application::currentInstance->m_pScene->save();
+            }
             
             if (ImGui::MenuItem("Load Scene", "Ctrl+L")) {};
             ImGui::Separator();

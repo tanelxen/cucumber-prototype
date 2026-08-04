@@ -16,6 +16,15 @@
 
 #include "Mesh.h"
 
+struct Transform
+{
+    glm::vec3 position = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
+    
+    glm::mat4 toMat4();
+};
+
 struct Component { virtual ~Component() = default; };
 
 struct TransformComponent : Component
@@ -23,12 +32,14 @@ struct TransformComponent : Component
     glm::vec3 position = { 0.0f, 0.0f, 0.0f };
     glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
     glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
+    
+    glm::mat4 toMat4();
 };
 
 struct MeshComponent : Component
 {
     std::string path = "<no mesh>";
-    glm::vec4 tintColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+//    glm::vec4 tintColor = { 1.0f, 1.0f, 1.0f, 1.0f };
     Mesh mesh;
 };
 

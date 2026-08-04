@@ -26,6 +26,7 @@ namespace RenderDevice {
     static Shader grid_shader;
     
     handle_t whiteTextureId;
+    handle_t normalTextureId;
     
     void init()
     {
@@ -44,8 +45,15 @@ namespace RenderDevice {
         flat_shader.init("assets/shaders/cube_shaded.glsl");
         grid_shader.init("assets/shaders/grid.glsl");
         
-        unsigned char pixels[4] = { 255, 255, 255, 255 };
-        whiteTextureId = makeTexture(1, 1, true, true, pixels);
+        {
+            unsigned char pixels[4] = { 255, 255, 255, 255 };
+            whiteTextureId = makeTexture(1, 1, true, true, pixels);
+        }
+        
+        {
+            unsigned char pixels[4] = { 128, 128, 255, 255 };
+            normalTextureId = makeTexture(1, 1, true, true, pixels);
+        }
     }
     
     handle_t getWhiteTexture() { return whiteTextureId; }

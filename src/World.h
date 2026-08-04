@@ -32,6 +32,8 @@ public:
     
     void selectEntityAtIndex(int index);
     
+    void save();
+    
     Viewport* m_pMainView;
 //    Viewport* m_pMainView2;
     
