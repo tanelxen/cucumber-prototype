@@ -70,6 +70,9 @@ set(SRC_RENDERER
 )
 
 set(SRC_PANELS
+        src/UIManager.cpp
+        src/UIManager.h
+
         src/ViewportPanel.cpp
         src/ViewportPanel.h
         src/ScenePanel.cpp

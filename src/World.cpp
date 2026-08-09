@@ -41,26 +41,7 @@ WorldScene::WorldScene()
 {
     g_grid.init();
     
-    m_pMainView = new Viewport();
-    m_pMainView->init();
-    
-    m_pViewportPanel = new ViewportPanel("Perspective");
-    m_pViewportPanel->setViewport(m_pMainView);
-    
-    
-//    m_pMainView2 = new Viewport();
-//    m_pMainView2->init();
-    
-//    m_pViewportPanel2 = new ViewportPanel("Perspective 2");
-//    m_pViewportPanel2->setViewport(m_pMainView2);
-    
-    m_pScenePanel = new ScenePanel();
-    m_pScenePanel->setScene(this);
-    
-    m_pInspectorPanel = new InspectorPanel();
-    m_pAssetsPanel = new AssetsPanel();
-    
-//    m_pInspectorPanel->setEntity(m_entities[0].get());
+
 }
 
 WorldScene::~WorldScene() = default;
@@ -69,8 +50,7 @@ WorldScene::~WorldScene() = default;
 
 void WorldScene::update(float dt)
 {
-    m_pViewportPanel->update(dt);
-//    m_pViewportPanel2->update(dt);
+//    m_pViewportPanel->update(dt);
 }
 
 void WorldScene::draw()
@@ -104,11 +84,11 @@ void WorldScene::draw()
 
 void WorldScene::selectEntityAtIndex(int index)
 {
-    if (index < m_entities.size())
-    {
-        Entity* rawPtr = m_entities[index].get();
-        m_pInspectorPanel->setEntity(rawPtr);
-    }
+//    if (index < m_entities.size())
+//    {
+//        Entity* rawPtr = m_entities[index].get();
+//        m_pInspectorPanel->setEntity(rawPtr);
+//    }
 }
 
 using json = nlohmann::json;

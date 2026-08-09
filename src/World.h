@@ -11,10 +11,6 @@
 #include <vector>
 #include <memory>
 
-class ViewportPanel;
-class ScenePanel;
-class InspectorPanel;
-class AssetsPanel;
 
 class Viewport;
 
@@ -35,13 +31,6 @@ public:
     void save();
     
     Viewport* m_pMainView;
-//    Viewport* m_pMainView2;
-    
-    ViewportPanel* m_pViewportPanel;
-//    ViewportPanel* m_pViewportPanel2;
-    ScenePanel* m_pScenePanel;
-    InspectorPanel* m_pInspectorPanel;
-    AssetsPanel* m_pAssetsPanel;
     
 //    std::vector<std::unique_ptr<Entity>> m_entities;
     std::vector<std::unique_ptr<Entity>> m_entities;

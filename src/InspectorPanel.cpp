@@ -78,12 +78,18 @@ void RegisterUI()
         {
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
             
-            ImGui::TextUnformatted(comp->path.c_str());
-            ImGui::SameLine(ImGui::GetContentRegionAvail().x * 0.3f);
+//            ImGui::TextUnformatted(comp->path.c_str());
+//            ImGui::SameLine(ImGui::GetContentRegionAvail().x * 0.3f);
             
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 5);
+//            ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 5);
             
-            if (ImGui::Button("Add Mesh"))
+            char buffer[256];
+            
+            ImGui::InputText("##MeshPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
+            ImGui::SameLine();
+            if (ImGui::Button("..."))
+            
+//            if (ImGui::Button("Add Mesh"))
             {
                 char const * filter[1] = { "*.obj" };
                 const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/obj/", 1, filter, NULL, 0);

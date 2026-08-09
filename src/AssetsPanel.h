@@ -10,8 +10,10 @@
 class AssetsPanel
 {
 public:
-    AssetsPanel() = default;
+    AssetsPanel();
     ~AssetsPanel() = default;
+    
+    bool isVisible = true;
     
     void draw();
     
