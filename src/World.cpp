@@ -7,6 +7,10 @@
 
 #include "World.h"
 
+#include "Application.h"
+#include "UIManager.h"
+#include "InspectorPanel.h"
+
 #include "Camera.h"
 
 #include "Cube.h"
@@ -18,10 +22,9 @@
 
 #include "Viewport.h"
 
-#include "ViewportPanel.h"
-#include "ScenePanel.h"
-#include "InspectorPanel.h"
-#include "AssetsPanel.h"
+//#include "ViewportPanel.h"
+//#include "ScenePanel.h"
+//#include "AssetsPanel.h"
 
 #include "RenderDevice.h"
 
@@ -75,20 +78,16 @@ void WorldScene::draw()
     RenderDevice::commit(m_pMainView->getCamera());
     m_pMainView->unbind();
     
-//    m_pMainView2->bind();
-//    RenderDevice::commit(m_pMainView2->getCamera());
-//    m_pMainView2->unbind();
-    
     RenderDevice::endFrame();
 }
 
 void WorldScene::selectEntityAtIndex(int index)
 {
-//    if (index < m_entities.size())
-//    {
-//        Entity* rawPtr = m_entities[index].get();
-//        m_pInspectorPanel->setEntity(rawPtr);
-//    }
+    if (index < m_entities.size())
+    {
+        Entity* rawPtr = m_entities[index].get();
+        Application::currentInstance->m_pUIManager->setEntity(rawPtr);
+    }
 }
 
 using json = nlohmann::json;

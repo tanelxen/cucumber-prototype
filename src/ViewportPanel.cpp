@@ -14,7 +14,7 @@
 #include <glad/glad.h>
 #include <imgui.h>
 
-ViewportPanel::ViewportPanel(const std::string &name) : m_name(name)
+ViewportPanel::ViewportPanel(const std::string &name) : EditorPanel(name)
 {
     m_pCamera = new Camera();
     

@@ -7,16 +7,18 @@
 
 #pragma once
 
+#include "EditorPanel.h"
+
 class Entity;
 
-class InspectorPanel
+class InspectorPanel: public EditorPanel
 {
 public:
-    InspectorPanel() = default;
+    InspectorPanel();
     ~InspectorPanel() = default;
     
     void setEntity(Entity* entity);
-    void draw();
+    void draw() override;
     
 private:
     Entity* m_entity;

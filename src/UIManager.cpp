@@ -32,6 +32,11 @@ UIManager::UIManager()
     
     m_pInspectorPanel = new InspectorPanel();
     m_pAssetsPanel = new AssetsPanel();
+    
+    m_panels.push_back(m_pViewportPanel);
+    m_panels.push_back(m_pScenePanel);
+    m_panels.push_back(m_pInspectorPanel);
+    m_panels.push_back(m_pAssetsPanel);
 }
 
 UIManager::~UIManager()
@@ -42,7 +47,10 @@ UIManager::~UIManager()
 
 void UIManager::update(float dt)
 {
-    m_pViewportPanel->update(dt);
+    for (auto panel : m_panels)
+    {
+        panel->update(dt);
+    }
 }
 
 void UIManager::draw()
@@ -206,24 +214,12 @@ void UIManager::drawMenuBar()
         
         if (ImGui::BeginMenu("View"))
         {
-            if (ImGui::MenuItem("Hierarchy", NULL, true))
+            for (auto panel : m_panels)
             {
-                //Hierarchy
-            }
-            
-            if (ImGui::MenuItem("Inspector", NULL, true))
-            {
-                //Inspector
-            }
-            
-            if (ImGui::MenuItem("Assets", NULL, m_pAssetsPanel->isVisible))
-            {
-                m_pAssetsPanel->isVisible = !m_pAssetsPanel->isVisible;
-            }
-            
-            if (ImGui::MenuItem("Console", NULL, false))
-            {
-                //Console
+                if (ImGui::MenuItem(panel->m_name.c_str(), NULL, panel->isVisible))
+                {
+                    panel->isVisible = !panel->isVisible;
+                }
             }
             
             ImGui::EndMenu();
@@ -235,16 +231,20 @@ void UIManager::drawMenuBar()
 
 void UIManager::drawPanels()
 {
-    m_pViewportPanel->draw();
-    
-    m_pScenePanel->draw();
-    m_pInspectorPanel->draw();
-    
-    if (m_pAssetsPanel->isVisible)
+    for (auto panel : m_panels)
     {
-        m_pAssetsPanel->draw();
+        if (panel->isVisible)
+        {
+            panel->draw();
+        }
     }
 }
+
+void UIManager::setEntity(Entity *entity)
+{
+    m_pInspectorPanel->setEntity(entity);
+}
+
 
 
 static ImVec4 ColorFromHexStr(const char* hex)

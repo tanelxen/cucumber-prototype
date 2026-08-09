@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <string>
+#include "EditorPanel.h"
 
 class Viewport;
 
-class ViewportPanel
+class ViewportPanel: public EditorPanel
 {
 public:
     ViewportPanel(const std::string &name);
@@ -19,14 +19,13 @@ public:
     
     void setViewport(Viewport* viewport);
     
-    void update(float dt);
-    void draw();
+    void update(float dt) override;
+    void draw() override;
     
 public:
     inline bool isHovered() { return m_isHovered; }
     
 private:
-    std::string m_name;
     Viewport* m_viewport;
     
     class Camera* m_pCamera;

@@ -7,15 +7,15 @@
 
 #pragma once
 
-class AssetsPanel
+#include "EditorPanel.h"
+
+class AssetsPanel: public EditorPanel
 {
 public:
     AssetsPanel();
     ~AssetsPanel() = default;
     
-    bool isVisible = true;
-    
-    void draw();
+    void draw() override;
     
 private:
 };

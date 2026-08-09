@@ -170,13 +170,13 @@ void drawComponentUi(std::type_index typeIdx, Component* comp)
 
 void InspectorPanel::draw()
 {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
+//    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{16, 16});
     ImGui::Begin("Inspector");
     
     if (!m_entity)
     {
         ImGui::End();
-        ImGui::PopStyleVar();
+//        ImGui::PopStyleVar();
         return;
     }
     
@@ -230,8 +230,14 @@ void InspectorPanel::draw()
     }
     
     ImGui::End();
-    ImGui::PopStyleVar();
+//    ImGui::PopStyleVar();
 }
+
+InspectorPanel::InspectorPanel() : EditorPanel("Inspector")
+{
+    
+}
+
 
 // Вспомогательная функция для отрисовки одной оси с цветной кнопкой-сбросом
 bool DrawAxisControl(const char* label, float& value, const ImVec4& color, float resetValue, float speed, float width) {

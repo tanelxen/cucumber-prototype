@@ -7,18 +7,18 @@
 
 #pragma once
 
-#include <string>
+#include "EditorPanel.h"
 
 class WorldScene;
 
-class ScenePanel
+class ScenePanel: public EditorPanel
 {
 public:
-    ScenePanel() = default;
+    ScenePanel();
     ~ScenePanel() = default;
     
     void setScene(WorldScene* scene);
-    void draw();
+    void draw() override;
     
 private:
     WorldScene* m_scene;

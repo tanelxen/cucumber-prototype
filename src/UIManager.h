@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <vector>
+
+class EditorPanel;
 class ViewportPanel;
 class InspectorPanel;
 class AssetsPanel;
@@ -14,6 +17,7 @@ class ScenePanel;
 class Viewport;
 
 class WorldScene;
+class Entity;
 
 class UIManager
 {
@@ -24,12 +28,12 @@ public:
     void init(struct GLFWwindow* window);
     
     void setScene(WorldScene* scene);
+    void setEntity(Entity* entity);
     
     void update(float dt);
     void draw();
     
-public:
-    
+private:
     ViewportPanel* m_pViewportPanel;
     Viewport* m_pMainView;
     
@@ -40,4 +44,6 @@ public:
 private:
     void drawMenuBar();
     void drawPanels();
+    
+    std::vector<EditorPanel*> m_panels;
 };

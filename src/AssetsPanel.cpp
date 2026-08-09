@@ -168,7 +168,7 @@ void DrawFiles()
     ImGui::EndChild();
 }
 
-AssetsPanel::AssetsPanel()
+AssetsPanel::AssetsPanel() : EditorPanel("Assets")
 {
     {
         int width, height;

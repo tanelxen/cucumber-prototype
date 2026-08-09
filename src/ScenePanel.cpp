@@ -127,6 +127,11 @@ void DrawSceneTree(Node* rootNode)
     ImGui::End();
 }
 
+ScenePanel::ScenePanel() : EditorPanel("Scene")
+{
+    
+}
+
 void ScenePanel::setScene(WorldScene *scene)
 {
     m_scene = scene;
