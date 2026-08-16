@@ -148,15 +148,15 @@ void Mesh::draw(glm::mat4& transform) const
 {
     for (const auto& surface : m_surfaces)
     {
-        auto& material = m_materials[surface.MaterialIndex];
+        auto& material = m_materials[surface.materialSlot];
         
         RenderCommand cmd = {
             .vao = vertexArray->getID(),
-            .start = surface.IndexStart,
-            .count = surface.IndexCount,
+            .start = surface.startIndex,
+            .count = surface.count,
             
             .pipeline = PipelineType::Generic,
-            .blendMode = BlendMode::Opaque,
+            .blendMode = material.blendMode,
             .baseTexture = material.albedoMap,
             .color = material.tintColor,
             

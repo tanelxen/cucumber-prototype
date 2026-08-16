@@ -40,6 +40,7 @@ private:
     
     int m_width = 1;
     int m_height = 1;
+    float m_scale = 2;
     
     glm::vec2 minBounds;
     glm::vec2 maxBounds;

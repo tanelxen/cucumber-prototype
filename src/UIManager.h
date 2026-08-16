@@ -14,9 +14,11 @@ class ViewportPanel;
 class InspectorPanel;
 class AssetsPanel;
 class ScenePanel;
+class MaterialPanel;
 class Viewport;
 
 class WorldScene;
+class Material;
 class Entity;
 
 class UIManager
@@ -29,6 +31,7 @@ public:
     
     void setScene(WorldScene* scene);
     void setEntity(Entity* entity);
+    void setMaterial(Material* material);
     
     void update(float dt);
     void draw();
@@ -40,6 +43,7 @@ private:
     ScenePanel* m_pScenePanel;
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
+    MaterialPanel* m_pMaterialPanel;
     
 private:
     void drawMenuBar();

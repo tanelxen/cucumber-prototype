@@ -9,6 +9,7 @@
 
 #include "ViewportPanel.h"
 #include "InspectorPanel.h"
+#include "MaterialPanel.h"
 #include "AssetsPanel.h"
 #include "ScenePanel.h"
 #include "Viewport.h"
@@ -26,16 +27,24 @@ UIManager::UIManager()
     
     m_pViewportPanel = new ViewportPanel("Perspective");
     m_pViewportPanel->setViewport(m_pMainView);
+    m_pViewportPanel->m_manager = this;
     
     m_pScenePanel = new ScenePanel();
-//    m_pScenePanel->setScene(this);
+    m_pScenePanel->m_manager = this;
     
     m_pInspectorPanel = new InspectorPanel();
+    m_pInspectorPanel->m_manager = this;
+    
     m_pAssetsPanel = new AssetsPanel();
+    m_pAssetsPanel->m_manager = this;
+    
+    m_pMaterialPanel = new MaterialPanel();
+    m_pMaterialPanel->m_manager = this;
     
     m_panels.push_back(m_pViewportPanel);
     m_panels.push_back(m_pScenePanel);
     m_panels.push_back(m_pInspectorPanel);
+    m_panels.push_back(m_pMaterialPanel);
     m_panels.push_back(m_pAssetsPanel);
 }
 
@@ -245,6 +254,10 @@ void UIManager::setEntity(Entity *entity)
     m_pInspectorPanel->setEntity(entity);
 }
 
+void UIManager::setMaterial(Material* material)
+{
+    m_pMaterialPanel->setMaterial(material);
+}
 
 
 static ImVec4 ColorFromHexStr(const char* hex)

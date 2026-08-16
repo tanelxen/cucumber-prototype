@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "RenderDevice.h"
+
 #include <glm/glm.hpp>
 #include <string>
 
@@ -14,17 +16,30 @@ class VertexBuffer;
 class VertexArray;
 class IndexBuffer;
 
-struct Surface {
-    uint32_t MaterialIndex;   // Индекс материала в векторе материалов модели
-    uint32_t IndexStart;      // Смещение в индексном буфере (в штуках индексов, НЕ байтах)
-    uint32_t IndexCount;      // Сколько индексов рисовать для этой поверхности
+struct Surface
+{
     std::string m_name;
+    uint32_t materialSlot;
+    uint32_t startIndex;
+    uint32_t count;
 };
 
-struct Material {
+struct Material
+{
     glm::vec4 tintColor = glm::vec4(1);
     uint32_t albedoMap = 0;
+    
+    BlendMode blendMode = BlendMode::Opaque;
+    
+    std::string m_name;
+    std::string m_source;
+    bool isEmbedded;
 };
+
+//struct MaterialAsset
+//{
+//    
+//};
 
 class Mesh
 {

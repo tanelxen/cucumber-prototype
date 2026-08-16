@@ -10,163 +10,274 @@
 
 #include "RenderDevice.h"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "../vendor/tiny_obj_loader.h"
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
+#define CGLTF_IMPLEMENTATION
+#include "../vendor/cgltf.h"
 
 #include "../vendor/stb_image.h"
 
 #include <glm/glm.hpp>
 
-#include <unordered_map>
 #include <iostream>
 
-struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 normal;
-    glm::vec2 texCoord;
-    
-    bool operator==(const Vertex& other) const {
-        return pos == other.pos &&
-        normal == other.normal &&
-        texCoord == other.texCoord;
-    }
-};
+void loadGLTFWithSurfaces(cgltf_data* data,
+                          std::vector<glm::vec3>& outPositions,
+                          std::vector<glm::vec3>& outNormals,
+                          std::vector<glm::vec2>& outTexCoords,
+                          std::vector<uint32_t>& outIndices,
+                          std::vector<Surface>& outSurfaces);
 
-namespace std {
-    template<> struct hash<Vertex> {
-        size_t operator()(Vertex const& vertex) const {
-            size_t h1 = hash<glm::vec3>()(vertex.pos);
-            size_t h2 = hash<glm::vec3>()(vertex.normal);
-            size_t h3 = hash<glm::vec2>()(vertex.texCoord);
-            
-            // Комбинируем хэши
-            return ((h1 ^ (h2 << 1)) >> 1) ^ (h3 << 1);
-        }
-    };
-}
+std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath);
 
-namespace ModelLoader {
-    
-    bool LoadOBJ(const std::string& filepath, Mesh& mesh)
+namespace ModelLoader
+{
+    bool LoadGLTF(const std::string& path, Mesh& model)
     {
-        tinyobj::ObjReaderConfig reader_config;
-//        reader_config.mtl_search_path = "./"; // Path to material files
+        cgltf_options options = {};
+        cgltf_data* data = nullptr;
         
-        tinyobj::ObjReader reader;
+        if (cgltf_parse_file(&options, path.c_str(), &data) != cgltf_result_success) return false;
         
-        if (!reader.ParseFromFile(filepath, reader_config)) {
-            if (!reader.Error().empty()) {
-                std::cerr << "TinyObjReader: " << reader.Error();
-            }
-            return 1;
+        if (cgltf_load_buffers(&options, data, path.c_str()) != cgltf_result_success)
+        {
+            cgltf_free(data);
+            return false;
         }
         
-        if (!reader.Warning().empty()) {
-            std::cout << "TinyObjReader: " << reader.Warning();
-        }
-        
-        auto& attrib = reader.GetAttrib();
-        auto& shapes = reader.GetShapes();
-        auto& materials = reader.GetMaterials();
+        model.m_name = path;
+        model.m_materials = loadGLTFMaterials(data, path);
         
         std::vector<glm::vec3> positions;
         std::vector<glm::vec3> normals;
         std::vector<glm::vec2> texCoords;
         std::vector<uint32_t> indices;
-        
         std::vector<Surface> surfaces;
         
-        // Карта для отслеживания уже добавленных уникальных вершин
-        std::unordered_map<Vertex, uint32_t> uniqueVertices;
+        loadGLTFWithSurfaces(data, positions, normals, texCoords, indices, surfaces);
+        model.init(positions, normals, texCoords, indices);
+        model.setSurfaces(surfaces);
         
-        int maxMatIndex = -1;
-        
-        for (const auto& shape : shapes)
-        {
-            Surface surface { .m_name = shape.name };
-            
-            // Фиксируем, где в глобальном буфере индексов начнется этот Surface
-            surface.IndexStart = static_cast<uint32_t>(indices.size());
-            
-            // По спецификации OBJ материал привязан к граням.
-            // Берем материал первой грани этого shape (для простоты считаем, что у shape один материал)
-            if (!shape.mesh.material_ids.empty() && shape.mesh.material_ids[0] >= 0) {
-                surface.MaterialIndex = static_cast<uint32_t>(shape.mesh.material_ids[0]);
-            } else {
-                surface.MaterialIndex = 0; // Дефолтный материал, если не назначен
-            }
+        cgltf_free(data);
+    }
+}
 
-            if (int(surface.MaterialIndex) > maxMatIndex) {
-                maxMatIndex = surface.MaterialIndex;
+void loadGLTFWithSurfaces(cgltf_data* data,
+                          std::vector<glm::vec3>& outPositions,
+                          std::vector<glm::vec3>& outNormals,
+                          std::vector<glm::vec2>& outTexCoords,
+                          std::vector<uint32_t>& outIndices,
+                          std::vector<Surface>& outSurfaces)
+{
+    uint32_t vertexOffset = 0;
+    
+    for (cgltf_size i = 0; i < data->meshes_count; ++i)
+    {
+        cgltf_mesh& mesh = data->meshes[i];
+        
+        std::string meshName = mesh.name ? mesh.name : "Mesh_" + std::to_string(i);
+        
+        for (cgltf_size j = 0; j < mesh.primitives_count; ++j)
+        {
+            cgltf_primitive& primitive = mesh.primitives[j];
+            
+            Surface surface{};
+            surface.startIndex = static_cast<uint32_t>(outIndices.size());
+            surface.m_name = meshName + "_prim_" + std::to_string(j);
+            
+            if (primitive.material != nullptr)
+            {
+                ptrdiff_t matIndex = primitive.material - data->materials;
+                surface.materialSlot = static_cast<uint32_t>(matIndex);
+            }
+            else
+            {
+                surface.materialSlot = 0;
             }
             
-            size_t index_offset = 0;
+            cgltf_accessor* posAccessor = nullptr;
+            cgltf_accessor* normAccessor = nullptr;
+            cgltf_accessor* uvAccessor = nullptr;
             
-            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
-                for (size_t v = 0; v < 3; v++) {
-                    tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
-                    
-                    Vertex vertex{};
-                    
-                    // 1. Позиция
-                    vertex.pos = {
-                        attrib.vertices[3 * idx.vertex_index + 0],
-                        attrib.vertices[3 * idx.vertex_index + 1],
-                        attrib.vertices[3 * idx.vertex_index + 2]
-                    };
-                    
-                    // 2. Нормаль
-                    if (idx.normal_index >= 0) {
-                        vertex.normal = {
-                            attrib.normals[3 * idx.normal_index + 0],
-                            attrib.normals[3 * idx.normal_index + 1],
-                            attrib.normals[3 * idx.normal_index + 2]
-                        };
-                    } else {
-                        vertex.normal = glm::vec3(0.0f);
-                    }
-                    
-                    // 3. Текстурные координаты (UV)
-                    if (idx.texcoord_index >= 0) {
-                        vertex.texCoord = {
-                            attrib.texcoords[2 * idx.texcoord_index + 0],
-                            1.0f - attrib.texcoords[2 * idx.texcoord_index + 1] // Инвертируем Y (V) для OpenGL
-                        };
-                    } else {
-                        vertex.texCoord = glm::vec2(0.0f);
-                    }
-                    
-                    // Проверка на дубликаты
-                    if (uniqueVertices.count(vertex) == 0) {
-                        uniqueVertices[vertex] = static_cast<uint32_t>(positions.size());
-                        
-                        positions.push_back(vertex.pos);
-                        normals.push_back(vertex.normal);
-                        texCoords.push_back(vertex.texCoord);
-                    }
-                    
-                    indices.push_back(uniqueVertices[vertex]);
-                }
+            for (cgltf_size k = 0; k < primitive.attributes_count; ++k)
+            {
+                cgltf_attribute& attr = primitive.attributes[k];
+                if (attr.type == cgltf_attribute_type_position)  posAccessor = attr.data;
+                if (attr.type == cgltf_attribute_type_normal)    normAccessor = attr.data;
+                if (attr.type == cgltf_attribute_type_texcoord)  uvAccessor = attr.data;
+            }
+            
+            if (!posAccessor) continue;
+            
+            if (posAccessor)
+            {
+                // Получаем прямой указатель на начало данных в памяти
+                uint8_t* bufferPtr = (uint8_t*)posAccessor->buffer_view->buffer->data
+                + posAccessor->buffer_view->offset
+                + posAccessor->offset;
                 
-                index_offset += 3;
+                // Приводим его к типу ваших вершин (glm::vec3)
+                glm::vec3* sourcePositions = (glm::vec3*)bufferPtr;
+                
+                // Вставляем весь массив целиком за один шаг
+                outPositions.insert(outPositions.end(), sourcePositions, sourcePositions + posAccessor->count);
             }
             
+            // 2. Быстрое копирование НОРМАЛЕЙ
+            if (normAccessor)
+            {
+                uint8_t* bufferPtr = (uint8_t*)normAccessor->buffer_view->buffer->data
+                + normAccessor->buffer_view->offset
+                + normAccessor->offset;
+                
+                glm::vec3* sourceNormals = (glm::vec3*)bufferPtr;
+                outNormals.insert(outNormals.end(), sourceNormals, sourceNormals + normAccessor->count);
+            }
+            else
+            {
+                outNormals.insert(outNormals.end(), posAccessor->count, glm::vec3(0.0f, 1.0f, 0.0f));
+            }
             
-            // Вычисляем, сколько индексов занял этот Surface
-            surface.IndexCount = static_cast<uint32_t>(indices.size()) - surface.IndexStart;
+            // 3. Быстрое копирование ТЕКСТУРНЫХ КООРДИНАТ
+            if (uvAccessor)
+            {
+                uint8_t* bufferPtr = (uint8_t*)uvAccessor->buffer_view->buffer->data
+                + uvAccessor->buffer_view->offset
+                + uvAccessor->offset;
+                
+                glm::vec2* sourceUVs = (glm::vec2*)bufferPtr;
+                outTexCoords.insert(outTexCoords.end(), sourceUVs, sourceUVs + uvAccessor->count);
+            }
+            else
+            {
+                outTexCoords.insert(outTexCoords.end(), posAccessor->count, glm::vec2(0.0f));
+            }
             
-            // Если у поверхности есть геометрия, сохраняем её
-            if (surface.IndexCount > 0) {
-                surfaces.push_back(surface);
+            size_t vertexCount = posAccessor->count;
+            
+            if (primitive.indices)
+            {
+                cgltf_accessor* indexAccessor = primitive.indices;
+                surface.count = static_cast<uint32_t>(indexAccessor->count);
+                
+                for (cgltf_size idx = 0; idx < indexAccessor->count; ++idx)
+                {
+                    uint32_t index = static_cast<uint32_t>(cgltf_accessor_read_index(indexAccessor, idx));
+                    outIndices.push_back(index + vertexOffset);
+                }
+            }
+            else
+            {
+                surface.count = static_cast<uint32_t>(vertexCount);
+                
+                for (uint32_t idx = 0; idx < static_cast<uint32_t>(vertexCount); ++idx)
+                {
+                    outIndices.push_back(idx + vertexOffset);
+                }
+            }
+            
+            outSurfaces.push_back(surface);
+            vertexOffset += static_cast<uint32_t>(vertexCount);
+        }
+    }
+}
+
+uint32_t loadSingleGLTFTexture(const cgltf_image& img, const std::string& baseDir)
+{
+    int width = 0, height = 0, channels = 0;
+    stbi_uc* pixelData = nullptr;
+    
+    if (img.uri != nullptr)
+    {
+        std::string fullPath = baseDir + "/" + img.uri;
+        
+        // glTF использует URL-кодирование. Заменяем "%20" обратно на пробелы для файловой системы
+        size_t pos;
+        while ((pos = fullPath.find("%20")) != std::string::npos) {
+            fullPath.replace(pos, 3, " ");
+        }
+        
+        // Загружаем всегда 4 канала (RGBA) для унификации, либо 0 для автоматического определения
+        pixelData = stbi_load(fullPath.c_str(), &width, &height, &channels, 4);
+        if (!pixelData) {
+            std::cerr << "[stb_image] Не удалось загрузить внешний файл: " << fullPath << std::endl;
+            return 0;
+        }
+        
+        channels = 4;
+    }
+    else if (img.buffer_view != nullptr)
+    {
+        cgltf_buffer_view* view = img.buffer_view;
+        
+        const uint8_t* rawData = static_cast<const uint8_t*>(view->buffer->data) + view->offset;
+        size_t dataSize = view->size;
+        
+        pixelData = stbi_load_from_memory(rawData, static_cast<int>(dataSize), &width, &height, &channels, 4);
+        if (!pixelData) {
+            std::cerr << "[stb_image] Не удалось декодировать встроенную текстуру из GLB" << std::endl;
+            return 0;
+        }
+        channels = 4;
+    }
+    
+    if (!pixelData) return 0;
+    
+    bool isSRGB = true;
+    bool hasAlpha = (channels == 4);
+    
+    uint32_t textureHandle = RenderDevice::makeTexture(width, height, hasAlpha, isSRGB, pixelData);
+    
+    stbi_image_free(pixelData);
+    
+    return textureHandle;
+}
+
+std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath)
+{
+    std::vector<Material> outMaterials;
+    
+    std::vector<uint32_t> textures(data->images_count, 0);
+    std::string baseDir = gltfFilePath.substr(0, gltfFilePath.find_last_of("/\\"));
+    
+    for (cgltf_size i = 0; i < data->images_count; ++i) {
+        textures[i] = loadSingleGLTFTexture(data->images[i], baseDir);
+    }
+    
+    if (data->materials_count == 0)
+    {
+        outMaterials.push_back(Material());
+        return outMaterials;
+    }
+    
+    for (cgltf_size i = 0; i < data->materials_count; ++i)
+    {
+        cgltf_material& gltfMat = data->materials[i];
+        
+        Material material;
+        material.m_name = gltfMat.name;
+        
+        if (gltfMat.has_pbr_metallic_roughness)
+        {
+            cgltf_pbr_metallic_roughness& pbr = gltfMat.pbr_metallic_roughness;
+            
+            material.tintColor.x = pbr.base_color_factor[0];
+            material.tintColor.y = pbr.base_color_factor[1];
+            material.tintColor.z = pbr.base_color_factor[2];
+            material.tintColor.w = pbr.base_color_factor[3];
+            
+            if (pbr.base_color_texture.texture != nullptr)
+            {
+                cgltf_texture* tex = pbr.base_color_texture.texture;
+                
+                if (tex->image != nullptr)
+                {
+                    ptrdiff_t index = tex->image - data->images;
+                    material.albedoMap = textures[index];
+                }
             }
         }
         
-        mesh.init(positions, normals, texCoords, indices);
-        mesh.setSurfaces(surfaces);
-        
-        mesh.m_materials.resize(maxMatIndex + 1);
+        outMaterials.push_back(material);
     }
+    
+    return outMaterials;
 }

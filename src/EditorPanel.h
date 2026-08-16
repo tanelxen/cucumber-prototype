@@ -19,4 +19,6 @@ public:
     
     std::string m_name;
     bool isVisible = true;
+    
+    class UIManager* m_manager;
 };

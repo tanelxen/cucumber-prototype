@@ -32,6 +32,6 @@ void main()
     
     FragColor = o_texture * color;
     
-    float gamma = 2.0;
-    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
+//    float gamma = 2.0;
+//    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
 }

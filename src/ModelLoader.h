@@ -12,5 +12,5 @@
 class Mesh;
 
 namespace ModelLoader {
-    bool LoadOBJ(const std::string& filepath, Mesh& mesh);
+    bool LoadGLTF(const std::string& filepath, Mesh& mesh);
 };

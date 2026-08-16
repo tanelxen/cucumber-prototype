@@ -81,6 +81,8 @@ set(SRC_PANELS
         src/InspectorPanel.h
         src/AssetsPanel.cpp
         src/AssetsPanel.h
+        src/MaterialPanel.cpp
+        src/MaterialPanel.h
 )
 
 set(SRC_IMGUI
