@@ -28,6 +28,7 @@ static void loadGLTFWithSurfaces(cgltf_data* data,
 
 
 static std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath);
+static std::vector<AnimationClip> loadGLTFAnimations(cgltf_data* data, const std::unordered_map<cgltf_node*, int>& nodeToBoneIndex);
 
 namespace ModelLoader
 {
@@ -69,7 +70,43 @@ namespace ModelLoader
             model.setSkinned(boneIndices, weights);
         }
         
+        std::unordered_map<cgltf_node*, int> nodeToBoneIndex;
+        
+        // Загрузка скелета
+        if (data->skins_count > 0)
+        {
+            cgltf_skin& skin = data->skins[0];
+            model.m_skeleton.resize(skin.joints_count);
+            model.m_finalBoneMatrices.resize(skin.joints_count, glm::mat4(1.0f));
+            
+            // Заполняем nodeToBoneIndex
+            for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+                nodeToBoneIndex[skin.joints[i]] = static_cast<int>(i);
+            }
+            
+            for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+                cgltf_node* jointNode = skin.joints[i];
+                if (jointNode->parent && nodeToBoneIndex.count(jointNode->parent)) {
+                    model.m_skeleton[i].parentIndex = nodeToBoneIndex[jointNode->parent];
+                }
+            }
+            
+            if (skin.inverse_bind_matrices) {
+                cgltf_accessor* ibmAcc = skin.inverse_bind_matrices;
+                for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+                    cgltf_accessor_read_float(ibmAcc, i, (float*)&model.m_skeleton[i].inverseBindMatrix, 16);
+                }
+            }
+        }
+        
+        // Загрузка анимаций (передаем data и сформированную мапу узлов)
+        if (data->animations_count > 0)
+        {
+            model.m_animations = loadGLTFAnimations(data, nodeToBoneIndex);
+        }
+        
         cgltf_free(data);
+        return true;
     }
 }
 
@@ -327,4 +364,93 @@ static std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::stri
     }
     
     return outMaterials;
+}
+
+static std::vector<AnimationClip> loadGLTFAnimations(cgltf_data* data, const std::unordered_map<cgltf_node*, int>& nodeToBoneIndex)
+{
+    std::vector<AnimationClip> animations;
+    
+    for (cgltf_size i = 0; i < data->animations_count; ++i)
+    {
+        cgltf_animation& gltfAnim = data->animations[i];
+        
+        AnimationClip clip;
+        clip.name = gltfAnim.name ? gltfAnim.name : "Animation_" + std::to_string(i);
+        clip.duration = 0.0f;
+        
+        // Временная мапа для сбора данных разных каналов (Translation, Rotation, Scale) в один трек для конкретной кости
+        std::unordered_map<int, AnimationTrack> trackMap;
+        
+        for (cgltf_size c = 0; c < gltfAnim.channels_count; ++c)
+        {
+            cgltf_animation_channel& channel = gltfAnim.channels[c];
+            cgltf_node* targetNode = channel.target_node;
+            
+            // Если узел не является частью скелета (не найден в мапе), пропускаем
+            if (!targetNode || nodeToBoneIndex.find(targetNode) == nodeToBoneIndex.end())
+                continue;
+            
+            int boneIndex = nodeToBoneIndex.at(targetNode);
+            AnimationTrack& track = trackMap[boneIndex];
+            track.boneIndex = boneIndex;
+            
+            cgltf_animation_sampler* sampler = channel.sampler;
+            cgltf_accessor* input = sampler->input;   // Время (таймстемпы)
+            cgltf_accessor* output = sampler->output; // Значения ключевых кадров
+            
+            // 1. Считываем временные метки
+            std::vector<float> times(input->count);
+            for (cgltf_size k = 0; k < input->count; ++k)
+            {
+                cgltf_accessor_read_float(input, k, &times[k], 1);
+                // Обновляем общую длительность клипа
+                if (times[k] > clip.duration) {
+                    clip.duration = times[k];
+                }
+            }
+            
+            // 2. Считываем значения в зависимости от типа трансформации
+            if (channel.target_path == cgltf_animation_path_type_translation)
+            {
+                track.positionTimes = times;
+                track.positions.resize(output->count);
+                
+                for (cgltf_size k = 0; k < output->count; ++k) {
+                    cgltf_accessor_read_float(output, k, (float*)&track.positions[k], 3);
+                }
+            }
+            else if (channel.target_path == cgltf_animation_path_type_rotation)
+            {
+                track.rotationTimes = times;
+                track.rotations.resize(output->count);
+                
+                for (cgltf_size k = 0; k < output->count; ++k) {
+                    float q[4];
+                    cgltf_accessor_read_float(output, k, q, 4);
+                    
+                    // ВАЖНО: glTF хранит кватернионы в формате [X, Y, Z, W]
+                    // Конструктор glm::quat по умолчанию принимает [W, X, Y, Z]
+                    track.rotations[k] = glm::quat(q[3], q[0], q[1], q[2]);
+                }
+            }
+            else if (channel.target_path == cgltf_animation_path_type_scale)
+            {
+                track.scaleTimes = times;
+                track.scales.resize(output->count);
+                
+                for (cgltf_size k = 0; k < output->count; ++k) {
+                    cgltf_accessor_read_float(output, k, (float*)&track.scales[k], 3);
+                }
+            }
+        }
+        
+        // Переносим сформированные треки из мапы в итоговый массив клипа
+        for (auto& pair : trackMap) {
+            clip.tracks.push_back(pair.second);
+        }
+        
+        animations.push_back(clip);
+    }
+    
+    return animations;
 }

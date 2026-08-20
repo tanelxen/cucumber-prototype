@@ -10,6 +10,8 @@
 #include "RenderDevice.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include <string>
 
 class VertexBuffer;
@@ -36,6 +38,38 @@ struct Material
     bool isEmbedded;
 };
 
+struct Bone {
+    int parentIndex = -1;
+    glm::mat4 inverseBindMatrix{1.0f}; // Матрица перехода из локального пространства меша в пространство кости
+    
+    // Текущие трансформы
+    glm::vec3 translation{0.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 scale{1.0f};
+    
+    glm::mat4 globalTransform{1.0f};
+};
+
+// Хранит ключи для конкретной кости
+struct AnimationTrack {
+    int boneIndex;
+    
+    std::vector<float> positionTimes;
+    std::vector<glm::vec3> positions;
+    
+    std::vector<float> rotationTimes;
+    std::vector<glm::quat> rotations;
+    
+    std::vector<float> scaleTimes;
+    std::vector<glm::vec3> scales;
+};
+
+struct AnimationClip {
+    std::string name;
+    float duration = 0.0f;
+    std::vector<AnimationTrack> tracks;
+};
+
 class Mesh
 {
 public:
@@ -55,6 +89,10 @@ public:
     std::vector<Surface> m_surfaces;
     std::vector<Material> m_materials;
     
+    std::vector<Bone> m_skeleton;
+    std::vector<AnimationClip> m_animations;
+    std::vector<glm::mat4> m_finalBoneMatrices; // То, что отправим в шейдер
+    
 private:
     VertexArray* vertexArray;
     
@@ -66,4 +104,7 @@ private:
     VertexBuffer* weightsBuffer;
     
     IndexBuffer* indexBuffer;
+    
+    float m_animationTime = 0.0f;
+    int m_currentAnimIndex = 0;
 };
