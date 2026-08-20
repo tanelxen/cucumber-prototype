@@ -128,6 +128,27 @@ void RegisterUI()
                 ImGui::TreePop();
             }
             
+            if (!comp->mesh.m_animations.empty())
+            {
+                auto& cur_anim = comp->mesh.m_animations[comp->mesh.m_currentAnimIndex];
+                
+                if (ImGui::BeginCombo("##sequence combo", cur_anim.name.c_str(), ImGuiComboFlags_None))
+                {
+                    for (int i = 0; i < comp->mesh.m_animations.size(); ++i)
+                    {
+                        bool is_selected = (comp->mesh.m_currentAnimIndex == i);
+                        
+                        if (ImGui::Selectable(comp->mesh.m_animations[i].name.c_str(), is_selected))
+                        {
+                            comp->mesh.m_currentAnimIndex = i;
+                        }
+                        
+                        if (is_selected) ImGui::SetItemDefaultFocus();
+                    }
+                    
+                    ImGui::EndCombo();
+                }
+            }
         }
     };
 }

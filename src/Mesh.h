@@ -93,6 +93,8 @@ public:
     std::vector<AnimationClip> m_animations;
     std::vector<glm::mat4> m_finalBoneMatrices; // То, что отправим в шейдер
     
+    int m_currentAnimIndex = 0;
+    
 private:
     VertexArray* vertexArray;
     
@@ -106,5 +108,5 @@ private:
     IndexBuffer* indexBuffer;
     
     float m_animationTime = 0.0f;
-    int m_currentAnimIndex = 0;
+    
 };
