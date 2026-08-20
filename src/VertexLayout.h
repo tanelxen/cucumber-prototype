@@ -12,7 +12,7 @@
 
 enum class ShaderDataType
 {
-    None = 0, Float, Float2, Float3, Float4, Mat3, Mat4, Int, Int2, Int3, Int4, Bool
+    None = 0, Float, Float2, Float3, Float4, Mat3, Mat4, Int, Int2, Int3, Int4, UByte, UByte2, UByte3, UByte4, Bool
 };
 
 enum VertexAttributeLocation : uint32_t
@@ -20,6 +20,8 @@ enum VertexAttributeLocation : uint32_t
     Position = 0,
     Normal   = 1,
     TexCoord = 2,
+    BoneIndices = 3,
+    BoneWeights = 4
 };
 
 struct VertexAttribute

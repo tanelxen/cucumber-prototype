@@ -22,6 +22,7 @@ namespace RenderDevice {
     std::vector<RenderCommand> transparentPass;
     
     static Shader generic_shader;
+    static Shader skinned_shader;
     static Shader flat_shader;
     static Shader grid_shader;
     
@@ -42,6 +43,7 @@ namespace RenderDevice {
         glFrontFace(GL_CCW);
         
         generic_shader.init("assets/shaders/generic.glsl");
+        skinned_shader.init("assets/shaders/skinned.glsl");
         flat_shader.init("assets/shaders/cube_shaded.glsl");
         grid_shader.init("assets/shaders/grid.glsl");
         
@@ -137,9 +139,12 @@ namespace RenderDevice {
             
             switch (cmd.pipeline)
             {
-                
                 case PipelineType::Generic:
                     shader = &generic_shader;
+                    break;
+                    
+                case PipelineType::Skinned:
+                    shader = &skinned_shader;
                     break;
                     
                 case PipelineType::FlatShaded:
@@ -207,6 +212,11 @@ namespace RenderDevice {
             if (cmd.pipeline != PipelineType::Grid)
             {
                 shader->setUniform("color", cmd.color);
+            }
+            
+            if (cmd.pipeline == PipelineType::Skinned && cmd.bones != nullptr)
+            {
+                shader->setUniform("uBones", *cmd.bones);
             }
             
             if (lastVAO != cmd.vao)

@@ -44,6 +44,10 @@ static uint32_t GetComponentCount(ShaderDataType type)
         case ShaderDataType::Int2:   return 2;
         case ShaderDataType::Int3:   return 3;
         case ShaderDataType::Int4:   return 4;
+        case ShaderDataType::UByte:  return 1;
+        case ShaderDataType::UByte2: return 2;
+        case ShaderDataType::UByte3: return 3;
+        case ShaderDataType::UByte4: return 4;
         case ShaderDataType::Bool:   return 1;
         default: return 0;
     }
@@ -58,12 +62,16 @@ static GLenum ShaderDataTypeToOpenGLBaseType(ShaderDataType type)
         case ShaderDataType::Float3:
         case ShaderDataType::Float4:
         case ShaderDataType::Mat3:
-        case ShaderDataType::Mat4: return GL_FLOAT;
+        case ShaderDataType::Mat4:   return GL_FLOAT;
         case ShaderDataType::Int:
         case ShaderDataType::Int2:
         case ShaderDataType::Int3:
-        case ShaderDataType::Int4: return GL_INT;
-        case ShaderDataType::Bool: return GL_BOOL;
+        case ShaderDataType::Int4:   return GL_INT;
+        case ShaderDataType::UByte:
+        case ShaderDataType::UByte2:
+        case ShaderDataType::UByte3:
+        case ShaderDataType::UByte4: return GL_UNSIGNED_BYTE;
+        case ShaderDataType::Bool:   return GL_BOOL;
         default: return 0;
     }
 }
@@ -81,14 +89,28 @@ void VertexArray::setVertexBuffer(const VertexBuffer* vertexBuffer)
         
         glEnableVertexAttribArray(location);
         
-        glVertexAttribPointer(
-                              location,
-                              GetComponentCount(element.type),
-                              ShaderDataTypeToOpenGLBaseType(element.type),
-                              element.normalized ? GL_TRUE : GL_FALSE,
-                              layout.getStride(),
-                              (const void*)(uintptr_t)element.offset
-                              );
+        if (element.type == ShaderDataType::Int4)
+        {
+            glVertexAttribIPointer(
+                                  location,
+                                  GetComponentCount(element.type),
+                                  ShaderDataTypeToOpenGLBaseType(element.type),
+                                  layout.getStride(),
+                                  (const void*)(uintptr_t)element.offset
+                                  );
+            
+        }
+        else
+        {
+            glVertexAttribPointer(
+                                  location,
+                                  GetComponentCount(element.type),
+                                  ShaderDataTypeToOpenGLBaseType(element.type),
+                                  element.normalized ? GL_TRUE : GL_FALSE,
+                                  layout.getStride(),
+                                  (const void*)(uintptr_t)element.offset
+                                  );
+        }
     }
     
     vertexBuffer->unbind();

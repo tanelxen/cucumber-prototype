@@ -39,6 +39,10 @@ static uint32_t ShaderDataTypeSize(ShaderDataType type)
         case ShaderDataType::Int2:   return 4 * 2;
         case ShaderDataType::Int3:   return 4 * 3;
         case ShaderDataType::Int4:   return 4 * 4;
+        case ShaderDataType::UByte:  return 1;
+        case ShaderDataType::UByte2: return 2;
+        case ShaderDataType::UByte3: return 3;
+        case ShaderDataType::UByte4: return 4;
         case ShaderDataType::Bool:   return 1;
         default: return 0;
     }

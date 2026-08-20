@@ -54,6 +54,16 @@ WorldScene::~WorldScene() = default;
 void WorldScene::update(float dt)
 {
 //    m_pViewportPanel->update(dt);
+    
+    for (auto& entity : m_entities)
+    {
+        auto meshComp = entity->getComponent<MeshComponent>();
+        
+        if (meshComp)
+        {
+            meshComp->mesh.update(dt);
+        }
+    }
 }
 
 void WorldScene::draw()

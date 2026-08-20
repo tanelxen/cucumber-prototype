@@ -8,8 +8,6 @@
 #include "ModelLoader.h"
 #include "Mesh.h"
 
-#include "RenderDevice.h"
-
 #define CGLTF_IMPLEMENTATION
 #include "../vendor/cgltf.h"
 
@@ -19,14 +17,17 @@
 
 #include <iostream>
 
-void loadGLTFWithSurfaces(cgltf_data* data,
-                          std::vector<glm::vec3>& outPositions,
-                          std::vector<glm::vec3>& outNormals,
-                          std::vector<glm::vec2>& outTexCoords,
-                          std::vector<uint32_t>& outIndices,
-                          std::vector<Surface>& outSurfaces);
+static void loadGLTFWithSurfaces(cgltf_data* data,
+                                 std::vector<glm::vec3>& outPositions,
+                                 std::vector<glm::vec3>& outNormals,
+                                 std::vector<glm::vec2>& outTexCoords,
+                                 std::vector<glm::ivec4>& outBoneIndices,
+                                 std::vector<glm::vec4>& outWeights,
+                                 std::vector<uint32_t>& outIndices,
+                                 std::vector<Surface>& outSurfaces);
 
-std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath);
+
+static std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath);
 
 namespace ModelLoader
 {
@@ -52,20 +53,34 @@ namespace ModelLoader
         std::vector<uint32_t> indices;
         std::vector<Surface> surfaces;
         
-        loadGLTFWithSurfaces(data, positions, normals, texCoords, indices, surfaces);
-        model.init(positions, normals, texCoords, indices);
+        std::vector<glm::ivec4> boneIndices;
+        std::vector<glm::vec4> weights;
+        
+        loadGLTFWithSurfaces(data, positions, normals, texCoords, boneIndices, weights, indices, surfaces);
+        
+        model.setPositions(positions);
+        model.setNormals(normals);
+        model.setTexCoords(texCoords);
+        model.setIndices(indices);
         model.setSurfaces(surfaces);
+        
+        if (!boneIndices.empty() && !weights.empty())
+        {
+            model.setSkinned(boneIndices, weights);
+        }
         
         cgltf_free(data);
     }
 }
 
-void loadGLTFWithSurfaces(cgltf_data* data,
-                          std::vector<glm::vec3>& outPositions,
-                          std::vector<glm::vec3>& outNormals,
-                          std::vector<glm::vec2>& outTexCoords,
-                          std::vector<uint32_t>& outIndices,
-                          std::vector<Surface>& outSurfaces)
+static void loadGLTFWithSurfaces(cgltf_data* data,
+                                 std::vector<glm::vec3>& outPositions,
+                                 std::vector<glm::vec3>& outNormals,
+                                 std::vector<glm::vec2>& outTexCoords,
+                                 std::vector<glm::ivec4>& outBoneIndices,
+                                 std::vector<glm::vec4>& outWeights,
+                                 std::vector<uint32_t>& outIndices,
+                                 std::vector<Surface>& outSurfaces)
 {
     uint32_t vertexOffset = 0;
     
@@ -79,7 +94,9 @@ void loadGLTFWithSurfaces(cgltf_data* data,
         {
             cgltf_primitive& primitive = mesh.primitives[j];
             
-            Surface surface{};
+            if (primitive.type != cgltf_primitive_type_triangles) continue;
+            
+            Surface surface;
             surface.startIndex = static_cast<uint32_t>(outIndices.size());
             surface.m_name = meshName + "_prim_" + std::to_string(j);
             
@@ -97,31 +114,33 @@ void loadGLTFWithSurfaces(cgltf_data* data,
             cgltf_accessor* normAccessor = nullptr;
             cgltf_accessor* uvAccessor = nullptr;
             
+            cgltf_accessor* jointsAccessor = nullptr;
+            cgltf_accessor* weightsAccessor = nullptr;
+            
             for (cgltf_size k = 0; k < primitive.attributes_count; ++k)
             {
                 cgltf_attribute& attr = primitive.attributes[k];
                 if (attr.type == cgltf_attribute_type_position)  posAccessor = attr.data;
                 if (attr.type == cgltf_attribute_type_normal)    normAccessor = attr.data;
                 if (attr.type == cgltf_attribute_type_texcoord)  uvAccessor = attr.data;
+                
+                if (attr.type == cgltf_attribute_type_joints)  jointsAccessor = attr.data;
+                if (attr.type == cgltf_attribute_type_weights) weightsAccessor = attr.data;
             }
             
             if (!posAccessor) continue;
             
             if (posAccessor)
             {
-                // Получаем прямой указатель на начало данных в памяти
                 uint8_t* bufferPtr = (uint8_t*)posAccessor->buffer_view->buffer->data
                 + posAccessor->buffer_view->offset
                 + posAccessor->offset;
                 
-                // Приводим его к типу ваших вершин (glm::vec3)
                 glm::vec3* sourcePositions = (glm::vec3*)bufferPtr;
                 
-                // Вставляем весь массив целиком за один шаг
                 outPositions.insert(outPositions.end(), sourcePositions, sourcePositions + posAccessor->count);
             }
             
-            // 2. Быстрое копирование НОРМАЛЕЙ
             if (normAccessor)
             {
                 uint8_t* bufferPtr = (uint8_t*)normAccessor->buffer_view->buffer->data
@@ -136,7 +155,6 @@ void loadGLTFWithSurfaces(cgltf_data* data,
                 outNormals.insert(outNormals.end(), posAccessor->count, glm::vec3(0.0f, 1.0f, 0.0f));
             }
             
-            // 3. Быстрое копирование ТЕКСТУРНЫХ КООРДИНАТ
             if (uvAccessor)
             {
                 uint8_t* bufferPtr = (uint8_t*)uvAccessor->buffer_view->buffer->data
@@ -149,6 +167,35 @@ void loadGLTFWithSurfaces(cgltf_data* data,
             else
             {
                 outTexCoords.insert(outTexCoords.end(), posAccessor->count, glm::vec2(0.0f));
+            }
+            
+            if (jointsAccessor)
+            {
+                if (jointsAccessor->component_type == cgltf_component_type_r_8u)
+                {
+                    uint8_t* bufferPtr = (uint8_t*)jointsAccessor->buffer_view->buffer->data
+                    + jointsAccessor->buffer_view->offset
+                    + jointsAccessor->offset;
+                    
+                    glm::u8vec4* boneIndices = (glm::u8vec4*)bufferPtr;
+                    
+                    outBoneIndices.insert(outBoneIndices.end(), boneIndices, boneIndices + jointsAccessor->count);
+                }
+            }
+            
+            if (weightsAccessor)
+            {
+                size_t count = weightsAccessor->count;
+                std::vector<glm::vec4> weights(count, glm::vec4(0.0f));
+                
+                for (cgltf_size k = 0; k < count; ++k)
+                {
+                    float w[4];
+                    cgltf_accessor_read_float(weightsAccessor, k, w, 4);
+                    weights[k] = glm::vec4(w[0], w[1], w[2], w[3]);
+                }
+                
+                outWeights.insert(outWeights.end(), weights.begin(), weights.end());
             }
             
             size_t vertexCount = posAccessor->count;
@@ -180,7 +227,7 @@ void loadGLTFWithSurfaces(cgltf_data* data,
     }
 }
 
-uint32_t loadSingleGLTFTexture(const cgltf_image& img, const std::string& baseDir)
+static uint32_t loadSingleGLTFTexture(const cgltf_image& img, const std::string& baseDir)
 {
     int width = 0, height = 0, channels = 0;
     stbi_uc* pixelData = nullptr;
@@ -231,7 +278,7 @@ uint32_t loadSingleGLTFTexture(const cgltf_image& img, const std::string& baseDi
     return textureHandle;
 }
 
-std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath)
+static std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath)
 {
     std::vector<Material> outMaterials;
     

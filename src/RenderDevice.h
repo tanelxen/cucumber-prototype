@@ -51,7 +51,7 @@ enum class BlendMode
 enum class PipelineType
 {
 //    World, Skinned
-    Generic, FlatShaded, Grid
+    Generic, FlatShaded, Grid, Skinned
 };
 
 struct RenderCommand
@@ -68,8 +68,7 @@ struct RenderCommand
     BlendMode blendMode = BlendMode::Opaque;
     glm::vec4 color = {1, 1, 1, 1};
     
-    // Object
     glm::mat4 transform = glm::mat4(1);
     
-//    uint32_t passFlags = 0;
+    const std::vector<glm::mat4>* bones;
 };

@@ -36,21 +36,19 @@ struct Material
     bool isEmbedded;
 };
 
-//struct MaterialAsset
-//{
-//    
-//};
-
 class Mesh
 {
 public:
-    void initCube();
+    void setPositions(const std::vector<glm::vec3>& positions);
+    void setNormals(const std::vector<glm::vec3>& normals);
+    void setTexCoords(const std::vector<glm::vec2>& uv);
+    void setIndices(const std::vector<uint32_t>& indices);
     
-    void init(const std::vector<glm::vec3>& positions, const std::vector<glm::vec3>& normals, const std::vector<glm::vec2>& texCoords, const std::vector<uint32_t>& indices);
-    void init(const std::vector<float>& positions, const std::vector<float>& normals, const std::vector<float>& texCoords, const std::vector<uint32_t>& indices);
+    void setSkinned(const std::vector<glm::ivec4>& boneIndices, const std::vector<glm::vec4>& weights);
     
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
+    void update(float dt);
     void draw(glm::mat4& transform) const;
     
     std::string m_name;
@@ -58,11 +56,14 @@ public:
     std::vector<Material> m_materials;
     
 private:
+    VertexArray* vertexArray;
+    
     VertexBuffer* posBuffer;
     VertexBuffer* nrmBuffer;
     VertexBuffer* texBuffer;
+    
+    VertexBuffer* bonesBuffer;
+    VertexBuffer* weightsBuffer;
+    
     IndexBuffer* indexBuffer;
-    VertexArray* vertexArray;
-    
-    
 };
