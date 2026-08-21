@@ -76,6 +76,29 @@ static GLenum ShaderDataTypeToOpenGLBaseType(ShaderDataType type)
     }
 }
 
+static bool IsInteger(ShaderDataType type)
+{
+    switch (type)
+    {
+        case ShaderDataType::Float:
+        case ShaderDataType::Float2:
+        case ShaderDataType::Float3:
+        case ShaderDataType::Float4:
+        case ShaderDataType::Mat3:
+        case ShaderDataType::Mat4:   return false;
+        case ShaderDataType::Int:
+        case ShaderDataType::Int2:
+        case ShaderDataType::Int3:
+        case ShaderDataType::Int4:
+        case ShaderDataType::UByte:
+        case ShaderDataType::UByte2:
+        case ShaderDataType::UByte3:
+        case ShaderDataType::UByte4: return true;
+        case ShaderDataType::Bool:   return false;
+        default: return 0;
+    }
+}
+
 void VertexArray::setVertexBuffer(const VertexBuffer* vertexBuffer)
 {
     bind();
@@ -89,7 +112,7 @@ void VertexArray::setVertexBuffer(const VertexBuffer* vertexBuffer)
         
         glEnableVertexAttribArray(location);
         
-        if (element.type == ShaderDataType::Int4)
+        if (IsInteger(element.type))
         {
             glVertexAttribIPointer(
                                   location,
@@ -115,15 +138,12 @@ void VertexArray::setVertexBuffer(const VertexBuffer* vertexBuffer)
     
     vertexBuffer->unbind();
     unbind();
-    
-//    m_VertexBuffers.push_back(vertexBuffer);
 }
 
 void VertexArray::setIndexBuffer(const IndexBuffer* indexBuffer)
 {
     bind();
     indexBuffer->bind();
-//    m_IndexBuffer = indexBuffer;
     
     unbind();
     indexBuffer->unbind();

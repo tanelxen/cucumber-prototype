@@ -10,7 +10,8 @@
 #include <string>
 
 class Mesh;
+class Animator;
 
 namespace ModelLoader {
-    bool LoadGLTF(const std::string& filepath, Mesh& mesh);
+    bool LoadGLTF(const std::string& filepath, Mesh& mesh, Animator& animator);
 };

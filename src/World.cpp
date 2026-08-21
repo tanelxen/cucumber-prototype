@@ -61,7 +61,7 @@ void WorldScene::update(float dt)
         
         if (meshComp)
         {
-            meshComp->mesh.update(dt);
+            meshComp->animator.update(dt);
         }
     }
 }
@@ -80,7 +80,12 @@ void WorldScene::draw()
         if (transformComp && meshComp)
         {
             auto model = transformComp->toMat4();
-            meshComp->mesh.draw(model);
+            
+            if (meshComp->animator.m_clips.empty()) {
+                meshComp->mesh.draw(model);
+            } else {
+                meshComp->mesh.draw(model, meshComp->animator.getFinalBoneMatrices());
+            }
         }
     }
     

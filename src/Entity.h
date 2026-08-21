@@ -15,6 +15,7 @@
 #include <glm/glm.hpp>
 
 #include "Mesh.h"
+#include "Animator.h"
 
 struct Transform
 {
@@ -40,7 +41,9 @@ struct MeshComponent : Component
 {
     std::string path = "<no mesh>";
 //    glm::vec4 tintColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+    
     Mesh mesh;
+    Animator animator;
 };
 
 class Entity

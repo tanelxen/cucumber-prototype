@@ -9,13 +9,16 @@
 
 #include "RenderDevice.h"
 
+//#include "Animator.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_precision.hpp>
 
 #include <string>
 
-class VertexBuffer;
 class VertexArray;
+class VertexBuffer;
 class IndexBuffer;
 
 struct Surface
@@ -38,75 +41,43 @@ struct Material
     bool isEmbedded;
 };
 
-struct Bone {
-    int parentIndex = -1;
-    glm::mat4 inverseBindMatrix{1.0f}; // Матрица перехода из локального пространства меша в пространство кости
-    
-    // Текущие трансформы
-    glm::vec3 translation{0.0f};
-    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec3 scale{1.0f};
-    
-    glm::mat4 globalTransform{1.0f};
+struct VertexPosition {
+    glm::vec3 position;
 };
 
-// Хранит ключи для конкретной кости
-struct AnimationTrack {
-    int boneIndex;
-    
-    std::vector<float> positionTimes;
-    std::vector<glm::vec3> positions;
-    
-    std::vector<float> rotationTimes;
-    std::vector<glm::quat> rotations;
-    
-    std::vector<float> scaleTimes;
-    std::vector<glm::vec3> scales;
+struct VertexShading {
+    glm::vec3 normal;
+    glm::vec2 texCoord;
 };
 
-struct AnimationClip {
-    std::string name;
-    float duration = 0.0f;
-    std::vector<AnimationTrack> tracks;
+struct VertexSkinning {
+    glm::u8vec4 boneIndices;
+    glm::u8vec4 boneWeights;
 };
 
 class Mesh
 {
 public:
-    void setPositions(const std::vector<glm::vec3>& positions);
-    void setNormals(const std::vector<glm::vec3>& normals);
-    void setTexCoords(const std::vector<glm::vec2>& uv);
+    Mesh();
+    ~Mesh();
+    
+    void setVertexData(const std::vector<VertexPosition>& positions, const std::vector<VertexShading>& shadingData, const std::vector<VertexSkinning>* skinningData);
     void setIndices(const std::vector<uint32_t>& indices);
-    
-    void setSkinned(const std::vector<glm::ivec4>& boneIndices, const std::vector<glm::vec4>& weights);
-    
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
-    void update(float dt);
     void draw(glm::mat4& transform) const;
+    void draw(glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const;
     
     std::string m_name;
     std::vector<Surface> m_surfaces;
     std::vector<Material> m_materials;
     
-    std::vector<Bone> m_skeleton;
-    std::vector<AnimationClip> m_animations;
-    std::vector<glm::mat4> m_finalBoneMatrices; // То, что отправим в шейдер
-    
-    int m_currentAnimIndex = 0;
-    
 private:
-    VertexArray* vertexArray;
+    std::unique_ptr<VertexArray> m_vao;
     
-    VertexBuffer* posBuffer;
-    VertexBuffer* nrmBuffer;
-    VertexBuffer* texBuffer;
+    std::unique_ptr<VertexBuffer> m_posBuffer;
+    std::unique_ptr<VertexBuffer> m_shadingBuffer;
+    std::unique_ptr<VertexBuffer> m_skinningBuffer;
     
-    VertexBuffer* bonesBuffer;
-    VertexBuffer* weightsBuffer;
-    
-    IndexBuffer* indexBuffer;
-    
-    float m_animationTime = 0.0f;
-    
+    std::unique_ptr<IndexBuffer>  m_indexBuffer;
 };

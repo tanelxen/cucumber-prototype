@@ -6,7 +6,10 @@
 //
 
 #include "ModelLoader.h"
+
 #include "Mesh.h"
+#include "Animator.h"
+#include "Skeleton.h"
 
 #define CGLTF_IMPLEMENTATION
 #include "../vendor/cgltf.h"
@@ -21,8 +24,8 @@ static void loadGLTFWithSurfaces(cgltf_data* data,
                                  std::vector<glm::vec3>& outPositions,
                                  std::vector<glm::vec3>& outNormals,
                                  std::vector<glm::vec2>& outTexCoords,
-                                 std::vector<glm::ivec4>& outBoneIndices,
-                                 std::vector<glm::vec4>& outWeights,
+                                 std::vector<glm::u8vec4>& outBoneIndices,
+                                 std::vector<glm::u8vec4>& outWeights,
                                  std::vector<uint32_t>& outIndices,
                                  std::vector<Surface>& outSurfaces);
 
@@ -32,7 +35,7 @@ static std::vector<AnimationClip> loadGLTFAnimations(cgltf_data* data, const std
 
 namespace ModelLoader
 {
-    bool LoadGLTF(const std::string& path, Mesh& model)
+    bool LoadGLTF(const std::string& path, Mesh& model, Animator& animator)
     {
         cgltf_options options = {};
         cgltf_data* data = nullptr;
@@ -54,21 +57,30 @@ namespace ModelLoader
         std::vector<uint32_t> indices;
         std::vector<Surface> surfaces;
         
-        std::vector<glm::ivec4> boneIndices;
-        std::vector<glm::vec4> weights;
+        std::vector<glm::u8vec4> boneIndices;
+        std::vector<glm::u8vec4> weights;
         
         loadGLTFWithSurfaces(data, positions, normals, texCoords, boneIndices, weights, indices, surfaces);
         
-        model.setPositions(positions);
-        model.setNormals(normals);
-        model.setTexCoords(texCoords);
+        auto size = positions.size();
+        std::vector<VertexPosition> vertGeometry(size);
+        std::vector<VertexShading> vertShading(size);
+        std::vector<VertexSkinning> vertSkinning(size);
+        
+        for (int i = 0; i < size; ++i)
+        {
+            vertGeometry[i] = { .position = positions[i] };
+            vertShading[i] = { .normal = normals[i], .texCoord = texCoords[i] };
+            
+            if (i < boneIndices.size())
+            {
+                vertSkinning[i] = { .boneIndices = boneIndices[i], .boneWeights = weights[i] };
+            }
+        }
+        
+        model.setVertexData(vertGeometry, vertShading, &vertSkinning);
         model.setIndices(indices);
         model.setSurfaces(surfaces);
-        
-        if (!boneIndices.empty() && !weights.empty())
-        {
-            model.setSkinned(boneIndices, weights);
-        }
         
         std::unordered_map<cgltf_node*, int> nodeToBoneIndex;
         
@@ -76,8 +88,9 @@ namespace ModelLoader
         if (data->skins_count > 0)
         {
             cgltf_skin& skin = data->skins[0];
-            model.m_skeleton.resize(skin.joints_count);
-            model.m_finalBoneMatrices.resize(skin.joints_count, glm::mat4(1.0f));
+            
+            auto skeleton = std::make_shared<Skeleton>();
+            skeleton->bones.resize(skin.joints_count);
             
             // Заполняем nodeToBoneIndex
             for (cgltf_size i = 0; i < skin.joints_count; ++i) {
@@ -87,22 +100,29 @@ namespace ModelLoader
             for (cgltf_size i = 0; i < skin.joints_count; ++i) {
                 cgltf_node* jointNode = skin.joints[i];
                 if (jointNode->parent && nodeToBoneIndex.count(jointNode->parent)) {
-                    model.m_skeleton[i].parentIndex = nodeToBoneIndex[jointNode->parent];
+                    skeleton->bones[i].parentIndex = nodeToBoneIndex[jointNode->parent];
                 }
             }
             
             if (skin.inverse_bind_matrices) {
                 cgltf_accessor* ibmAcc = skin.inverse_bind_matrices;
                 for (cgltf_size i = 0; i < skin.joints_count; ++i) {
-                    cgltf_accessor_read_float(ibmAcc, i, (float*)&model.m_skeleton[i].inverseBindMatrix, 16);
+                    cgltf_accessor_read_float(ibmAcc, i, (float*)&skeleton->bones[i].inverseBindMatrix, 16);
                 }
             }
+            
+            animator.setSkeleton(skeleton);
         }
         
         // Загрузка анимаций (передаем data и сформированную мапу узлов)
         if (data->animations_count > 0)
         {
-            model.m_animations = loadGLTFAnimations(data, nodeToBoneIndex);
+            auto animations = loadGLTFAnimations(data, nodeToBoneIndex);
+            
+            for (auto clip : animations)
+            {
+                animator.addClip(clip);
+            }
         }
         
         cgltf_free(data);
@@ -114,8 +134,8 @@ static void loadGLTFWithSurfaces(cgltf_data* data,
                                  std::vector<glm::vec3>& outPositions,
                                  std::vector<glm::vec3>& outNormals,
                                  std::vector<glm::vec2>& outTexCoords,
-                                 std::vector<glm::ivec4>& outBoneIndices,
-                                 std::vector<glm::vec4>& outWeights,
+                                 std::vector<glm::u8vec4>& outBoneIndices,
+                                 std::vector<glm::u8vec4>& outWeights,
                                  std::vector<uint32_t>& outIndices,
                                  std::vector<Surface>& outSurfaces)
 {
@@ -223,13 +243,13 @@ static void loadGLTFWithSurfaces(cgltf_data* data,
             if (weightsAccessor)
             {
                 size_t count = weightsAccessor->count;
-                std::vector<glm::vec4> weights(count, glm::vec4(0.0f));
+                std::vector<glm::u8vec4> weights(count);
                 
                 for (cgltf_size k = 0; k < count; ++k)
                 {
                     float w[4];
                     cgltf_accessor_read_float(weightsAccessor, k, w, 4);
-                    weights[k] = glm::vec4(w[0], w[1], w[2], w[3]);
+                    weights[k] = glm::u8vec4(w[0] * 255, w[1] * 255, w[2] * 255, w[3] * 255);
                 }
                 
                 outWeights.insert(outWeights.end(), weights.begin(), weights.end());

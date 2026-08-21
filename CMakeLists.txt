@@ -42,7 +42,11 @@ set(SRC_COMMON
         src/Mesh.h
         src/ModelLoader.cpp
         src/ModelLoader.h
-        
+        src/Skeleton.h
+        src/Animation.h
+        src/Animator.cpp
+        src/Animator.h
+
         src/Viewport.cpp
         src/Viewport.h
         

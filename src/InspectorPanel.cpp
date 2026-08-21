@@ -98,7 +98,7 @@ void RegisterUI()
                 
                 if (path != nullptr)
                 {
-                    ModelLoader::LoadGLTF(path, comp->mesh);
+                    ModelLoader::LoadGLTF(path, comp->mesh, comp->animator);
                     
                     std::filesystem::path p(path);
                     comp->path = p.filename();
@@ -128,19 +128,22 @@ void RegisterUI()
                 ImGui::TreePop();
             }
             
-            if (!comp->mesh.m_animations.empty())
+            if (!comp->animator.m_clips.empty())
             {
-                auto& cur_anim = comp->mesh.m_animations[comp->mesh.m_currentAnimIndex];
+                auto& animator = comp->animator;
+                auto& clips = animator.m_clips;
                 
-                if (ImGui::BeginCombo("##sequence combo", cur_anim.name.c_str(), ImGuiComboFlags_None))
+                const char* title = animator.m_currentClipIndex == -1 ? "<no selected>" : clips[animator.m_currentClipIndex].name.c_str();
+                
+                if (ImGui::BeginCombo("##sequence combo", title, ImGuiComboFlags_None))
                 {
-                    for (int i = 0; i < comp->mesh.m_animations.size(); ++i)
+                    for (int i = 0; i < clips.size(); ++i)
                     {
-                        bool is_selected = (comp->mesh.m_currentAnimIndex == i);
+                        bool is_selected = (animator.m_currentClipIndex == i);
                         
-                        if (ImGui::Selectable(comp->mesh.m_animations[i].name.c_str(), is_selected))
+                        if (ImGui::Selectable(clips[i].name.c_str(), is_selected))
                         {
-                            comp->mesh.m_currentAnimIndex = i;
+                            animator.play(i);
                         }
                         
                         if (is_selected) ImGui::SetItemDefaultFocus();
