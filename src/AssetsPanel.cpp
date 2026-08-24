@@ -192,30 +192,30 @@ AssetsPanel::AssetsPanel() : EditorPanel("Assets")
 void AssetsPanel::draw()
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-    ImGui::Begin("Assets", nullptr, ImGuiWindowFlags_MenuBar);
+    ImGui::Begin("Assets", nullptr/*, ImGuiWindowFlags_MenuBar*/);
     
-    if (ImGui::BeginMenuBar())
-    {
-        ImGui::TextUnformatted("Files");
-        
-        std::filesystem::path path = rootDir;
-        
-        for (auto dir : std::filesystem::relative(currentDir, rootDir))
-        {
-            path = path / dir;
-            
-            ImGui::TextUnformatted(">");
-            
-            if (GUI::MenuBarButton(dir.string()))
-            {
-                ChangeDir(path);
-            }
-        }
-        
-        ImGui::EndMenuBar();
-    }
-    
-    DrawFiles();
+//    if (ImGui::BeginMenuBar())
+//    {
+//        ImGui::TextUnformatted("Files");
+//        
+//        std::filesystem::path path = rootDir;
+//        
+//        for (auto dir : std::filesystem::relative(currentDir, rootDir))
+//        {
+//            path = path / dir;
+//            
+//            ImGui::TextUnformatted(">");
+//            
+//            if (GUI::MenuBarButton(dir.string()))
+//            {
+//                ChangeDir(path);
+//            }
+//        }
+//        
+//        ImGui::EndMenuBar();
+//    }
+//    
+//    DrawFiles();
     
     ImGui::End();
     ImGui::PopStyleVar();

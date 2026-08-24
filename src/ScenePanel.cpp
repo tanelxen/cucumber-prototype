@@ -183,25 +183,29 @@ void ScenePanel::draw()
     
 //    DrawSceneTree(&root);
     
+    static int selectedIndex = -1;
     
     ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoCollapse);
     
     if (ImGui::Button("+"))
     {
-        auto count = m_scene->m_entities.size();
+        auto count = (int)m_scene->m_entities.size();
         auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
-        entity->addComponent<TransformComponent>();
-        entity->addComponent<MeshComponent>();
         
         m_scene->m_entities.push_back(std::move(entity));
         m_scene->selectEntityAtIndex(count);
+        selectedIndex = count;
     }
     
     for (int i = 0; i < m_scene->m_entities.size(); ++i)
     {
-        if (ImGui::Selectable(m_scene->m_entities[i]->m_name.c_str()))
+        bool selected = selectedIndex == i;
+        const char* name = m_scene->m_entities[i]->m_name.empty() ? "?" : m_scene->m_entities[i]->m_name.c_str();
+        
+        if ( ImGui::Selectable(name, selected) )
         {
             m_scene->selectEntityAtIndex(i);
+            selectedIndex = i;
         }
     }
     

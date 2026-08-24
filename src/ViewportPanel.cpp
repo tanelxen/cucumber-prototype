@@ -19,7 +19,7 @@ ViewportPanel::ViewportPanel(const std::string &name) : EditorPanel(name)
     m_pCamera = new Camera();
     
     m_pCameraController = new CameraController(m_pCamera);
-    m_pCameraController->position = {0, 2, 2};
+    m_pCameraController->position = {0, 128, 128};
 }
 
 void ViewportPanel::setViewport(Viewport *viewport)

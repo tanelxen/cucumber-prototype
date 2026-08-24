@@ -59,34 +59,37 @@ void CameraController::update(float dt)
     float rightmove = 0;
     float upmove = 0;
     
-    if (Input::isKeyPressed(KEY_W))
+    if (m_isFlyMode)
     {
-        forwardmove += 1;
-    }
-    
-    if (Input::isKeyPressed(KEY_S))
-    {
-        forwardmove -= 1;
-    }
-    
-    if (Input::isKeyPressed(KEY_D))
-    {
-        rightmove += 1;
-    }
-    
-    if (Input::isKeyPressed(KEY_A))
-    {
-        rightmove -= 1;
-    }
-    
-    if (Input::isKeyPressed(KEY_SPACE))
-    {
-        upmove += 1;
-    }
-    
-    if (Input::isKeyPressed(GLFW_KEY_C))
-    {
-        upmove -= 1;
+        if (Input::isKeyPressed(KEY_W))
+        {
+            forwardmove += 1;
+        }
+        
+        if (Input::isKeyPressed(KEY_S))
+        {
+            forwardmove -= 1;
+        }
+        
+        if (Input::isKeyPressed(KEY_D))
+        {
+            rightmove += 1;
+        }
+        
+        if (Input::isKeyPressed(KEY_A))
+        {
+            rightmove -= 1;
+        }
+        
+        if (Input::isKeyPressed(KEY_SPACE))
+        {
+            upmove += 1;
+        }
+        
+        if (Input::isKeyPressed(GLFW_KEY_C))
+        {
+            upmove -= 1;
+        }
     }
     
 //    bool jump = Input::isKeyPressed(KEY_SPACE);

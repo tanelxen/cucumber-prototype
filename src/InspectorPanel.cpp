@@ -31,7 +31,61 @@
 
 #include "RenderDevice.h"
 
-void RegisterUI();
+class ComponentInspector {
+public:
+    // Сигнатура функции отрисовки: принимает чистый указатель на компонент
+    using RenderFunc = std::function<void(Component*, InspectorPanel* p)>;
+    
+    static ComponentInspector& Get() {
+        static ComponentInspector instance;
+        return instance;
+    }
+    
+    // Регистрация нового UI для компонента
+    template<typename T>
+    void Register(const std::string& displayName, RenderFunc func) {
+        std::type_index id = std::type_index(typeid(T));
+        registry[id] = { displayName, func };
+    }
+    
+    // Отрисовка компонента по его динамическому типу
+    void Render(Component* component, InspectorPanel* panel) {
+        if (!component) return;
+        
+        std::type_index id = component->GetTypeIndex();
+        auto it = registry.find(id);
+        
+        if (it != registry.end()) {
+            const auto& info = it->second;
+            
+            // Отрисовываем красивый заголовок в ImGui
+            if (ImGui::CollapsingHeader(info.displayName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+//                ImGui::Checkbox("Enabled", &component->enabled);
+                // Вызываем кастомную функцию отрисовки
+                info.renderFunc(component, panel);
+            }
+        } else {
+            // Фолбэк, если UI для компонента забыли зарегистрировать
+            ImGui::CollapsingHeader(typeid(*component).name());
+        }
+    }
+    
+    // Дополнительный метод для получения красивого имени (для меню добавления)
+    std::string GetName(std::type_index id) {
+        auto it = registry.find(id);
+        return (it != registry.end()) ? it->second.displayName : id.name();
+    }
+    
+private:
+    struct InspectorInfo {
+        std::string displayName;
+        RenderFunc renderFunc;
+    };
+    
+    std::unordered_map<std::type_index, InspectorInfo> registry;
+};
+
+static void RegisterUI();
 
 void InspectorPanel::setEntity(Entity *entity)
 {
@@ -42,69 +96,43 @@ void InspectorPanel::setEntity(Entity *entity)
 //bool DrawVector3Control(const char* label, float* values, float resetValue, float speed);
 bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth);
 
-
-std::unordered_map<std::type_index, std::function<void(Component* , InspectorPanel*)>> uiRegistry;
-
-void RegisterUI()
+static void RegisterUI()
 {
-    uiRegistry[typeid(TransformComponent)] = [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<TransformComponent*>(c);
-        
-        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            DrawVec3Control("Position", comp->position, 0, 100);
-            DrawVec3Control("Rotation", comp->rotation, 0, 100);
-            DrawVec3Control("Scale", comp->scale, 1, 100);
-            
-//            ImGui::Indent();
-//            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
-//            if (ImGui::BeginTable("#transform", 2, ImGuiTableFlags_SizingStretchProp))
-//            {
-//                ImGui::TableSetupColumn("name", 0, 0.25f);
-//                ImGui::TableSetupColumn("set", 0, 0.65f);
-//                
-//                ImGui::TableNextColumn();
-//                ImGui::AlignTextToFramePadding();
-//                ImGui::Text("Position");
-//                
-//                ImGui::TableNextColumn();
-//                
-//                DrawVec3Control("Position", comp->position, 0, 100);
-//                
-//                ImGui::EndTable();
-//            }
-//            
-//            ImGui::PopStyleVar();
-//            ImGui::Unindent();
-        }
-    };
+    auto& inspector = ComponentInspector::Get();
     
-    uiRegistry[typeid(MeshComponent)] = [](Component* c, InspectorPanel* p) {
+    inspector.Register<TransformComponent>("Transform", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<TransformComponent*>(c);
+        DrawVec3Control("Position", comp->position, 0, 100);
+        DrawVec3Control("Rotation", comp->rotation, 0, 100);
+        DrawVec3Control("Scale", comp->scale, 1, 100);
+    });
+    
+    inspector.Register<MeshComponent>("Mesh", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<MeshComponent*>(c);
         
-        if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+//        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
+        
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
+        
+        ImGui::InputText("##MeshPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
+        ImGui::SameLine();
+        if (ImGui::Button("..."))
         {
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
+            char const * filter[2] = { "*.gltf", "*.glb" };
+            const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/gltf/", 2, filter, NULL, 0);
             
-            char buffer[256];
-            snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
-            
-            ImGui::InputText("##MeshPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
-            ImGui::SameLine();
-            if (ImGui::Button("..."))
+            if (path != nullptr)
             {
-                char const * filter[2] = { "*.gltf", "*.glb" };
-                const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/gltf/", 2, filter, NULL, 0);
+                ModelLoader::LoadGLTF(path, comp->mesh, comp->animator);
                 
-                if (path != nullptr)
-                {
-                    ModelLoader::LoadGLTF(path, comp->mesh, comp->animator);
-                    
-                    std::filesystem::path p(path);
-                    comp->path = p.filename();
-                }
+                std::filesystem::path p(path);
+                comp->path = p.filename();
             }
-            
+        }
+        
+        if (!comp->mesh.m_surfaces.empty())
+        {
             if (ImGui::TreeNode("Surfaces"))
             {
                 for (int i = 0; i < comp->mesh.m_surfaces.size(); i++)
@@ -127,59 +155,33 @@ void RegisterUI()
                 
                 ImGui::TreePop();
             }
+        }
+        
+        if (!comp->animator.m_clips.empty())
+        {
+            auto& animator = comp->animator;
+            auto& clips = animator.m_clips;
             
-            if (!comp->animator.m_clips.empty())
+            const char* title = animator.m_currentClipIndex == -1 ? "<no selected>" : clips[animator.m_currentClipIndex].name.c_str();
+            
+            if (ImGui::BeginCombo("##sequence combo", title, ImGuiComboFlags_None))
             {
-                auto& animator = comp->animator;
-                auto& clips = animator.m_clips;
-                
-                const char* title = animator.m_currentClipIndex == -1 ? "<no selected>" : clips[animator.m_currentClipIndex].name.c_str();
-                
-                if (ImGui::BeginCombo("##sequence combo", title, ImGuiComboFlags_None))
+                for (int i = 0; i < clips.size(); ++i)
                 {
-                    for (int i = 0; i < clips.size(); ++i)
+                    bool is_selected = (animator.m_currentClipIndex == i);
+                    
+                    if (ImGui::Selectable(clips[i].name.c_str(), is_selected))
                     {
-                        bool is_selected = (animator.m_currentClipIndex == i);
-                        
-                        if (ImGui::Selectable(clips[i].name.c_str(), is_selected))
-                        {
-                            animator.play(i);
-                        }
-                        
-                        if (is_selected) ImGui::SetItemDefaultFocus();
+                        animator.play(i);
                     }
                     
-                    ImGui::EndCombo();
+                    if (is_selected) ImGui::SetItemDefaultFocus();
                 }
+                
+                ImGui::EndCombo();
             }
         }
-    };
-}
-
-void drawComponentUi(std::type_index typeIdx, Component* comp, InspectorPanel* panel)
-{
-    auto it = uiRegistry.find(typeIdx);
-    
-    if (it != uiRegistry.end())
-    {
-//        const auto& uiInfo = it->second;
-        
-//        // Используем ImGui::TreeNodeEx для создания выпадающего меню компонента
-//        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth;
-//        
-//        if (ImGui::TreeNodeEx(uiInfo.displayName.c_str(), flags)) {
-//            
-//            // Вызываем кастомный UI для этого компонента
-//            uiInfo.renderUiFunc(comp);
-//            
-//            ImGui::TreePop();
-//        }
-//        
-//        ImGui::Separator();
-        
-        const auto& uiInfo = it->second;
-        uiInfo(comp, panel);
-    }
+    });
 }
 
 void InspectorPanel::draw()
@@ -194,10 +196,7 @@ void InspectorPanel::draw()
         return;
     }
     
-    ImGui::SeparatorText("Entity");
-    
-    static bool active = true;
-    ImGui::Checkbox("##active", &active);
+    ImGui::Checkbox("##active", &m_entity->m_isActive);
     
     ImGui::SameLine();
     
@@ -211,37 +210,57 @@ void InspectorPanel::draw()
     }
     
     
-    ImGui::SeparatorText("Components");
+    ImGui::Separator();
     
-    for (auto& [typeIdx, comp] : m_entity->m_components)
+    for (auto& component : m_entity->getComponents())
     {
-        drawComponentUi(typeIdx, comp.get(), this);
+        ComponentInspector::Get().Render(component.get(), this);
+        ImGui::Spacing();
     }
     
-    if (ImGui::Button("Add Component"))
-    {
-        ImGui::OpenPopup("add_component_popup");
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    if (ImGui::Button("Add Component")) {
+        ImGui::OpenPopup("AddComponentPopup");
     }
     
-    if (ImGui::BeginPopup("add_component_popup"))
-    {
-        ImGui::TextDisabled("Componentes");
-        ImGui::Separator();
-        
-        if (ImGui::Selectable("Transform"))
-            std::cout << "Add Transform" << std::endl;
-
-        if (ImGui::Selectable("Mesh Renderer"))
-            std::cout << "Add Mesh Renderer" << std::endl;
-        
-        if (ImGui::Selectable("Light"))
-            std::cout << "Add Light" << std::endl;
-        
-        if (ImGui::Selectable("Script"))
-            std::cout << "Add Script" << std::endl;
-        
+    if (ImGui::BeginPopup("AddComponentPopup")) {
+        if (ImGui::MenuItem("Transform")) { m_entity->addComponent<TransformComponent>(); }
+        if (ImGui::MenuItem("Mesh"))     { m_entity->addComponent<MeshComponent>(); }
         ImGui::EndPopup();
     }
+    
+//    if (ImGui::Button("Add Component"))
+//    {
+//        ImGui::OpenPopup("add_component_popup");
+//    }
+//    
+//    if (ImGui::BeginPopup("add_component_popup"))
+//    {
+//        ImGui::TextDisabled("Componentes");
+//        ImGui::Separator();
+//        
+//        if (ImGui::Selectable("Transform")) {
+//            std::cout << "Add Transform" << std::endl;
+//            m_entity->addComponent<TransformComponent>();
+//        }
+//
+//        if (ImGui::Selectable("Mesh")) {
+//            std::cout << "Add Mesh Renderer" << std::endl;
+//            m_entity->addComponent<MeshComponent>();
+//        }
+//        
+//        if (ImGui::Selectable("Light")) {
+//            std::cout << "Add Light" << std::endl;
+//        }
+//        
+//        if (ImGui::Selectable("Script")) {
+//            std::cout << "Add Script" << std::endl;
+//        }
+//        
+//        ImGui::EndPopup();
+//    }
     
     ImGui::End();
 //    ImGui::PopStyleVar();
@@ -315,74 +334,6 @@ bool DrawVector3Control(const char* label, float* values, float resetValue = 0.0
     ImGui::EndGroup();
     return modified;
 }
-
-
-
-//void DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f)
-//{
-//    ImGuiIO& io = ImGui::GetIO();
-//    auto boldFont = io.Fonts->Fonts[0];
-//    
-//    ImGui::PushID(label.c_str());
-//    
-//    ImGui::Columns(2);
-//    ImGui::SetColumnWidth(0, columnWidth);
-//    ImGui::Text("%s", label.c_str());
-//    ImGui::NextColumn();
-//    
-//    ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-//    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 0, 0 });
-//    
-//    float lineHeight = 16.0f + ImGui::GetStyle().FramePadding.y * 2.0f;
-//    ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
-//    
-//    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-//    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.2f, 1.0f });
-//    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-//    ImGui::PushFont(boldFont);
-//    if (ImGui::Button("X", buttonSize))
-//        values.x = resetValue;
-//    ImGui::PopFont();
-//    ImGui::PopStyleColor(3);
-//    
-//    ImGui::SameLine();
-//    ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
-//    ImGui::PopItemWidth();
-//    ImGui::SameLine();
-//    
-//    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-//    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.3f, 0.8f, 0.3f, 1.0f });
-//    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-//    ImGui::PushFont(boldFont);
-//    if (ImGui::Button("Y", buttonSize))
-//        values.y = resetValue;
-//    ImGui::PopFont();
-//    ImGui::PopStyleColor(3);
-//    
-//    ImGui::SameLine();
-//    ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f");
-//    ImGui::PopItemWidth();
-//    ImGui::SameLine();
-//    
-//    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-//    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.2f, 0.35f, 0.9f, 1.0f });
-//    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-//    ImGui::PushFont(boldFont);
-//    if (ImGui::Button("Z", buttonSize))
-//        values.z = resetValue;
-//    ImGui::PopFont();
-//    ImGui::PopStyleColor(3);
-//    
-//    ImGui::SameLine();
-//    ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
-//    ImGui::PopItemWidth();
-//    
-//    ImGui::PopStyleVar();
-//    
-//    ImGui::Columns(1);
-//    
-//    ImGui::PopID();
-//}
 
 
 bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)

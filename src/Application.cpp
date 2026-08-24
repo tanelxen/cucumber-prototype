@@ -54,7 +54,7 @@ Application::Application()
 
     const int window_width = 1440;
     const int window_height = 900;
-    m_pWindow = glfwCreateWindow(window_width, window_height, "Demo", nullptr, nullptr);
+    m_pWindow = glfwCreateWindow(window_width, window_height, "Cucumber", nullptr, nullptr);
 
     glfwSetKeyCallback(m_pWindow, key_callback);
 

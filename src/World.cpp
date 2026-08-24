@@ -57,6 +57,8 @@ void WorldScene::update(float dt)
     
     for (auto& entity : m_entities)
     {
+        if (!entity->m_isActive) continue;
+        
         auto meshComp = entity->getComponent<MeshComponent>();
         
         if (meshComp)
@@ -74,13 +76,15 @@ void WorldScene::draw()
     
     for (auto& entity : m_entities)
     {
+        if (!entity->m_isActive) continue;
+        
         auto transformComp = entity->getComponent<TransformComponent>();
         auto meshComp = entity->getComponent<MeshComponent>();
         
-        if (transformComp && meshComp)
+        auto model = transformComp ? transformComp->toMat4() : glm::mat4(1.0);
+        
+        if (meshComp)
         {
-            auto model = transformComp->toMat4();
-            
             if (meshComp->animator.m_clips.empty()) {
                 meshComp->mesh.draw(model);
             } else {

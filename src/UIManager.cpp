@@ -40,6 +40,7 @@ UIManager::UIManager()
     
     m_pMaterialPanel = new MaterialPanel();
     m_pMaterialPanel->m_manager = this;
+    m_pMaterialPanel->isVisible = false;
     
     m_panels.push_back(m_pViewportPanel);
     m_panels.push_back(m_pScenePanel);
