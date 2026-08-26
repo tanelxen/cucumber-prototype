@@ -24,12 +24,20 @@ void Mesh::draw(glm::mat4& transform) const
     {
         auto& material = m_materials[surface.materialSlot];
         
+        uint32_t features = 0;
+        
+        if (material.albedoMap > 0)
+        {
+            features |= ShaderFeature::HasAlbedoMap;
+        }
+        
         RenderCommand cmd = {
             .vao = m_vao->getID(),
             .start = surface.startIndex,
             .count = surface.count,
             
             .pipeline = PipelineType::Generic,
+            .featureMask = features,
             .blendMode = material.blendMode,
             .baseTexture = material.albedoMap,
             .color = material.tintColor,
@@ -47,12 +55,20 @@ void Mesh::draw(glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette
     {
         auto& material = m_materials[surface.materialSlot];
         
+        uint32_t features = ShaderFeature::HasSkinning;
+        
+        if (material.albedoMap > 0)
+        {
+            features |= ShaderFeature::HasAlbedoMap;
+        }
+        
         RenderCommand cmd = {
             .vao = m_vao->getID(),
             .start = surface.startIndex,
             .count = surface.count,
             
-            .pipeline = PipelineType::Skinned,
+            .pipeline = PipelineType::Generic,
+            .featureMask = features,
             .blendMode = material.blendMode,
             .baseTexture = material.albedoMap,
             .color = material.tintColor,

@@ -71,6 +71,8 @@ set(SRC_RENDERER
         src/IndexBuffer.h
         src/Shader.cpp
         src/Shader.h
+        src/ShaderVariant.cpp
+        src/ShaderVariant.h
 )
 
 set(SRC_PANELS

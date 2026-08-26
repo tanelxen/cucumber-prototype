@@ -1,44 +1,33 @@
 //
-// Created by Fedor Artemenkov on 05.07.2024.
+//  Shader.h
+//  Cucumber
+//
+//  Created by Fedor Artemenkov on 26.08.26.
 //
 
 #pragma once
 
-#include <string>
+#include "RenderDevice.h"
+
+#include <memory>
 #include <vector>
+#include <unordered_map>
 
 #include <glm/glm.hpp>
+#include <glad/glad.h>
+
+class ShaderVariant;
 
 class Shader
 {
 public:
-    Shader();
-
-    Shader(const Shader&) = delete;             // no copy allowed
-    Shader& operator =(const Shader&) = delete; // no copy allowed
-
-    Shader(Shader&& other) noexcept;            // move allowed
-    Shader& operator=(Shader&& other) noexcept; // move allowed
-
-    ~Shader();
-
-public:
     void init(const char* filename);
-    void init(const char* vert_src, const char* frag_src);
-
-    void bind() const;
-    void unbind() const;
+    ShaderVariant* getVariant(FeatureMask featureMask);
     
-    void setUniform(const std::string& name, bool value) const;
-    void setUniform(const std::string& name, float value) const;
-
-    void setUniform(const std::string& name, const glm::vec3& vector) const;
-    void setUniform(const std::string& name, const glm::vec4& vector) const;
-    void setUniform(const std::string& name, const glm::mat4& matrix) const;
+private:
+    std::string m_vertexTemplate;
+    std::string m_fragmentTemplate;
+    std::unordered_map<uint32_t, std::unique_ptr<ShaderVariant>> m_variants;
     
-    void setUniform(const std::string& name, const std::vector<glm::vec3>& vectors) const;
-    void setUniform(const std::string& name, const std::vector<glm::mat4>& matrices) const;
-
-//private:
-    int program;
+    
 };

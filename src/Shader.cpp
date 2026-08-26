@@ -1,107 +1,16 @@
 //
-// Created by Fedor Artemenkov on 05.07.2024.
+//  Shader.cpp
+//  Cucumber
+//
+//  Created by Fedor Artemenkov on 26.08.26.
 //
 
 #include "Shader.h"
-#include <glad/glad.h>
-#include <cstdio>
+#include "ShaderVariant.h"
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
-Shader::Shader()
-{
-    program = 0;
-}
-
-Shader::Shader(Shader &&other) noexcept
-{
-    program = other.program;
-    other.program = 0;
-}
-
-Shader &Shader::operator=(Shader &&other) noexcept
-{
-    program = other.program;
-    other.program = 0;
-
-    return *this;
-}
-
-Shader::~Shader()
-{
-    glDeleteShader(program);
-}
-
-unsigned int compile_shader(unsigned int type, const char* source);
-
-void Shader::init(const char *vert, const char *frag)
-{
-    program = glCreateProgram();
-
-    unsigned int vs = compile_shader(GL_VERTEX_SHADER, vert);
-    unsigned int fs = compile_shader(GL_FRAGMENT_SHADER, frag);
-
-    glAttachShader(program, vs);
-    glAttachShader(program, fs);
-    glLinkProgram(program);
-    glValidateProgram(program);
-
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-}
-
-void Shader::bind() const
-{
-    glUseProgram(program);
-}
-
-void Shader::unbind() const
-{
-    glUseProgram(0);
-}
-
-
-
-//void Shader::setUniformMatrix(const float *data, const char *name) const
-//{
-//    const GLint location = glGetUniformLocation(program, name);
-//
-//    if (location == -1)
-//    {
-//        printf("Shader have no uniform %s\n", name);
-//        return;
-//    }
-//
-//    glUniformMatrix4fv(location, 1, GL_FALSE, data);
-//}
-//
-//void Shader::setUniformMatrices(const float *data, int num, const char *name) const
-//{
-//    const GLint location = glGetUniformLocation(program, name);
-//
-//    if (location == -1)
-//    {
-//        printf("Shader have no uniform %s\n", name);
-//        return;
-//    }
-//
-//    glUniformMatrix4fv(location, num, GL_FALSE, data);
-//}
-
-//void Shader::setUniformVector4(const float *data, const char *name) const
-//{
-//    const GLint location = glGetUniformLocation(program, name);
-//
-//    if (location == -1)
-//    {
-//        printf("Shader have no uniform %s\n", name);
-//        return;
-//    }
-//
-//    glUniform4fv(location, 1, data);
-//}
 
 void Shader::init(const char *filepath)
 {
@@ -110,7 +19,7 @@ void Shader::init(const char *filepath)
         SRC_VERTEX = 0,
         SCR_FRAGMENT = 1
     };
-
+    
     std::ifstream stream(filepath);
     
     if (!stream.is_open())
@@ -118,13 +27,13 @@ void Shader::init(const char *filepath)
         std::cerr << "Error: Failed to open the file at path: " << filepath << std::endl;
         return;
     }
-
+    
     std::string line;
     std::stringstream vertexStream;
     std::stringstream fragmentStream;
-
+    
     ShaderSourceType currentType = SRC_NONE;
-
+    
     while (getline(stream, line))
     {
         if (line.find("#shader") != std::string::npos)
@@ -132,7 +41,7 @@ void Shader::init(const char *filepath)
             if (line.find("vertex") != std::string::npos)
             {
                 currentType = SRC_VERTEX;
-
+                
             }
             else if (line.find("fragment") != std::string::npos)
             {
@@ -148,124 +57,32 @@ void Shader::init(const char *filepath)
             fragmentStream << line << "\n";
         }
     }
-
-    init(vertexStream.str().c_str(), fragmentStream.str().c_str());
+    
+    m_vertexTemplate = vertexStream.str();
+    m_fragmentTemplate = fragmentStream.str();
 }
 
-void Shader::setUniform(const std::string& name, const glm::vec3& vector) const
+ShaderVariant* Shader::getVariant(FeatureMask key)
 {
-    const GLint location = glGetUniformLocation(program, name.c_str());
-
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
-    }
-
-    glUniform3fv(location, 1, (const float*) &vector);
-}
-
-void Shader::setUniform(const std::string& name, const glm::vec4& vector) const
-{
-    const GLint location = glGetUniformLocation(program, name.c_str());
-
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
-    }
-
-    glUniform4fv(location, 1, (const float*) &vector);
-}
-
-void Shader::setUniform(const std::string &name, const glm::mat4& matrix) const
-{
-    const GLint location = glGetUniformLocation(program, name.c_str());
-
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
+    auto it = m_variants.find(key);
+    if (it != m_variants.end()) {
+        return it->second.get();
     }
     
-    glUniformMatrix4fv(location, 1, GL_FALSE, (const float*) &matrix);
-}
-
-void Shader::setUniform(const std::string &name, const std::vector<glm::vec3> &vectors) const
-{
-    const GLint location = glGetUniformLocation(program, name.c_str());
-
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
-    }
+    std::string defines = "#version 410 core\n";
     
-    glUniform3fv(location, (GLsizei)(vectors.size()), &(vectors[0][0]));
-}
-
-void Shader::setUniform(const std::string &name, const std::vector<glm::mat4> &matrices) const
-{
-    const GLint location = glGetUniformLocation(program, name.c_str());
-
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
-    }
+    if (key & ShaderFeature::HasAlbedoMap) defines += "#define HAS_ALBEDO_MAP\n";
+    if (key & ShaderFeature::HasNormalMap) defines += "#define HAS_NORMAL_MAP\n";
+    if (key & ShaderFeature::HasSkinning)  defines += "#define HAS_SKINNING\n";
+    if (key & ShaderFeature::HasShadows)   defines += "#define HAS_SHADOWS\n";
     
-    glUniformMatrix4fv(location, (GLsizei)(matrices.size()), GL_FALSE, &(matrices[0][0][0]));
-}
-
-void Shader::setUniform(const std::string &name, bool value) const
-{
-    const GLint location = glGetUniformLocation(program, name.c_str());
+    std::string vs_source = defines + m_vertexTemplate;
+    std::string fs_source = defines + m_fragmentTemplate;
     
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
-    }
+    auto newVariant = std::make_unique<ShaderVariant>();
+    newVariant->init(vs_source.c_str(), fs_source.c_str());
+    ShaderVariant* ptr = newVariant.get();
     
-    glUniform1i(location, value);
-}
-
-void Shader::setUniform(const std::string &name, float value) const
-{
-    const GLint location = glGetUniformLocation(program, name.c_str());
-    
-    if (location == -1)
-    {
-        printf("Shader have no uniform %s\n", name.c_str());
-        return;
-    }
-    
-    glUniform1f(location, value);
-}
-
-
-unsigned int compile_shader(unsigned int type, const char* source)
-{
-    unsigned int id = glCreateShader(type);
-
-    glShaderSource(id, 1, &source, nullptr);
-    glCompileShader(id);
-
-    int result;
-    glGetShaderiv(id, GL_COMPILE_STATUS, &result);
-
-    if (result == GL_FALSE)
-    {
-        int length;
-        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
-
-        char message[1024];
-        glGetShaderInfoLog(id, length, &length, message);
-
-        printf("Failed to compile %s shader:\n", (type == GL_VERTEX_SHADER) ? "vertex" : "fragment");
-        printf("%s\n", message);
-        return 0;
-    }
-
-    return id;
+    m_variants[key] = std::move(newVariant);
+    return ptr;
 }

@@ -8,7 +8,7 @@
 #include "VertexArray.h"
 #include "VertexBuffer.h"
 #include "IndexBuffer.h"
-#include "Shader.h"
+#include "ShaderVariant.h"
 
 #include <glad/glad.h>
 

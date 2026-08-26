@@ -14,7 +14,7 @@
 
 class VertexBuffer;
 class IndexBuffer;
-class Shader;
+class ShaderVariant;
 
 class VertexArray
 {

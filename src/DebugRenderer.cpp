@@ -7,13 +7,13 @@
 
 #include <glad/glad.h>
 #include "Camera.h"
-#include "Shader.h"
+#include "ShaderVariant.h"
 
 #include "DebugRenderer.h"
 
 static unsigned int vbo;
 static unsigned int vao;
-static Shader shader;
+static ShaderVariant shader;
 
 DebugRenderer::DebugRenderer()
 {

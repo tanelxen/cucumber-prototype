@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Shader.h"
+#include "ShaderVariant.h"
 
 #include <glm/glm.hpp>
 #include <string>

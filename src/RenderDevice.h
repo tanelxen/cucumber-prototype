@@ -50,9 +50,19 @@ enum class BlendMode
 
 enum class PipelineType
 {
-//    World, Skinned
-    Generic, FlatShaded, Grid, Skinned
+    Generic, Grid, FlatShaded
 };
+
+using FeatureMask = uint32_t;
+
+namespace ShaderFeature
+{
+    constexpr FeatureMask None            = 0;
+    constexpr FeatureMask HasAlbedoMap    = 1 << 0;
+    constexpr FeatureMask HasNormalMap    = 1 << 1;
+    constexpr FeatureMask HasSkinning     = 1 << 2;
+    constexpr FeatureMask HasShadows      = 1 << 3;
+}
 
 struct RenderCommand
 {
@@ -64,6 +74,7 @@ struct RenderCommand
     
     // Material
     PipelineType pipeline;
+    FeatureMask featureMask;
     RenderDevice::handle_t baseTexture;
     BlendMode blendMode = BlendMode::Opaque;
     glm::vec4 color = {1, 1, 1, 1};

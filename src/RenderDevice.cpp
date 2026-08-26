@@ -14,6 +14,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Shader.h"
+#include "ShaderVariant.h"
 #include "Camera.h"
 
 namespace RenderDevice {
@@ -21,10 +22,9 @@ namespace RenderDevice {
     std::vector<RenderCommand> opaquePass;
     std::vector<RenderCommand> transparentPass;
     
-    static Shader generic_shader;
-    static Shader skinned_shader;
-    static Shader flat_shader;
-    static Shader grid_shader;
+    static Shader generic;
+    static ShaderVariant flat_shader;
+    static ShaderVariant grid_shader;
     
     handle_t whiteTextureId;
     handle_t normalTextureId;
@@ -42,10 +42,10 @@ namespace RenderDevice {
 //        glEnable(GL_FRAMEBUFFER_SRGB);
         glFrontFace(GL_CCW);
         
-        generic_shader.init("assets/shaders/generic.glsl");
-        skinned_shader.init("assets/shaders/skinned.glsl");
         flat_shader.init("assets/shaders/cube_shaded.glsl");
         grid_shader.init("assets/shaders/grid.glsl");
+        
+        generic.init("assets/shaders/generic.glsl");
         
         {
             unsigned char pixels[4] = { 255, 255, 255, 255 };
@@ -135,16 +135,12 @@ namespace RenderDevice {
         
         for (auto cmd : commands)
         {
-            Shader* shader;
+            ShaderVariant* shader;
             
             switch (cmd.pipeline)
             {
                 case PipelineType::Generic:
-                    shader = &generic_shader;
-                    break;
-                    
-                case PipelineType::Skinned:
-                    shader = &skinned_shader;
+                    shader = generic.getVariant(cmd.featureMask);
                     break;
                     
                 case PipelineType::FlatShaded:
@@ -156,10 +152,10 @@ namespace RenderDevice {
                     break;
             }
             
-            if (lastProgram != shader->program)
+            if (lastProgram != shader->getProgramId())
             {
                 shader->bind();
-                lastProgram = shader->program;
+                lastProgram = shader->getProgramId();
             }
             
             glm::mat4 mvp = viewProj * cmd.transform;
@@ -194,19 +190,12 @@ namespace RenderDevice {
                     break;
             }
             
-            auto baseTexture = cmd.baseTexture;
-            
-            if (baseTexture == 0)
-            {
-                baseTexture = whiteTextureId;
-            }
-            
-            if (lastBaseTexture != baseTexture)
+            if (cmd.featureMask & ShaderFeature::HasAlbedoMap && lastBaseTexture != cmd.baseTexture)
             {
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, baseTexture);
+                glBindTexture(GL_TEXTURE_2D, cmd.baseTexture);
                 
-                lastBaseTexture = baseTexture;
+                lastBaseTexture = cmd.baseTexture;
             }
             
             if (cmd.pipeline != PipelineType::Grid)
@@ -214,9 +203,9 @@ namespace RenderDevice {
                 shader->setUniform("color", cmd.color);
             }
             
-            if (cmd.pipeline == PipelineType::Skinned && cmd.bones != nullptr)
+            if (cmd.featureMask & ShaderFeature::HasSkinning && cmd.bones != nullptr)
             {
-                shader->setUniform("uBones", *cmd.bones);
+                shader->setUniform("uBones[0]", *cmd.bones);
             }
             
             if (lastVAO != cmd.vao)
