@@ -12,6 +12,7 @@
 #include "ModelLoader.h"
 
 #include "Entity.h"
+#include "AnimatorComponent.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -124,25 +125,41 @@ static void RegisterUI()
             
             if (path != nullptr)
             {
-                ModelLoader::LoadGLTF(path, comp->mesh, comp->animator);
+                auto resource = ModelLoader::LoadModel(path);
+                
+                comp->mesh = resource.mesh;
+                comp->materials = resource.embeddedMaterials;
+                
+                if (resource.hasSkeleton())
+                {
+                    auto animator = comp->owner->getComponent<AnimatorComponent>();
+                    
+                    if (animator == nullptr) {
+                        animator = comp->owner->addComponent<AnimatorComponent>();
+                    }
+                    
+                    animator->setSkeleton(resource.skeleton);
+                    animator->m_clips = resource.animations;
+                    animator->m_currentClipIndex = -1;
+                }
                 
                 std::filesystem::path p(path);
                 comp->path = p.filename();
             }
         }
         
-        if (!comp->mesh.m_surfaces.empty())
+        if (comp->mesh && !comp->mesh->m_surfaces.empty())
         {
             if (ImGui::TreeNode("Surfaces"))
             {
-                for (int i = 0; i < comp->mesh.m_surfaces.size(); i++)
+                for (int i = 0; i < comp->mesh->m_surfaces.size(); i++)
                 {
                     if (ImGui::TreeNode((void*)(intptr_t)i, "Surface %i", i))
                     {
-                        auto& surface = comp->mesh.m_surfaces[i];
+                        auto& surface = comp->mesh->m_surfaces[i];
                         ImGui::Text("%s: %i tris, %i material", surface.m_name.c_str(), surface.count / 3, surface.materialSlot);
                         
-                        auto& material = comp->mesh.m_materials[surface.materialSlot];
+                        auto& material = comp->mesh->m_materials[surface.materialSlot];
                         
                         if (ImGui::Button("Edit material"))
                         {
@@ -156,23 +173,25 @@ static void RegisterUI()
                 ImGui::TreePop();
             }
         }
-        
-        if (!comp->animator.m_clips.empty())
+    });
+    
+    inspector.Register<AnimatorComponent>("Animator", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<AnimatorComponent*>(c);
+        if (!comp->m_clips.empty())
         {
-            auto& animator = comp->animator;
-            auto& clips = animator.m_clips;
+            auto& clips = comp->m_clips;
             
-            const char* title = animator.m_currentClipIndex == -1 ? "<no selected>" : clips[animator.m_currentClipIndex].name.c_str();
+            const char* title = comp->m_currentClipIndex == -1 ? "<no selected>" : clips[comp->m_currentClipIndex]->name.c_str();
             
             if (ImGui::BeginCombo("##sequence combo", title, ImGuiComboFlags_None))
             {
                 for (int i = 0; i < clips.size(); ++i)
                 {
-                    bool is_selected = (animator.m_currentClipIndex == i);
+                    bool is_selected = (comp->m_currentClipIndex == i);
                     
-                    if (ImGui::Selectable(clips[i].name.c_str(), is_selected))
+                    if (ImGui::Selectable(clips[i]->name.c_str(), is_selected))
                     {
-                        animator.play(i);
+                        comp->play(i);
                     }
                     
                     if (is_selected) ImGui::SetItemDefaultFocus();

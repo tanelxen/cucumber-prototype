@@ -8,7 +8,7 @@
 #include "ModelLoader.h"
 
 #include "Mesh.h"
-#include "Animator.h"
+#include "AnimatorComponent.h"
 #include "Skeleton.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -19,6 +19,7 @@
 #include <glm/glm.hpp>
 
 #include <iostream>
+#include "unordered_map"
 
 static void loadGLTFWithSurfaces(cgltf_data* data,
                                  std::vector<glm::vec3>& outPositions,
@@ -33,100 +34,133 @@ static void loadGLTFWithSurfaces(cgltf_data* data,
 static std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::string& gltfFilePath);
 static std::vector<AnimationClip> loadGLTFAnimations(cgltf_data* data, const std::unordered_map<cgltf_node*, int>& nodeToBoneIndex);
 
+std::unordered_map<std::string, ModelResource> m_loadedModels;
+
+static ModelResource ParseGLB(const std::string& filepath)
+{
+    ModelResource result;
+    result.filepath = filepath;
+    
+    cgltf_options options = {};
+    cgltf_data* data = nullptr;
+    
+    if (cgltf_parse_file(&options, filepath.c_str(), &data) != cgltf_result_success) return result;
+    
+    if (cgltf_load_buffers(&options, data, filepath.c_str()) != cgltf_result_success)
+    {
+        cgltf_free(data);
+        return result;
+    }
+    
+    result.mesh = std::make_shared<Mesh>();
+    
+    result.mesh->m_name = filepath;
+    result.mesh->m_materials = loadGLTFMaterials(data, filepath);
+    
+    result.embeddedMaterials.reserve(result.mesh->m_materials.size());
+    for (auto& material : result.mesh->m_materials) {
+        result.embeddedMaterials.push_back(std::make_shared<Material>(material));
+    }
+    
+//    result.mesh->m_materials = result.embeddedMaterials;
+    
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> texCoords;
+    std::vector<uint32_t> indices;
+    std::vector<Surface> surfaces;
+    
+    std::vector<glm::u8vec4> boneIndices;
+    std::vector<glm::u8vec4> weights;
+    
+    loadGLTFWithSurfaces(data, positions, normals, texCoords, boneIndices, weights, indices, surfaces);
+    
+    auto size = positions.size();
+    std::vector<VertexPosition> vertGeometry(size);
+    std::vector<VertexShading> vertShading(size);
+    std::vector<VertexSkinning> vertSkinning(size);
+    
+    for (int i = 0; i < size; ++i)
+    {
+        vertGeometry[i] = { .position = positions[i] };
+        vertShading[i] = { .normal = normals[i], .texCoord = texCoords[i] };
+        
+        if (i < boneIndices.size())
+        {
+            vertSkinning[i] = { .boneIndices = boneIndices[i], .boneWeights = weights[i] };
+        }
+    }
+    
+    result.mesh->setVertexData(vertGeometry, vertShading, &vertSkinning);
+    result.mesh->setIndices(indices);
+    result.mesh->setSurfaces(surfaces);
+    
+    std::unordered_map<cgltf_node*, int> nodeToBoneIndex;
+    
+    // Загрузка скелета
+    if (data->skins_count > 0)
+    {
+        cgltf_skin& skin = data->skins[0];
+        
+        auto skeleton = std::make_shared<Skeleton>();
+        skeleton->bones.resize(skin.joints_count);
+        
+        // Заполняем nodeToBoneIndex
+        for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+            nodeToBoneIndex[skin.joints[i]] = static_cast<int>(i);
+        }
+        
+        for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+            cgltf_node* jointNode = skin.joints[i];
+            if (jointNode->parent && nodeToBoneIndex.count(jointNode->parent)) {
+                skeleton->bones[i].parentIndex = nodeToBoneIndex[jointNode->parent];
+            }
+        }
+        
+        if (skin.inverse_bind_matrices) {
+            cgltf_accessor* ibmAcc = skin.inverse_bind_matrices;
+            for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+                cgltf_accessor_read_float(ibmAcc, i, (float*)&skeleton->bones[i].inverseBindMatrix, 16);
+            }
+        }
+        
+        result.skeleton = skeleton;
+    }
+    
+    // Загрузка анимаций (передаем data и сформированную мапу узлов)
+    if (data->animations_count > 0)
+    {
+        auto animations = loadGLTFAnimations(data, nodeToBoneIndex);
+        
+        result.animations.reserve(animations.size());
+        
+        for (auto& clip : animations) {
+            result.animations.push_back(std::make_shared<AnimationClip>(std::move(clip)));
+        }
+    }
+    
+    cgltf_free(data);
+    
+    
+    return result;
+}
+
 namespace ModelLoader
 {
-    bool LoadGLTF(const std::string& path, Mesh& model, Animator& animator)
+    ModelResource LoadModel(const std::string& filepath)
     {
-        cgltf_options options = {};
-        cgltf_data* data = nullptr;
-        
-        if (cgltf_parse_file(&options, path.c_str(), &data) != cgltf_result_success) return false;
-        
-        if (cgltf_load_buffers(&options, data, path.c_str()) != cgltf_result_success)
-        {
-            cgltf_free(data);
-            return false;
+        // Проверяем, загружен ли этот файл ранее
+        auto it = m_loadedModels.find(filepath);
+        if (it != m_loadedModels.end()) {
+            return it->second; // Возвращаем пакет со shared_ptr (счетчик ссылок +1)
         }
         
-        model.m_name = path;
-        model.m_materials = loadGLTFMaterials(data, path);
+        // Если файла нет в памяти — загружаем через cgltf
+        ModelResource newModel = ParseGLB(filepath);
         
-        std::vector<glm::vec3> positions;
-        std::vector<glm::vec3> normals;
-        std::vector<glm::vec2> texCoords;
-        std::vector<uint32_t> indices;
-        std::vector<Surface> surfaces;
-        
-        std::vector<glm::u8vec4> boneIndices;
-        std::vector<glm::u8vec4> weights;
-        
-        loadGLTFWithSurfaces(data, positions, normals, texCoords, boneIndices, weights, indices, surfaces);
-        
-        auto size = positions.size();
-        std::vector<VertexPosition> vertGeometry(size);
-        std::vector<VertexShading> vertShading(size);
-        std::vector<VertexSkinning> vertSkinning(size);
-        
-        for (int i = 0; i < size; ++i)
-        {
-            vertGeometry[i] = { .position = positions[i] };
-            vertShading[i] = { .normal = normals[i], .texCoord = texCoords[i] };
-            
-            if (i < boneIndices.size())
-            {
-                vertSkinning[i] = { .boneIndices = boneIndices[i], .boneWeights = weights[i] };
-            }
-        }
-        
-        model.setVertexData(vertGeometry, vertShading, &vertSkinning);
-        model.setIndices(indices);
-        model.setSurfaces(surfaces);
-        
-        std::unordered_map<cgltf_node*, int> nodeToBoneIndex;
-        
-        // Загрузка скелета
-        if (data->skins_count > 0)
-        {
-            cgltf_skin& skin = data->skins[0];
-            
-            auto skeleton = std::make_shared<Skeleton>();
-            skeleton->bones.resize(skin.joints_count);
-            
-            // Заполняем nodeToBoneIndex
-            for (cgltf_size i = 0; i < skin.joints_count; ++i) {
-                nodeToBoneIndex[skin.joints[i]] = static_cast<int>(i);
-            }
-            
-            for (cgltf_size i = 0; i < skin.joints_count; ++i) {
-                cgltf_node* jointNode = skin.joints[i];
-                if (jointNode->parent && nodeToBoneIndex.count(jointNode->parent)) {
-                    skeleton->bones[i].parentIndex = nodeToBoneIndex[jointNode->parent];
-                }
-            }
-            
-            if (skin.inverse_bind_matrices) {
-                cgltf_accessor* ibmAcc = skin.inverse_bind_matrices;
-                for (cgltf_size i = 0; i < skin.joints_count; ++i) {
-                    cgltf_accessor_read_float(ibmAcc, i, (float*)&skeleton->bones[i].inverseBindMatrix, 16);
-                }
-            }
-            
-            animator.setSkeleton(skeleton);
-        }
-        
-        // Загрузка анимаций (передаем data и сформированную мапу узлов)
-        if (data->animations_count > 0)
-        {
-            auto animations = loadGLTFAnimations(data, nodeToBoneIndex);
-            
-            for (auto clip : animations)
-            {
-                animator.addClip(clip);
-            }
-        }
-        
-        cgltf_free(data);
-        return true;
+        // Сохраняем в кэш
+        m_loadedModels[filepath] = newModel;
+        return newModel;
     }
 }
 

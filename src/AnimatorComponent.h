@@ -1,5 +1,5 @@
 //
-//  Animator.h
+//  AnimatorComponent.h
 //  Cucumber
 //
 //  Created by Fedor Artemenkov on 21.08.26.
@@ -8,33 +8,33 @@
 #pragma once
 
 #include "Animation.h"
+#include "Entity.h"
 
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
 
 class Skeleton;
 
-class Animator
+class AnimatorComponent: public Component
 {
 public:
-    Animator();
-    ~Animator();
+    AnimatorComponent();
+    ~AnimatorComponent();
+    
+    void update(float dt) override;
     
     void setSkeleton(std::shared_ptr<Skeleton> skeleton);
-    void addClip(const AnimationClip& clip) { m_clips.push_back(clip); }
+//    void addClip(const AnimationClip& clip) { m_clips.push_back(clip); }
     
     void play(int clipIndex);
-    void update(float dt);
     
     const std::vector<glm::mat4>& getFinalBoneMatrices() const { return m_finalBoneMatrices; }
     
-    std::vector<AnimationClip> m_clips;
+    std::vector<std::shared_ptr<AnimationClip>> m_clips;
     int m_currentClipIndex = -1;
 
 private:
     std::shared_ptr<Skeleton> m_skeleton;
-    
-    
     
     float m_currentTime = 0.0f;
     

@@ -44,8 +44,8 @@ set(SRC_COMMON
         src/ModelLoader.h
         src/Skeleton.h
         src/Animation.h
-        src/Animator.cpp
-        src/Animator.h
+        src/AnimatorComponent.cpp
+        src/AnimatorComponent.h
 
         src/Viewport.cpp
         src/Viewport.h

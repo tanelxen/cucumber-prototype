@@ -19,12 +19,9 @@
 #include "ModelLoader.h"
 
 #include "Entity.h"
+#include "AnimatorComponent.h"
 
 #include "Viewport.h"
-
-//#include "ViewportPanel.h"
-//#include "ScenePanel.h"
-//#include "AssetsPanel.h"
 
 #include "RenderDevice.h"
 
@@ -59,11 +56,11 @@ void WorldScene::update(float dt)
     {
         if (!entity->m_isActive) continue;
         
-        auto meshComp = entity->getComponent<MeshComponent>();
+        auto animator = entity->getComponent<AnimatorComponent>();
         
-        if (meshComp)
+        if (animator)
         {
-            meshComp->animator.update(dt);
+            animator->update(dt);
         }
     }
 }
@@ -83,12 +80,14 @@ void WorldScene::draw()
         
         auto model = transformComp ? transformComp->toMat4() : glm::mat4(1.0);
         
-        if (meshComp)
+        if (meshComp && meshComp->mesh)
         {
-            if (meshComp->animator.m_clips.empty()) {
-                meshComp->mesh.draw(model);
+            auto animator = entity->getComponent<AnimatorComponent>();
+            
+            if (animator && animator->m_clips.empty()) {
+                meshComp->mesh->draw(model);
             } else {
-                meshComp->mesh.draw(model, meshComp->animator.getFinalBoneMatrices());
+                meshComp->mesh->draw(model, animator->getFinalBoneMatrices());
             }
         }
     }

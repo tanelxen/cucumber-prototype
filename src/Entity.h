@@ -15,7 +15,7 @@
 #include <glm/glm.hpp>
 
 #include "Mesh.h"
-#include "Animator.h"
+//#include "Animator.h"
 
 //struct Transform
 //{
@@ -56,8 +56,9 @@ struct MeshComponent : Component
 {
     std::string path = "<no mesh>";
     
-    Mesh mesh;
-    Animator animator;
+    std::shared_ptr<Mesh> mesh;
+    std::vector<std::shared_ptr<Material>> materials;
+//    Animator animator;
 };
 
 class Entity
@@ -73,7 +74,7 @@ public:
     
     // Добавление компонента
     template<typename T, typename... TArgs>
-    T& addComponent(TArgs&&... args)
+    T* addComponent(TArgs&&... args)
     {
         auto newComponent = std::make_unique<T>(std::forward<TArgs>(args)...);
         T* componentPtr = newComponent.get();
@@ -83,7 +84,7 @@ public:
         m_componentMap[typeid(T)] = componentPtr;
         
         componentPtr->awake();
-        return *componentPtr;
+        return componentPtr;
     }
     
     // Получение компонента

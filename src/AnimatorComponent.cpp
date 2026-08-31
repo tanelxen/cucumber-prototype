@@ -1,20 +1,20 @@
 //
-//  Animator.cpp
+//  AnimatorComponent.cpp
 //  Cucumber
 //
 //  Created by Fedor Artemenkov on 21.08.26.
 //
 
-#include "Animator.h"
+#include "AnimatorComponent.h"
 #include "Skeleton.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-Animator::Animator() = default;
-Animator::~Animator() = default;
+AnimatorComponent::AnimatorComponent() = default;
+AnimatorComponent::~AnimatorComponent() = default;
 
-void Animator::setSkeleton(std::shared_ptr<Skeleton> skeleton)
+void AnimatorComponent::setSkeleton(std::shared_ptr<Skeleton> skeleton)
 {
     m_skeleton = skeleton;
     
@@ -30,7 +30,7 @@ void Animator::setSkeleton(std::shared_ptr<Skeleton> skeleton)
     }
 }
 
-void Animator::play(int clipIndex)
+void AnimatorComponent::play(int clipIndex)
 {
     if (clipIndex >= 0 && clipIndex < m_clips.size())
     {
@@ -39,15 +39,15 @@ void Animator::play(int clipIndex)
     }
 }
 
-void Animator::update(float dt)
+void AnimatorComponent::update(float dt)
 {
     if (!m_skeleton || m_currentClipIndex < 0 || m_clips.empty()) return;
 
-    const AnimationClip& clip = m_clips[m_currentClipIndex];
+    auto clip = m_clips[m_currentClipIndex];
     
-    if (clip.duration > 0.0f)
+    if (clip->duration > 0.0f)
     {
-        m_currentTime = fmod(m_currentTime + dt, clip.duration);
+        m_currentTime = fmod(m_currentTime + dt, clip->duration);
     }
     
     // Вспомогательная функция для поиска двух соседних кадров и фактора интерполяции
@@ -65,7 +65,7 @@ void Animator::update(float dt)
     };
     
     // 1. Применяем анимацию к локальным трансформациям костей
-    for (const auto& track : clip.tracks)
+    for (const auto& track : clip->tracks)
     {
         int bIdx = track.boneIndex;
         auto& translation = m_translations[bIdx];

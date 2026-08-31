@@ -8,10 +8,25 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 class Mesh;
-class Animator;
+class Material;
+class Skeleton;
+class AnimationClip;
+
+struct ModelResource
+{
+    std::string filepath;
+    std::shared_ptr<Mesh> mesh = nullptr;
+    std::shared_ptr<Skeleton> skeleton = nullptr;
+    std::vector<std::shared_ptr<AnimationClip>> animations;
+    std::vector<std::shared_ptr<Material>> embeddedMaterials;
+    
+    bool hasSkeleton() const { return skeleton != nullptr; }
+    bool hasAnimations() const { return !animations.empty(); }
+};
 
 namespace ModelLoader {
-    bool LoadGLTF(const std::string& filepath, Mesh& mesh, Animator& animator);
+    ModelResource LoadModel(const std::string& filepath);
 };
