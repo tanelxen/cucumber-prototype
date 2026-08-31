@@ -143,8 +143,10 @@ static void RegisterUI()
                     animator->m_currentClipIndex = -1;
                 }
                 
-                std::filesystem::path p(path);
-                comp->path = p.filename();
+                
+                std::filesystem::path base_path("./assets");
+                auto rel_path = std::filesystem::relative(path, base_path);
+                comp->path = rel_path;
             }
         }
         

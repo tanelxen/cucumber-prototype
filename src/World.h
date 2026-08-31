@@ -29,6 +29,7 @@ public:
     void selectEntityAtIndex(int index);
     
     void save();
+    void load();
     
     Viewport* m_pMainView;
     

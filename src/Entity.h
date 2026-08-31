@@ -15,7 +15,7 @@
 #include <glm/glm.hpp>
 
 #include "Mesh.h"
-//#include "Animator.h"
+#include "../vendor/json.hpp"
 
 //struct Transform
 //{
@@ -36,7 +36,10 @@ public:
     virtual ~Component() = default;
     virtual void awake() {}
     virtual void update(float dt) {}
-    virtual void onImGuiRender() {}
+    
+    virtual void save(nlohmann::json& j) const = 0;
+    virtual void load(const nlohmann::json& j) = 0;
+    virtual const std::string getTypeName() const = 0;
     
     virtual std::type_index GetTypeIndex() const {
         return std::type_index(typeid(*this));
@@ -50,6 +53,29 @@ struct TransformComponent : Component
     glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
     
     glm::mat4 toMat4();
+    
+    const std::string getTypeName() const override { return "TransformComponent"; }
+    
+    void save(nlohmann::json& j) const override
+    {
+        j = nlohmann::json {
+            {"position", {position.x, position.y, position.z}},
+            {"rotation", {rotation.x, rotation.y, rotation.z}},
+            {"scale",    {scale.x,    scale.y,    scale.z}}
+        };
+    }
+    
+    void load(const nlohmann::json& j) override
+    {
+        auto pos = j.at("position").get<std::vector<float>>();
+        position = glm::vec3(pos[0], pos[1], pos[2]);
+        
+        auto rot = j.at("rotation").get<std::vector<float>>();
+        rotation = glm::vec3(rot[0], rot[1], rot[2]);
+        
+        auto scl = j.at("scale").get<std::vector<float>>();
+        scale = glm::vec3(scl[0], scl[1], scl[2]);
+    }
 };
 
 struct MeshComponent : Component
@@ -58,7 +84,18 @@ struct MeshComponent : Component
     
     std::shared_ptr<Mesh> mesh;
     std::vector<std::shared_ptr<Material>> materials;
-//    Animator animator;
+    
+    const std::string getTypeName() const override { return "MeshComponent"; }
+    
+    void save(nlohmann::json& j) const override
+    {
+        j = nlohmann::json{ {"source_glb", path} };
+    }
+    
+    void load(const nlohmann::json& j) override
+    {
+        path = j.at("source_glb");
+    }
 };
 
 class Entity
@@ -104,6 +141,8 @@ public:
             }
         }
     }
+    
+    const std::vector<std::unique_ptr<Component>>& getAllComponents() const { return m_components; }
     
 private:
     std::vector<std::unique_ptr<Component>> m_components;

@@ -32,6 +32,29 @@ public:
     
     std::vector<std::shared_ptr<AnimationClip>> m_clips;
     int m_currentClipIndex = -1;
+    
+    const std::string getTypeName() const override { return "AnimatorComponent"; }
+    
+    void save(nlohmann::json& j) const override
+    {
+        auto clip = m_clips[m_currentClipIndex];
+        j = nlohmann::json{ {"clip", clip->name} };
+    }
+    
+    void load(const nlohmann::json& j) override
+    {
+        std::string clipName = j.at("clip");
+        
+        auto it = std::find_if(m_clips.begin(), m_clips.end(), [&clipName](const std::shared_ptr<AnimationClip>& clip) {
+            return clip->name == clipName;
+        });
+        
+        if (it != m_clips.end())
+        {
+            int index = static_cast<int>(it - m_clips.begin());
+            play(index);
+        }
+    }
 
 private:
     std::shared_ptr<Skeleton> m_skeleton;

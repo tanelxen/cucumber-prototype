@@ -30,6 +30,7 @@
 #include "../vendor/json.hpp"
 
 #include <iostream>
+#include <fstream>
 
 static ShadedCube g_shadedCube;
 static Mesh g_mesh;
@@ -84,7 +85,7 @@ void WorldScene::draw()
         {
             auto animator = entity->getComponent<AnimatorComponent>();
             
-            if (animator && animator->m_clips.empty()) {
+            if (!animator || animator->m_clips.empty()) {
                 meshComp->mesh->draw(model);
             } else {
                 meshComp->mesh->draw(model, animator->getFinalBoneMatrices());
@@ -110,29 +111,153 @@ void WorldScene::selectEntityAtIndex(int index)
 
 using json = nlohmann::json;
 
-void to_json(json& j, const Entity& t)
+void to_json(json& entityJson, const Entity& entity)
 {
-    j = json{ {"name", t.m_name} };
+    entityJson["name"] = entity.m_name;
+    entityJson["active"] = entity.m_isActive;
+    
+    json componentsJson = json::object();
+    
+    for (const auto& comp : entity.getAllComponents())
+    {
+        json compData;
+        comp->save(compData);
+        
+        // Ключом будет имя компонента, например "TransformComponent"
+        componentsJson[comp->getTypeName()] = compData;
+    }
+    
+    entityJson["components"] = componentsJson;
+}
+
+void SerializeEntity(json& entityJson, const Entity* entity)
+{
+    entityJson["name"] = entity->m_name;
+    
+    json componentsArray = json::array();
+    
+    for (const auto& comp : entity->getAllComponents())
+    {
+        json compNode;
+        compNode["type"] = comp->getTypeName();
+        
+        json compData;
+        comp->save(compData);
+        compNode["data"] = compData;
+        
+        componentsArray.push_back(compNode);
+    }
+    
+    entityJson["components"] = componentsArray;
 }
 
 void WorldScene::save()
 {
-    // Создаем пустой JSON-массив для объектов
-    json entitiesArray = json::array();
+    json sceneJson;
     
-    // Вручную разыменовываем каждый unique_ptr
-    for (const auto& entityPtr : m_entities)
+    sceneJson["name"] = "test";
+    sceneJson["entities"] = json::array();
+    
+    for (const auto& entity : m_entities)
     {
-        if (entityPtr) { // Проверяем на nullptr на всякий случай
-            // Записываем сам объект (*entityPtr), библиотека вызовет to_json(json&, const Entity&)
-            entitiesArray.push_back(*entityPtr);
-        }
+        json entityJson;
+        SerializeEntity(entityJson, entity.get());
+        sceneJson["entities"].push_back(entityJson);
     }
     
-    auto j = json {
-        { "scene_name", "test" },
-        { "objects", entitiesArray }
-    };
+    std::ofstream file("scene.json");
+    file << sceneJson.dump(4);
+}
+
+void DeserializeEntity(const json& entityJson, Entity* entity)
+{
+    auto componentsArray = entityJson.at("components");
     
-    std::cout << j.dump(4) << "\n\n";
+    for (const auto& compNode : componentsArray)
+    {
+        std::string compName = compNode.at("type").get<std::string>();
+        const json& compData = compNode.at("data");
+        
+        Component* newComp = nullptr;
+        
+        // Фабрика компонентов по их текстовому имени
+        if (compName == "TransformComponent")
+        {
+            newComp = entity->addComponent<TransformComponent>();
+        }
+        else if (compName == "MeshComponent")
+        {
+            newComp = entity->addComponent<MeshComponent>();
+            
+            // После создания компонента, не забудьте накатить на него ресурсы!
+            // Берём путь к glb, который прочитается внутри Deserialize, и грузим через ResourceManager
+            std::string path = compData.at("source_glb");
+            ModelResource model = ModelLoader::LoadModel(path);
+            
+            auto meshComp = static_cast<MeshComponent*>(newComp);
+            meshComp->mesh = model.mesh;
+            meshComp->materials = model.embeddedMaterials;
+        }
+        else if (compName == "AnimatorComponent")
+        {
+            newComp = entity->addComponent<AnimatorComponent>();
+            
+            std::string path = compData.at("source_glb");
+            ModelResource model = ModelLoader::LoadModel(path);
+            
+            auto animComp = static_cast<AnimatorComponent*>(newComp);
+            animComp->setSkeleton(model.skeleton);
+            animComp->m_clips = model.animations;
+        }
+        
+        // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
+        if (newComp)
+        {
+            newComp->load(compData);
+        }
+    }
+}
+
+void WorldScene::load()
+{
+    std::string filename = "scene.json";
+    
+    // 1. Открываем и читаем JSON-файл
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Не удалось открыть файл сцены: " << filename << std::endl;
+        return;
+    }
+    
+    json sceneJson;
+    try {
+        file >> sceneJson;
+    } catch (const json::parse_error& e) {
+        std::cerr << "Ошибка парсинга JSON: " << e.what() << std::endl;
+        return;
+    }
+    
+    // Проверяем базовую структуру файла
+    if (!sceneJson.contains("entities") || !sceneJson["entities"].is_array()) {
+        std::cerr << "Неверный формат сцены: отсутствует массив 'entities'" << std::endl;
+        return;
+    }
+    
+    // ==========================================
+    // ПРОХОД 1: Создание Entity и их компонентов
+    // ==========================================
+    for (const auto& entityJson : sceneJson["entities"])
+    {
+        std::string name = entityJson.value("name", "Unnamed_Entity");
+        std::cout << "Load " << name << std::endl;
+
+        auto entity = std::make_unique<Entity>(name);
+        
+        if (entityJson.contains("components"))
+        {
+            DeserializeEntity(entityJson, entity.get());
+        }
+        
+        m_entities.push_back(std::move(entity));
+    }
 }

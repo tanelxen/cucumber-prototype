@@ -7,6 +7,7 @@
 
 #include "UIManager.h"
 
+#include "Application.h"
 #include "ViewportPanel.h"
 #include "InspectorPanel.h"
 #include "MaterialPanel.h"
@@ -199,10 +200,14 @@ void UIManager::drawMenuBar()
         {
             if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
             {
-                //                Application::currentInstance->m_pScene->save();
+                Application::currentInstance->m_pScene->save();
             }
             
-            if (ImGui::MenuItem("Load Scene", "Ctrl+L")) {};
+            if (ImGui::MenuItem("Load Scene", "Ctrl+L"))
+            {
+                Application::currentInstance->m_pScene->load();
+            };
+            
             ImGui::Separator();
             
             if (ImGui::MenuItem("Reload Scripts", "Ctrl+R")) {};
