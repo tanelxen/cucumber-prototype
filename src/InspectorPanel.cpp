@@ -31,6 +31,7 @@
 #include "../vendor/stb_image.h"
 
 #include "RenderDevice.h"
+#include "AudioSystem.h"
 
 class ComponentInspector {
 public:
@@ -96,6 +97,7 @@ void InspectorPanel::setEntity(Entity *entity)
 
 //bool DrawVector3Control(const char* label, float* values, float resetValue, float speed);
 bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth);
+void DrawAudioComponentInspector(AudioComponent* component);
 
 static void RegisterUI()
 {
@@ -118,7 +120,7 @@ static void RegisterUI()
         
         ImGui::InputText("##MeshPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
         ImGui::SameLine();
-        if (ImGui::Button("..."))
+        if (ImGui::Button("...##OpenMesh"))
         {
             char const * filter[2] = { "*.gltf", "*.glb" };
             const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/gltf/", 2, filter, NULL, 0);
@@ -203,6 +205,35 @@ static void RegisterUI()
             }
         }
     });
+    
+    inspector.Register<AudioComponent>("Sound", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<AudioComponent*>(c);
+
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
+        
+        ImGui::InputText("##SoundPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
+        ImGui::SameLine();
+        if (ImGui::Button("...##OpenSound"))
+        {
+            char const * filter[2] = { "*.mp3", "*.wav" };
+            const char* path = tinyfd_openFileDialog(NULL, "./assets/sounds/", 2, filter, NULL, 0);
+            
+            if (path != nullptr)
+            {
+                comp->init(path);
+                
+                std::filesystem::path base_path("./assets");
+                auto rel_path = std::filesystem::relative(path, base_path);
+                comp->path = rel_path;
+            }
+        }
+        
+        if (comp->m_isInitialized)
+        {
+            DrawAudioComponentInspector(comp);
+        }
+    });
 }
 
 void InspectorPanel::draw()
@@ -246,42 +277,13 @@ void InspectorPanel::draw()
         ImGui::OpenPopup("AddComponentPopup");
     }
     
-    if (ImGui::BeginPopup("AddComponentPopup")) {
-        if (ImGui::MenuItem("Transform")) { m_entity->addComponent<TransformComponent>(); }
-        if (ImGui::MenuItem("Mesh"))     { m_entity->addComponent<MeshComponent>(); }
+    if (ImGui::BeginPopup("AddComponentPopup"))
+    {
+        if (ImGui::MenuItem("Transform"))   { m_entity->addComponent<TransformComponent>(); }
+        if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
+        if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
         ImGui::EndPopup();
     }
-    
-//    if (ImGui::Button("Add Component"))
-//    {
-//        ImGui::OpenPopup("add_component_popup");
-//    }
-//    
-//    if (ImGui::BeginPopup("add_component_popup"))
-//    {
-//        ImGui::TextDisabled("Componentes");
-//        ImGui::Separator();
-//        
-//        if (ImGui::Selectable("Transform")) {
-//            std::cout << "Add Transform" << std::endl;
-//            m_entity->addComponent<TransformComponent>();
-//        }
-//
-//        if (ImGui::Selectable("Mesh")) {
-//            std::cout << "Add Mesh Renderer" << std::endl;
-//            m_entity->addComponent<MeshComponent>();
-//        }
-//        
-//        if (ImGui::Selectable("Light")) {
-//            std::cout << "Add Light" << std::endl;
-//        }
-//        
-//        if (ImGui::Selectable("Script")) {
-//            std::cout << "Add Script" << std::endl;
-//        }
-//        
-//        ImGui::EndPopup();
-//    }
     
     ImGui::End();
 //    ImGui::PopStyleVar();
@@ -446,4 +448,57 @@ bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetVal
     ImGui::PopID();
     
     return isChangedX || isChangedY || isChangedZ;
+}
+
+
+void DrawAudioComponentInspector(AudioComponent* component)
+{
+    // 1. Управление воспроизведением (Кнопки Play / Pause / Stop в один ряд)
+    if (component->IsPlaying()) {
+        // Если играет, показываем кнопку Pause (в miniaudio это просто Stop)
+        if (ImGui::Button("Pause")) {
+            component->stop();
+        }
+    } else {
+        if (ImGui::Button("Play")) {
+            component->play();
+        }
+    }
+    
+    ImGui::SameLine();
+    if (ImGui::Button("Stop")) {
+        component->stop();
+        component->SetCurrentTime(0.0f); // Сбрасываем в начало
+    }
+    
+    ImGui::SameLine();
+    bool isLooping = component->IsLooping();
+    if (ImGui::Checkbox("Looping", &isLooping)) {
+        component->setLooping(isLooping);
+    }
+    
+//    // 2. Прогресс-бар воспроизведения
+    float currentTime = component->GetCurrentTime();
+    float totalTime = component->m_length;
+    float progress = (totalTime > 0.0f) ? (currentTime / totalTime) : 0.0f;
+    
+    // Форматируем текст времени: "01:23 / 03:45"
+    char timeBuffer[64];
+    snprintf(timeBuffer, sizeof(timeBuffer), "%.1fs / %.1fs", currentTime, totalTime);
+    
+    // Отрисовка прогресс-бара
+    ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), timeBuffer);
+    
+//    // Интерактивная перемотка (Slider), если хочется кликать по таймлайну
+//    float seekTime = currentTime;
+//    if (ImGui::SliderFloat("Seek", &seekTime, 0.0f, totalTime, " ")) {
+//        component->SetCurrentTime(seekTime);
+//    }
+//    
+//    // 3. Основные настройки звука
+//    // Настройки громкости
+//    float volume = component->GetVolume();
+//    if (ImGui::SliderFloat("Volume", &volume, 0.0f, 2.0f, "%.2f")) {
+//        component->setVolume(volume);
+//    }
 }

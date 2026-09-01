@@ -13,6 +13,8 @@
 #include "Application.h"
 #include "Camera.h"
 
+#include "AudioSystem.h"
+
 static const float kMouseSense = 0.15;
 
 CameraController::CameraController(Camera *camera) : m_pCamera(camera)
@@ -108,4 +110,9 @@ void CameraController::update(float dt)
     {
         m_pCamera->setTransform(position, forward, right, up);
     }
+    
+    ma_engine* engine = AudioSystem::Get().GetEngine();
+    ma_engine_listener_set_position(engine, 0, position.x, position.y, position.z);
+    ma_engine_listener_set_direction(engine, 0, m_pCamera->getForward().x, m_pCamera->getForward().y, m_pCamera->getForward().z);
+    ma_engine_listener_set_world_up(engine, 0, 0, 1, 0);
 }

@@ -59,6 +59,8 @@ set(SRC_COMMON
         src/Sky.h
         
         vendor/tinyfiledialogs.c
+        
+        src/AudioSystem.h
 )
 
 set(SRC_RENDERER
@@ -119,9 +121,21 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)
 #source_group("Shaders" FILES ${SHADER_FILES})
 #add_custom_target(Shaders SOURCES ${SHADER_FILES})
 
+
+# Создаем статическую библиотеку miniaudio
+add_library(miniaudio STATIC 
+    vendor/miniaudio/miniaudio.c
+    vendor/miniaudio/miniaudio.h
+)
+
+# Указываем путь к заголовочным файлам
+target_include_directories(miniaudio PUBLIC 
+    vendor/miniaudio
+)
+
 target_include_directories(${PROJECT_NAME} PRIVATE vendor/glm)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui)
+target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui miniaudio)
 
 
 

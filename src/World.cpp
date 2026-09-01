@@ -24,6 +24,7 @@
 #include "Viewport.h"
 
 #include "RenderDevice.h"
+#include "AudioSystem.h"
 
 #include "Sky.h"
 
@@ -45,6 +46,7 @@ WorldScene::WorldScene()
 {
     g_grid.init();
     g_sky.init();
+    AudioSystem::Get().Initialize();
 }
 
 WorldScene::~WorldScene() = default;
@@ -58,13 +60,14 @@ void WorldScene::update(float dt)
     for (auto& entity : m_entities)
     {
         if (!entity->m_isActive) continue;
+        entity->update(dt);
         
-        auto animator = entity->getComponent<AnimatorComponent>();
-        
-        if (animator)
-        {
-            animator->update(dt);
-        }
+//        auto animator = entity->getComponent<AnimatorComponent>();
+//        
+//        if (animator)
+//        {
+//            animator->update(dt);
+//        }
     }
 }
 
@@ -215,6 +218,15 @@ void DeserializeEntity(const json& entityJson, Entity* entity)
             auto animComp = static_cast<AnimatorComponent*>(newComp);
             animComp->setSkeleton(model.skeleton);
             animComp->m_clips = model.animations;
+        }
+        else if (compName == "AudioComponent")
+        {
+            newComp = entity->addComponent<AudioComponent>();
+            
+            std::string path = compData.at("source");
+            
+            auto audioComp = static_cast<AudioComponent*>(newComp);
+            audioComp->init(path);
         }
         
         // Загружаем уникальное состояние (время, позицию, скорость и т.д.)

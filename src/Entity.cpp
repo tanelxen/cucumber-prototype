@@ -30,3 +30,19 @@ glm::mat4 TransformComponent::toMat4()
     
     return model;
 }
+
+void AudioComponent::update(float dt)
+{
+    auto comp = owner->getComponent<TransformComponent>();
+    auto transform = static_cast<TransformComponent*>(comp);
+    
+    ma_sound_set_spatialization_enabled(&m_sound, true);
+    ma_sound_set_positioning(&m_sound, ma_positioning_absolute);
+    ma_sound_set_attenuation_model(&m_sound, ma_attenuation_model_linear);
+    
+    ma_sound_set_rolloff(&m_sound, 1.0f);
+    ma_sound_set_min_distance(&m_sound, 80.0f);
+    ma_sound_set_max_distance(&m_sound, 1250.0f);
+    
+    ma_sound_set_position(&m_sound, transform->position.x, transform->position.y, transform->position.z);
+}

@@ -1,0 +1,45 @@
+//
+//  AudioSystem.h
+//  Cucumber
+//
+//  Created by Fedor Artemenkov on 01.09.26.
+//
+
+#pragma once
+
+#include "miniaudio.h"
+#include <iostream>
+
+class AudioSystem
+{
+public:
+    static AudioSystem& Get()
+    {
+        static AudioSystem instance;
+        return instance;
+    }
+    
+    bool Initialize()
+    {
+        ma_result result = ma_engine_init(nullptr, &m_engine);
+        if (result != MA_SUCCESS) {
+            std::cerr << "Failed to initialize miniaudio engine." << std::endl;
+            return false;
+        }
+        return true;
+    }
+    
+    void Shutdown()
+    {
+        ma_engine_uninit(&m_engine);
+    }
+    
+    ma_engine* GetEngine() { return &m_engine; }
+    
+private:
+    AudioSystem() = default;
+    ~AudioSystem() { Shutdown(); }
+    
+    ma_engine m_engine;
+};
+
