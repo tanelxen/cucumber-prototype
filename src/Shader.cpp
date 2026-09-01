@@ -75,6 +75,7 @@ ShaderVariant* Shader::getVariant(FeatureMask key)
     if (key & ShaderFeature::HasNormalMap) defines += "#define HAS_NORMAL_MAP\n";
     if (key & ShaderFeature::HasSkinning)  defines += "#define HAS_SKINNING\n";
     if (key & ShaderFeature::HasShadows)   defines += "#define HAS_SHADOWS\n";
+    if (key & ShaderFeature::HasSpherical)   defines += "#define HAS_SH_LIGHT\n";
     
     std::string vs_source = defines + m_vertexTemplate;
     std::string fs_source = defines + m_fragmentTemplate;

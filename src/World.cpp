@@ -25,6 +25,8 @@
 
 #include "RenderDevice.h"
 
+#include "Sky.h"
+
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "../vendor/json.hpp"
@@ -35,14 +37,14 @@
 static ShadedCube g_shadedCube;
 static Mesh g_mesh;
 static Grid g_grid;
+static Sky g_sky;
 
 //static Entity g_entity("My Entity");
 
 WorldScene::WorldScene()
 {
     g_grid.init();
-    
-
+    g_sky.init();
 }
 
 WorldScene::~WorldScene() = default;
@@ -70,7 +72,7 @@ void WorldScene::draw()
 {
     RenderDevice::startFrame();
     
-    g_grid.draw();
+//    g_grid.draw();
     
     for (auto& entity : m_entities)
     {
@@ -94,7 +96,12 @@ void WorldScene::draw()
     }
     
     m_pMainView->bind();
+    
+    auto camera = m_pMainView->getCamera();
+    g_sky.draw(camera->view, camera->projection);
+    
     RenderDevice::commit(m_pMainView->getCamera());
+    
     m_pMainView->unbind();
     
     RenderDevice::endFrame();

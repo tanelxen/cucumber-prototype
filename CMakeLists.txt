@@ -55,6 +55,9 @@ set(SRC_COMMON
         src/Entity.cpp
         src/Entity.h
         
+        src/Sky.cpp
+        src/Sky.h
+        
         vendor/tinyfiledialogs.c
 )
 

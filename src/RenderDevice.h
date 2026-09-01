@@ -35,6 +35,8 @@ namespace RenderDevice {
     void submit(RenderCommand cmd);
     void commit(Camera* camera);
     void endFrame();
+    
+    inline std::vector<glm::vec3> shCoefficients(9, glm::vec3(0.0f));
 }
 
 enum PassType
@@ -62,6 +64,7 @@ namespace ShaderFeature
     constexpr FeatureMask HasNormalMap    = 1 << 1;
     constexpr FeatureMask HasSkinning     = 1 << 2;
     constexpr FeatureMask HasShadows      = 1 << 3;
+    constexpr FeatureMask HasSpherical    = 1 << 4;
 }
 
 struct RenderCommand

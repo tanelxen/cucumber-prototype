@@ -29,6 +29,8 @@ namespace RenderDevice {
     handle_t whiteTextureId;
     handle_t normalTextureId;
     
+    
+    
     void init()
     {
         gladLoadGL();
@@ -56,6 +58,18 @@ namespace RenderDevice {
             unsigned char pixels[4] = { 128, 128, 255, 255 };
             normalTextureId = makeTexture(1, 1, true, true, pixels);
         }
+        
+        
+        
+//        shCoefficients[0] = glm::vec3(0.43233, 0.219065, 0.161589);
+//        shCoefficients[1] = glm::vec3(0.250797, 0.106321, 0.0464793);
+//        shCoefficients[2] = glm::vec3(0.30481, 0.187916, 0.128884);
+//        shCoefficients[3] = glm::vec3(-0.0314883, -0.0288192, -0.0495037);
+//        shCoefficients[4] = glm::vec3(-0.0538252, -0.0303336, -0.0321333);
+//        shCoefficients[5] = glm::vec3(0.156495, 0.0838068, 0.0351124);
+//        shCoefficients[6] = glm::vec3(0.193687, 0.110605, 0.065372);
+//        shCoefficients[7] = glm::vec3(-0.000409677, 0.012437, 0.0138015);
+//        shCoefficients[8] = glm::vec3(0.0474989, 0.0719414, 0.0850631);
     }
     
     handle_t getWhiteTexture() { return whiteTextureId; }
@@ -158,8 +172,8 @@ namespace RenderDevice {
                 lastProgram = shader->getProgramId();
             }
             
-            glm::mat4 mvp = viewProj * cmd.transform;
-            shader->setUniform("MVP", mvp);
+            shader->setUniform("uModel", cmd.transform);
+            shader->setUniform("uVP", viewProj);
             
             switch (cmd.blendMode)
             {
@@ -206,6 +220,11 @@ namespace RenderDevice {
             if (cmd.featureMask & ShaderFeature::HasSkinning && cmd.bones != nullptr)
             {
                 shader->setUniform("uBones[0]", *cmd.bones);
+            }
+            
+            if (cmd.featureMask & ShaderFeature::HasSpherical)
+            {
+                shader->setUniform("u_SH[0]", shCoefficients);
             }
             
             if (lastVAO != cmd.vao)
