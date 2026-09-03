@@ -72,6 +72,8 @@ public:
     std::vector<Surface> m_surfaces;
     std::vector<Material> m_materials;
     
+    bool m_useAmbientLight = true;
+    
 private:
     std::unique_ptr<VertexArray> m_vao;
     

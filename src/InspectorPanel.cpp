@@ -13,12 +13,14 @@
 
 #include "Entity.h"
 #include "AnimatorComponent.h"
+#include "ScriptComponent.h"
+
+#include "ScriptEngine.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 
 #include <stdio.h>
-#include <iostream>
 #include <filesystem>
 
 #include <unordered_map>
@@ -30,10 +32,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb_image.h"
 
-#include "RenderDevice.h"
-#include "AudioSystem.h"
+std::vector<std::string> GetAvailableScriptClasses();
 
-class ComponentInspector {
+class ComponentInspector
+{
 public:
     // Сигнатура функции отрисовки: принимает чистый указатель на компонент
     using RenderFunc = std::function<void(Component*, InspectorPanel* p)>;
@@ -51,18 +53,20 @@ public:
     }
     
     // Отрисовка компонента по его динамическому типу
-    void Render(Component* component, InspectorPanel* panel) {
+    void Render(Component* component, InspectorPanel* panel)
+    {
         if (!component) return;
         
         std::type_index id = component->GetTypeIndex();
         auto it = registry.find(id);
+        
+        ImGui::PushID(component);
         
         if (it != registry.end()) {
             const auto& info = it->second;
             
             // Отрисовываем красивый заголовок в ImGui
             if (ImGui::CollapsingHeader(info.displayName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-//                ImGui::Checkbox("Enabled", &component->enabled);
                 // Вызываем кастомную функцию отрисовки
                 info.renderFunc(component, panel);
             }
@@ -70,6 +74,8 @@ public:
             // Фолбэк, если UI для компонента забыли зарегистрировать
             ImGui::CollapsingHeader(typeid(*component).name());
         }
+        
+        ImGui::PopID();
     }
     
     // Дополнительный метод для получения красивого имени (для меню добавления)
@@ -95,9 +101,9 @@ void InspectorPanel::setEntity(Entity *entity)
     RegisterUI();
 }
 
-//bool DrawVector3Control(const char* label, float* values, float resetValue, float speed);
 bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth);
 void DrawAudioComponentInspector(AudioComponent* component);
+void DrawScriptProperties(asITypeInfo* type);
 
 static void RegisterUI()
 {
@@ -113,14 +119,12 @@ static void RegisterUI()
     inspector.Register<MeshComponent>("Mesh", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<MeshComponent*>(c);
         
-//        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
-        
         char buffer[256];
         snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
         
-        ImGui::InputText("##MeshPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
+        ImGui::InputText("##Path", buffer, 256, ImGuiInputTextFlags_ReadOnly);
         ImGui::SameLine();
-        if (ImGui::Button("...##OpenMesh"))
+        if (ImGui::Button("..."))
         {
             char const * filter[2] = { "*.gltf", "*.glb" };
             const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/gltf/", 2, filter, NULL, 0);
@@ -150,6 +154,10 @@ static void RegisterUI()
                 auto rel_path = std::filesystem::relative(path, base_path);
                 comp->path = rel_path;
             }
+        }
+        
+        if (comp->mesh) {
+            ImGui::Checkbox("Skybox ambient", &comp->mesh->m_useAmbientLight);
         }
         
         if (comp->mesh && !comp->mesh->m_surfaces.empty())
@@ -212,9 +220,9 @@ static void RegisterUI()
         char buffer[256];
         snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
         
-        ImGui::InputText("##SoundPath", buffer, 256, ImGuiInputTextFlags_ReadOnly);
+        ImGui::InputText("##Path", buffer, 256, ImGuiInputTextFlags_ReadOnly);
         ImGui::SameLine();
-        if (ImGui::Button("...##OpenSound"))
+        if (ImGui::Button("..."))
         {
             char const * filter[2] = { "*.mp3", "*.wav" };
             const char* path = tinyfd_openFileDialog(NULL, "./assets/sounds/", 2, filter, NULL, 0);
@@ -234,17 +242,42 @@ static void RegisterUI()
             DrawAudioComponentInspector(comp);
         }
     });
+    
+    inspector.Register<ScriptComponent>("Script", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<ScriptComponent*>(c);
+        
+        ImGui::TextDisabled("%s", comp->scriptPath.c_str());
+        
+        if (comp->m_isInitialized)
+        {
+            if (ImGui::Button("Edit")) {
+                
+#if defined(_WIN32)
+                // Для Windows: открывает файл в программе по умолчанию (обычно Блокнот)
+                std::string command = "start \"" + comp->scriptPath + "\"";
+#elif defined(__APPLE__)
+                // Для macOS
+                std::string command = "open \"" + comp->scriptPath + "\"";
+#else
+                // Для Linux
+                std::string command = "xdg-open \"" + comp->scriptPath + "\"";
+#endif
+                
+                std::system(command.c_str());
+            }
+            
+            comp->drawProperties();
+        }
+    });
 }
 
 void InspectorPanel::draw()
 {
-//    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{16, 16});
     ImGui::Begin("Inspector");
     
     if (!m_entity)
     {
         ImGui::End();
-//        ImGui::PopStyleVar();
         return;
     }
     
@@ -282,6 +315,29 @@ void InspectorPanel::draw()
         if (ImGui::MenuItem("Transform"))   { m_entity->addComponent<TransformComponent>(); }
         if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
         if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
+//        if (ImGui::MenuItem("Script"))       { m_entity->addComponent<ScriptComponent>(); }
+        
+        if (ImGui::BeginMenu("Scripts")) {
+            // Получаем актуальный список классов из AngelScript
+            auto availableScripts = GetAvailableScriptClasses();
+            
+            if (availableScripts.empty()) {
+                ImGui::TextDisabled("No scripts found");
+            }
+            
+            for (const auto& className : availableScripts)
+            {
+                if (ImGui::MenuItem(className.c_str()))
+                {
+                    auto comp = m_entity->addComponent<ScriptComponent>();
+                    comp->init(className);
+                    
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::EndMenu();
+        }
+        
         ImGui::EndPopup();
     }
     
@@ -294,71 +350,6 @@ InspectorPanel::InspectorPanel() : EditorPanel("Inspector")
     
 }
 
-
-// Вспомогательная функция для отрисовки одной оси с цветной кнопкой-сбросом
-bool DrawAxisControl(const char* label, float& value, const ImVec4& color, float resetValue, float speed, float width) {
-    bool modified = false;
-    
-    // Стилизуем кнопку (красный, зеленый или синий цвет)
-    ImGui::PushStyleColor(ImGuiCol_Button, color);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x + 0.1f, color.y + 0.1f, color.z + 0.1f, color.w));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-    
-    // Кнопка сброса оси (например, "X")
-    ImGui::PushID(label);
-    if (ImGui::Button(label, ImVec2(20, 0))) {
-        value = resetValue;
-        modified = true;
-    }
-    ImGui::PopID();
-    ImGui::PopStyleColor(3);
-    
-    ImGui::SameLine(0, 2); // Минимальный отступ между кнопкой и полем ввода
-    ImGui::SetNextItemWidth(width - 22); // Вычитаем ширину кнопки и отступа
-    
-    // Поле ввода значения
-    std::string dragLabel = "##" + std::string(label);
-    if (ImGui::DragFloat(dragLabel.c_str(), &value, speed, 0.0f, 0.0f, "%.2f")) {
-        modified = true;
-    }
-    
-    return modified;
-}
-
-// Основная функция для отрисовки трех осей (вектора)
-bool DrawVector3Control(const char* label, float* values, float resetValue = 0.0f, float speed = 0.1f)
-{
-    bool modified = false;
-    
-    ImGui::BeginGroup();
-    ImGui::TextUnformatted(label);
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x * 0.3f); // Выравниваем поля ввода по сетке
-    
-    // Вычисляем доступную ширину для трех полей с учетом отступов стиля
-    float totalWidth = ImGui::GetContentRegionAvail().x;
-    float itemWidth = (totalWidth - (ImGui::GetStyle().ItemSpacing.x * 2.0f)) / 3.0f;
-    
-    // Цвета в стиле Unreal Engine (Красный, Зеленый, Синий)
-    ImVec4 colorX = ImVec4(0.7f, 0.1f, 0.15f, 1.0f);
-    ImVec4 colorY = ImVec4(0.2f, 0.7f, 0.2f, 1.0f);
-    ImVec4 colorZ = ImVec4(0.1f, 0.4f, 0.7f, 1.0f);
-    
-    // Ось X
-    if (DrawAxisControl("X", values[0], colorX, resetValue, speed, itemWidth)) modified = true;
-    
-    // Ось Y
-    ImGui::SameLine();
-    if (DrawAxisControl("Y", values[1], colorY, resetValue, speed, itemWidth)) modified = true;
-    
-    // Ось Z
-    ImGui::SameLine();
-    if (DrawAxisControl("Z", values[2], colorZ, resetValue, speed, itemWidth)) modified = true;
-    
-    ImGui::EndGroup();
-    return modified;
-}
-
-
 bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -368,7 +359,7 @@ bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetVal
     
     ImGui::Columns(2);
     ImGui::SetColumnWidth(0, columnWidth);
-    ImGui::Text(label.c_str());
+    ImGui::Text("%s", label.c_str());
     ImGui::NextColumn();
     
     ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
@@ -456,24 +447,24 @@ void DrawAudioComponentInspector(AudioComponent* component)
     // 1. Управление воспроизведением (Кнопки Play / Pause / Stop в один ряд)
     if (component->IsPlaying()) {
         // Если играет, показываем кнопку Pause (в miniaudio это просто Stop)
-        if (ImGui::Button("Pause")) {
+        if (ImGui::Button("Pause##SoundPause")) {
             component->stop();
         }
     } else {
-        if (ImGui::Button("Play")) {
+        if (ImGui::Button("Play##SoundPlay")) {
             component->play();
         }
     }
     
     ImGui::SameLine();
-    if (ImGui::Button("Stop")) {
+    if (ImGui::Button("Stop##SoundStop")) {
         component->stop();
         component->SetCurrentTime(0.0f); // Сбрасываем в начало
     }
     
     ImGui::SameLine();
     bool isLooping = component->IsLooping();
-    if (ImGui::Checkbox("Looping", &isLooping)) {
+    if (ImGui::Checkbox("Looping##SoundLooping", &isLooping)) {
         component->setLooping(isLooping);
     }
     
@@ -501,4 +492,39 @@ void DrawAudioComponentInspector(AudioComponent* component)
 //    if (ImGui::SliderFloat("Volume", &volume, 0.0f, 2.0f, "%.2f")) {
 //        component->setVolume(volume);
 //    }
+}
+
+// Функция возвращает имена всех скриптовых классов, наследующих MonoBehaviour
+std::vector<std::string> GetAvailableScriptClasses()
+{
+    std::vector<std::string> scriptClasses;
+    
+    // Получаем наш единый модуль
+    asIScriptModule* mod = ScriptEngine::get().GetRawEngine()->GetModule("Game", asGM_ONLY_IF_EXISTS);
+    if (!mod) return scriptClasses;
+    
+    // Находим базовый тип MonoBehaviour для проверки наследования
+    asITypeInfo* baseType = mod->GetTypeInfoByName("MonoBehaviour");
+    if (!baseType) return scriptClasses;
+    
+    // Обходим все типы (классы), объявленные в модуле
+    asUINT typeCount = mod->GetObjectTypeCount();
+    
+    for (asUINT i = 0; i < typeCount; i++)
+    {
+        asITypeInfo* type = mod->GetObjectTypeByIndex(i);
+        if (!type) continue;
+        
+        // Нам нужны только классы (не enums/интерфейсы) и они не должны быть абстрактными
+        if (type->GetFlags() & asOBJ_SCRIPT_OBJECT && !(type->GetFlags() & asOBJ_ABSTRACT))
+        {
+            
+            // Проверяем, наследуется ли этот класс от MonoBehaviour
+            if (type->DerivesFrom(baseType)) {
+                scriptClasses.push_back(type->GetName());
+            }
+        }
+    }
+    
+    return scriptClasses;
 }

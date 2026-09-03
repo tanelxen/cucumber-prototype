@@ -36,5 +36,12 @@ public:
 //    std::vector<std::unique_ptr<Entity>> m_entities;
     std::vector<std::unique_ptr<Entity>> m_entities;
     
+    Entity* findEntityByName(const std::string& name);
+    
+    bool m_drawGrid = true;
+    bool m_drawSkybox = true;
+    
 private:
 };
+
+inline WorldScene* g_currentScene;

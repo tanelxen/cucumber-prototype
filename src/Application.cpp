@@ -28,6 +28,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 Application* Application::currentInstance = nullptr;
 
+int kek();
+
 Application::Application()
 {
     /* GLFW */

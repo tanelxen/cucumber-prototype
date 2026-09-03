@@ -16,10 +16,13 @@
 #include "Viewport.h"
 #include "World.h"
 
+#include "ScriptEngine.h"
+
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+void DrawScriptConsoleWindow();
 
 UIManager::UIManager()
 {
@@ -48,6 +51,8 @@ UIManager::UIManager()
     m_panels.push_back(m_pInspectorPanel);
     m_panels.push_back(m_pMaterialPanel);
     m_panels.push_back(m_pAssetsPanel);
+    
+    g_UIManager = this;
 }
 
 UIManager::~UIManager()
@@ -61,6 +66,10 @@ void UIManager::update(float dt)
     for (auto panel : m_panels)
     {
         panel->update(dt);
+    }
+    
+    if (m_is_picking_mode) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand); // Или ImGuiMouseCursor_TextInput
     }
 }
 
@@ -203,14 +212,18 @@ void UIManager::drawMenuBar()
                 Application::currentInstance->m_pScene->save();
             }
             
-            if (ImGui::MenuItem("Load Scene", "Ctrl+L"))
+            if (ImGui::MenuItem("Load Scene", "Cmd+L"))
             {
                 Application::currentInstance->m_pScene->load();
             };
             
             ImGui::Separator();
             
-            if (ImGui::MenuItem("Reload Scripts", "Ctrl+R")) {};
+            if (ImGui::MenuItem("Reload Scripts", "Ctrl+R"))
+            {
+                ScriptEngine::get().HotReloadAllScripts("assets/scripts");
+                
+            };
             ImGui::EndMenu();
         }
         
@@ -253,6 +266,16 @@ void UIManager::drawPanels()
             panel->draw();
         }
     }
+    
+    DrawScriptConsoleWindow();
+    
+    if (ImGui::IsKeyDown(ImGuiKey_Escape))
+    {
+        if (g_UIManager->m_is_picking_mode)
+        {
+            g_UIManager->endPicking();
+        }
+    }
 }
 
 void UIManager::setEntity(Entity *entity)
@@ -265,6 +288,17 @@ void UIManager::setMaterial(Material* material)
     m_pMaterialPanel->setMaterial(material);
 }
 
+void UIManager::startPicking(std::function<void (Entity *)> callback)
+{
+    m_active_picking_callback = callback;
+    m_is_picking_mode = true;
+}
+
+void UIManager::endPicking()
+{
+    m_active_picking_callback = nullptr;
+    m_is_picking_mode = false;
+}
 
 static ImVec4 ColorFromHexStr(const char* hex)
 {
@@ -273,4 +307,116 @@ static ImVec4 ColorFromHexStr(const char* hex)
     if (hex[0] == '#') hex++;
     std::sscanf(hex, "%02x%02x%02x", &r, &g, &b);
     return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
+}
+
+void DrawScriptConsoleWindow()
+{
+    ImGui::Begin("Script Console");
+    
+    // Кнопка очистки консоли
+    if (ImGui::Button("Clear")) {
+        ScriptEngine::get().ClearLogs();
+    }
+    
+    ImGui::Separator();
+    
+//    // Область вывода сообщений (скроллящаяся)
+//    ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+//    
+//    const auto& logs = ScriptEngine::get().GetLogMessages();
+//    for (const auto& log : logs) {
+//        ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // Белый по умолчанию (Info)
+//        const char* prefix = "[INFO]";
+//        
+//        if (log.type == ScriptLogType::Warning) {
+//            color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f); // Желтый (Warning)
+//            prefix = "[WARN]";
+//        }
+//        else if (log.type == ScriptLogType::Error) {
+//            color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Красный (Error)
+//            prefix = "[ERRO]";
+//        }
+//        
+//        // Выводим текст с цветовой подсветкой
+//        ImGui::PushStyleColor(ImGuiCol_Text, color);
+//        
+//        // Форматируем строку: Файл(Строка,Колонка): Сообщение
+//        ImGui::TextWrapped("%s %s(%d, %d): %s",
+//                           prefix,
+//                           log.section.c_str(),
+//                           log.row,
+//                           log.col,
+//                           log.text.c_str()
+//                           );
+//        
+//        ImGui::PopStyleColor();
+//    }
+//    
+//    // Автоматический скролл вниз при появлении новых ошибок
+//    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+//        ImGui::SetScrollHereY(1.0f);
+//    }
+//    
+//    ImGui::EndChild();
+    
+    const auto& logs = ScriptEngine::get().GetLogMessages();
+    
+    ImGui::BeginChild("ScrollingRegion", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), true);
+    
+    ImGuiListClipper clipper;
+    clipper.Begin(static_cast<int>(logs.size()));
+    
+    while (clipper.Step())
+    {
+        for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
+        {
+            const auto& log = logs[i];
+            
+            ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // Белый по умолчанию (Info)
+            const char* prefix = "[INFO]";
+            
+            if (log.type == ScriptLogType::Warning) {
+                color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f); // Желтый (Warning)
+                prefix = "[WARN]";
+            }
+            else if (log.type == ScriptLogType::Error) {
+                color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Красный (Error)
+                prefix = "[ERRO]";
+            }
+            else if (log.type == ScriptLogType::ScriptPrint) {
+                color = ImVec4(0.4f, 1.0f, 0.4f, 1.0f); // Светло-зеленый для print()
+                prefix = "[SCRIPT]";
+            }
+            
+            ImGui::PushStyleColor(ImGuiCol_Text, color);
+            
+            if (log.type == ScriptLogType::ScriptPrint)
+            {
+                ImGui::TextWrapped("%s %s", prefix, log.text.c_str());
+            }
+            else
+            {
+                ImGui::TextWrapped("%s %s(%d, %d): %s",
+                                   prefix,
+                                   log.section.c_str(),
+                                   log.row,
+                                   log.col,
+                                   log.text.c_str()
+                                   );
+            }
+            
+//            // Делаем строку выделяемой целиком
+//            bool is_selected = false;
+//            if (ImGui::Selectable(logs[i].text.c_str(), &is_selected))
+//            {
+//                // При клике копируем строку в буфер обмена Windows/Linux
+//                ImGui::SetClipboardText(logs[i].text.c_str());
+//            }
+            
+            ImGui::PopStyleColor();
+        }
+    }
+    ImGui::EndChild();
+    
+    ImGui::End();
 }

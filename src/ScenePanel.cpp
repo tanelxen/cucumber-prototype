@@ -6,6 +6,7 @@
 //
 
 #include "ScenePanel.h"
+#include "UIManager.h"
 #include "World.h"
 #include "Entity.h"
 
@@ -175,14 +176,6 @@ void ScenePanel::setScene(WorldScene *scene)
 
 void ScenePanel::draw()
 {
-//    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-//    ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoCollapse);
-//    
-//    ImGui::End();
-//    ImGui::PopStyleVar();
-    
-//    DrawSceneTree(&root);
-    
     static int selectedIndex = -1;
     
     ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoCollapse);
@@ -197,15 +190,115 @@ void ScenePanel::draw()
         selectedIndex = count;
     }
     
-    for (int i = 0; i < m_scene->m_entities.size(); ++i)
+    ImGui::Separator();
+    
+    
+    
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
+    
+    if (selectedIndex == -1) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+    
+    if (ImGui::TreeNodeEx(&m_scene, flags, "Scene"))
     {
-        bool selected = selectedIndex == i;
-        const char* name = m_scene->m_entities[i]->m_name.empty() ? "?" : m_scene->m_entities[i]->m_name.c_str();
+        if (ImGui::IsItemClicked()) {
+            selectedIndex = -1;
+        }
         
-        if ( ImGui::Selectable(name, selected) )
+        for (int i = 0; i < m_scene->m_entities.size(); ++i)
         {
-            m_scene->selectEntityAtIndex(i);
-            selectedIndex = i;
+            auto& entity = m_scene->m_entities[i];
+            
+            // Настройки флагов для текущего узла дерева
+            ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
+            
+            // Если у узла нет детей, делаем его "листом" (убираем стрелочку раскрытия)
+            //    if (node->children.empty()) {
+            flags |= ImGuiTreeNodeFlags_Leaf /*| ImGuiTreeNodeFlags_NoTreePushOnOpen */| ImGuiTreeNodeFlags_Bullet;
+            //    }
+            
+            if (selectedIndex == i) {
+                flags |= ImGuiTreeNodeFlags_Selected;
+            }
+            
+            const char* name = entity->m_name.empty() ? "?" : entity->m_name.c_str();
+            
+            bool isOpened = ImGui::TreeNodeEx(&entity, flags, "%s", name);
+            
+
+            if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
+            {
+                Entity* picked_entity = m_scene->m_entities[i].get();
+                
+                if (g_UIManager->m_is_picking_mode) {
+                    // Если мы в режиме пипетки, вызываем сохраненную лямбду
+                    if (g_UIManager->m_active_picking_callback && picked_entity) {
+                        g_UIManager->m_active_picking_callback(picked_entity);
+                    }
+                    
+                    g_UIManager->endPicking();
+                } else {
+                    // Обычная логика выбора объекта для инспектора
+                    //                m_selected_entity = picked_entity;
+                    m_scene->selectEntityAtIndex(i);
+                    selectedIndex = i;
+                }
+            }
+            
+            // =================================================================
+            // НАЧАЛО МАГИИ DRAG-N-DROP (ИСТОЧНИК)
+            // =================================================================
+            // Проверяем, начал ли пользователь тащить мышкой этот конкретный элемент дерева
+            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+                
+                // Нам нужно передать указатель на саму сущность (Entity*).
+                // Для этого мы передаем адрес указателя (&entity), а размер равен sizeof(Entity*)
+                // Строка "HIERARCHY_ENTITY" — это уникальный строковый идентификатор payload,
+                // он должен в точности совпадать с тем, что мы написали в инспекторе!
+                ImGui::SetDragDropPayload("HIERARCHY_ENTITY", &entity, sizeof(Entity*));
+                
+                // Визуальный текст-подсказка, который будет лететь за курсором мыши
+                ImGui::Text("Link Entity: %s", entity->m_name.c_str());
+                
+                ImGui::EndDragDropSource();
+            }
+            // =================================================================
+            
+            
+            if (ImGui::BeginPopupContextItem())
+            {
+                if (ImGui::MenuItem("Удалить объект"))
+                {
+                    if (i < m_scene->m_entities.size())
+                    {
+                        m_scene->m_entities[i] = std::move(m_scene->m_entities.back());
+                        m_scene->m_entities.pop_back();
+                    }
+                    
+                    selectedIndex = -2;
+                }
+                
+                if (ImGui::MenuItem("Создать дочерний объект")) {
+                    // Логика создания
+                }
+                
+                ImGui::EndPopup();
+            }
+            
+            if (isOpened) {
+                ImGui::TreePop();
+            }
+        }
+        
+        ImGui::TreePop();
+    }
+    
+    if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        if (g_UIManager->m_is_picking_mode)
+        {
+            g_UIManager->endPicking();
         }
     }
     

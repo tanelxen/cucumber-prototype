@@ -74,7 +74,7 @@ void main()
 //    float gamma = 2.0;
 //    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
     
-    vec3 ambient = vec3(0.0);
+    vec3 ambient = vec3(1.0);
     
 #ifdef HAS_SH_LIGHT
     vec3 N = normalize(v_Normal);

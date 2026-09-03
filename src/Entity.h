@@ -235,29 +235,81 @@ public:
     bool m_isActive;
     
 //    const std::string& getName() const { return m_name; }
-    const std::vector<std::unique_ptr<Component>>& getComponents() const { return m_components; }
+    
+    
+    std::string GetName() const { return m_name; }
     
     // Добавление компонента
     template<typename T, typename... TArgs>
     T* addComponent(TArgs&&... args)
     {
         auto newComponent = std::make_unique<T>(std::forward<TArgs>(args)...);
-        T* componentPtr = newComponent.get();
+        T* rawPtr = newComponent.get();
         
-        componentPtr->owner = this;
+        rawPtr->owner = this;
+        
         m_components.push_back(std::move(newComponent));
-        m_componentMap[typeid(T)] = componentPtr;
+        m_componentMap.insert({typeid(T), rawPtr});
         
-        componentPtr->awake();
-        return componentPtr;
+        rawPtr->awake();
+        return rawPtr;
     }
     
-    // Получение компонента
+    // Получение ПЕРВОГО попавшегося компонента типа
     template<typename T>
-    T* getComponent()
+    T* getComponent() const
     {
         auto it = m_componentMap.find(typeid(T));
         return (it != m_componentMap.end()) ? static_cast<T*>(it->second) : nullptr;
+    }
+    
+    // Получение ВСЕХ компонентов определенного типа
+    template <typename T>
+    void getComponents(std::vector<T*>& outResults) const
+    {
+        auto range = m_componentMap.equal_range(typeid(T));
+        
+        for (auto it = range.first; it != range.second; ++it) {
+            outResults.push_back(static_cast<T*>(it->second));
+        }
+    }
+    
+    // Получение ВСЕХ компонентов определенного типа
+    template <typename T>
+    std::vector<T*> getComponents() const
+    {
+        std::vector<T*> result;
+        auto range = m_componentMap.equal_range(typeid(T));
+        
+        for (auto it = range.first; it != range.second; ++it) {
+            result.push_back(static_cast<T*>(it->second));
+        }
+        return result;
+    }
+    
+    const std::vector<std::unique_ptr<Component>>& getComponents() const { return m_components; }
+    
+    template <typename T>
+    bool removeComponent(T* componentToRemove)
+    {
+        auto range = m_componentMap.equal_range(typeid(T));
+        
+        for (auto it = range.first; it != range.second; ++it)
+        {
+            if (it->second == componentToRemove) {
+                // 1. Удаляем из мапы поиска
+                m_componentMap.erase(it);
+                
+                // 2. Удаляем из вектора-владельца памяти
+                m_components.erase(
+                                   std::remove_if(m_components.begin(), m_components.end(),
+                                                  [componentToRemove](const auto& comp) { return comp.get() == componentToRemove; }),
+                                   m_components.end()
+                                   );
+                return true;
+            }
+        }
+        return false;
     }
     
     // Обновление всех компонентов сущности
@@ -270,9 +322,7 @@ public:
         }
     }
     
-    const std::vector<std::unique_ptr<Component>>& getAllComponents() const { return m_components; }
-    
 private:
     std::vector<std::unique_ptr<Component>> m_components;
-    std::unordered_map<std::type_index, Component*> m_componentMap;
+    std::unordered_multimap<std::type_index, Component*> m_componentMap;
 };

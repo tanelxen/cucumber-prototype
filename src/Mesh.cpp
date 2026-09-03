@@ -31,7 +31,10 @@ void Mesh::draw(glm::mat4& transform) const
             features |= ShaderFeature::HasAlbedoMap;
         }
         
-        features |= ShaderFeature::HasSpherical;
+        if (m_useAmbientLight)
+        {
+            features |= ShaderFeature::HasSpherical;
+        }
         
         RenderCommand cmd = {
             .vao = m_vao->getID(),
@@ -64,7 +67,10 @@ void Mesh::draw(glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette
             features |= ShaderFeature::HasAlbedoMap;
         }
         
-        features |= ShaderFeature::HasSpherical;
+        if (m_useAmbientLight)
+        {
+            features |= ShaderFeature::HasSpherical;
+        }
         
         RenderCommand cmd = {
             .vao = m_vao->getID(),

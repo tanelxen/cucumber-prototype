@@ -11,6 +11,8 @@
 #include "CameraController.h"
 #include "Camera.h"
 
+#include "World.h"
+
 #include <glad/glad.h>
 #include <imgui.h>
 
@@ -45,6 +47,10 @@ void ViewportPanel::draw()
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
     ImGui::Begin(m_name.c_str());
+    
+    ImGui::Checkbox("Grid", &g_currentScene->m_drawGrid);
+    ImGui::SameLine();
+    ImGui::Checkbox("Sky", &g_currentScene->m_drawSkybox);
     
     float fbo_width = (float)m_viewport->getWidth();
     float fbo_height = (float)m_viewport->getHeight();

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <vector>
+#include <functional>
 
 class EditorPanel;
 class ViewportPanel;
@@ -33,8 +34,15 @@ public:
     void setEntity(Entity* entity);
     void setMaterial(Material* material);
     
+    void startPicking(std::function<void(Entity*)> callback);
+    void endPicking();
+    
     void update(float dt);
     void draw();
+    
+    bool m_is_picking_mode = false;
+    std::function<void(Entity*)> m_active_picking_callback = nullptr;
+//    Entity* m_selected_entity = nullptr;
     
 private:
     ViewportPanel* m_pViewportPanel;
@@ -51,3 +59,5 @@ private:
     
     std::vector<EditorPanel*> m_panels;
 };
+
+inline UIManager* g_UIManager;

@@ -61,6 +61,11 @@ set(SRC_COMMON
         vendor/tinyfiledialogs.c
         
         src/AudioSystem.h
+        
+        src/ScriptEngine.cpp
+        src/ScriptEngine.h
+        src/ScriptComponent.cpp
+        src/ScriptComponent.h
 )
 
 set(SRC_RENDERER
@@ -133,9 +138,50 @@ target_include_directories(miniaudio PUBLIC
     vendor/miniaudio
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE vendor/glm)
+####################### ANGELSCRIPT #######################
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui miniaudio)
+# Включаем модуль для скачивания зависимостей
+include(FetchContent)
+
+# Объявляем зависимость и СРАЗУ указываем, где лежит правильный CMakeLists.txt внутри репозитория
+FetchContent_Declare(
+    angelscript
+    GIT_REPOSITORY https://github.com/anjo76/angelscript
+    GIT_TAG        master
+    SOURCE_SUBDIR  sdk/angelscript/projects/cmake
+)
+
+# Скачиваем и подключаем подпроект одной командой
+FetchContent_MakeAvailable(angelscript)
+
+# 2. Создаем переменные для удобства путей
+set(AS_ADDON_DIR "${angelscript_SOURCE_DIR}/sdk/add_on")
+
+# 3. Создаем библиотеку для аддонов и добавляем туда нужные файлы
+# Вы можете раскомментировать или добавить другие аддоны по аналогии
+add_library(angelscript_addons STATIC
+    ${AS_ADDON_DIR}/scriptstdstring/scriptstdstring.cpp
+    ${AS_ADDON_DIR}/scriptarray/scriptarray.cpp
+    ${AS_ADDON_DIR}/scriptbuilder/scriptbuilder.cpp
+    ${AS_ADDON_DIR}/scripthandle/scripthandle.cpp
+)
+
+# Указываем, где искать хедеры для самих аддонов
+target_include_directories(angelscript_addons PUBLIC ${AS_ADDON_DIR})
+
+# Связываем аддоны с основным AngelScript (чтобы они видели его заголовочные файлы)
+target_link_libraries(angelscript_addons PUBLIC angelscript)
+target_include_directories(angelscript_addons PUBLIC ${angelscript_SOURCE_DIR}/sdk/angelscript/include)
+
+#######################
+
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    vendor/glm
+    ${angelscript_SOURCE_DIR}/sdk/angelscript/include
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui miniaudio angelscript angelscript_addons)
 
 
 

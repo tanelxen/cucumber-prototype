@@ -20,11 +20,13 @@
 
 #include "Entity.h"
 #include "AnimatorComponent.h"
+#include "ScriptComponent.h"
 
 #include "Viewport.h"
 
 #include "RenderDevice.h"
 #include "AudioSystem.h"
+#include "ScriptEngine.h"
 
 #include "Sky.h"
 
@@ -40,13 +42,19 @@ static Mesh g_mesh;
 static Grid g_grid;
 static Sky g_sky;
 
-//static Entity g_entity("My Entity");
-
 WorldScene::WorldScene()
 {
     g_grid.init();
     g_sky.init();
     AudioSystem::Get().Initialize();
+    
+    if (!ScriptEngine::get().init()) {
+        std::cerr << "Failed to init AngelScript!" << std::endl;
+    }
+    
+    ScriptEngine::get().CompileAllScripts("assets/scripts");
+    
+    g_currentScene = this;
 }
 
 WorldScene::~WorldScene() = default;
@@ -59,15 +67,7 @@ void WorldScene::update(float dt)
     
     for (auto& entity : m_entities)
     {
-        if (!entity->m_isActive) continue;
-        entity->update(dt);
-        
-//        auto animator = entity->getComponent<AnimatorComponent>();
-//        
-//        if (animator)
-//        {
-//            animator->update(dt);
-//        }
+        if (entity->m_isActive) entity->update(dt);
     }
 }
 
@@ -75,7 +75,10 @@ void WorldScene::draw()
 {
     RenderDevice::startFrame();
     
-//    g_grid.draw();
+    if (m_drawGrid)
+    {
+        g_grid.draw();
+    }
     
     for (auto& entity : m_entities)
     {
@@ -100,8 +103,11 @@ void WorldScene::draw()
     
     m_pMainView->bind();
     
-    auto camera = m_pMainView->getCamera();
-    g_sky.draw(camera->view, camera->projection);
+    if (m_drawSkybox)
+    {
+        auto camera = m_pMainView->getCamera();
+        g_sky.draw(camera->view, camera->projection);
+    }
     
     RenderDevice::commit(m_pMainView->getCamera());
     
@@ -128,7 +134,7 @@ void to_json(json& entityJson, const Entity& entity)
     
     json componentsJson = json::object();
     
-    for (const auto& comp : entity.getAllComponents())
+    for (const auto& comp : entity.getComponents())
     {
         json compData;
         comp->save(compData);
@@ -146,7 +152,7 @@ void SerializeEntity(json& entityJson, const Entity* entity)
     
     json componentsArray = json::array();
     
-    for (const auto& comp : entity->getAllComponents())
+    for (const auto& comp : entity->getComponents())
     {
         json compNode;
         compNode["type"] = comp->getTypeName();
@@ -228,6 +234,10 @@ void DeserializeEntity(const json& entityJson, Entity* entity)
             auto audioComp = static_cast<AudioComponent*>(newComp);
             audioComp->init(path);
         }
+        else if (compName == "ScriptComponent")
+        {
+            newComp = entity->addComponent<ScriptComponent>();
+        }
         
         // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
         if (newComp)
@@ -280,3 +290,14 @@ void WorldScene::load()
         m_entities.push_back(std::move(entity));
     }
 }
+
+Entity *WorldScene::findEntityByName(const std::string &name)
+{
+    auto it = std::find_if(m_entities.begin(), m_entities.end(),
+                           [&name](const std::unique_ptr<Entity>& entity) {
+        return entity && entity->m_name == name;
+    });
+    
+    return (it != m_entities.end()) ? it->get() : nullptr;
+}
+
