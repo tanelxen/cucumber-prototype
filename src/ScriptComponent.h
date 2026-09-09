@@ -16,6 +16,7 @@
 class ScriptComponent : public Component
 {
 public:
+    ScriptComponent();
     ~ScriptComponent();
     
     std::string scriptPath;
@@ -41,7 +42,7 @@ public:
     
 //    void awake() override;
     
-    void start();
+    void start() override;
     void update(float dt) override;
     
     void save(nlohmann::json& j) const override;

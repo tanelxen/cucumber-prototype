@@ -7,10 +7,18 @@
 
 #include "ScriptComponent.h"
 #include "ScriptEngine.h"
+
+#include "TransformComponent.h"
+
 #include <imgui.h>
 #include <iostream>
 
 static asIScriptObject* GetScriptObjectOnEntity(Entity* entity, const std::string& className);
+
+ScriptComponent::ScriptComponent() : Component(Flags::RequiresUpdate | Flags::RequiresFixedUpdate)
+{
+    
+}
 
 void ScriptComponent::init(const std::string& className)
 {
@@ -97,6 +105,8 @@ void ScriptComponent::update(float dt)
 
 ScriptComponent::~ScriptComponent()
 {
+    std::cout << "~ScriptComponent(): " << std::endl;
+    
     if (m_ScriptObject) {
         m_ScriptObject->Release();
     }

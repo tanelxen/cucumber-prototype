@@ -12,8 +12,11 @@
 #include "ModelLoader.h"
 
 #include "Entity.h"
+#include "TransformComponent.h"
 #include "AnimatorComponent.h"
 #include "ScriptComponent.h"
+#include "AudioComponent.h"
+#include "MeshComponent.h"
 
 #include "ScriptEngine.h"
 

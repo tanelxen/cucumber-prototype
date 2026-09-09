@@ -13,14 +13,15 @@
 
 #include "Camera.h"
 
-#include "Cube.h"
-#include "Mesh.h"
 #include "Grid.h"
 #include "ModelLoader.h"
 
 #include "Entity.h"
+#include "TransformComponent.h"
 #include "AnimatorComponent.h"
 #include "ScriptComponent.h"
+#include "AudioComponent.h"
+#include "MeshComponent.h"
 
 #include "Viewport.h"
 
@@ -30,15 +31,11 @@
 
 #include "Sky.h"
 
-#include "glm/gtc/matrix_transform.hpp"
-
 #include "../vendor/json.hpp"
 
 #include <iostream>
 #include <fstream>
 
-static ShadedCube g_shadedCube;
-static Mesh g_mesh;
 static Grid g_grid;
 static Sky g_sky;
 
@@ -48,11 +45,15 @@ WorldScene::WorldScene()
     g_sky.init();
     AudioSystem::Get().Initialize();
     
-    if (!ScriptEngine::get().init()) {
+    if (ScriptEngine::get().init())
+    {
+        ScriptEngine::get().CompileAllScripts("assets/scripts");
+    }
+    else
+    {
         std::cerr << "Failed to init AngelScript!" << std::endl;
     }
     
-    ScriptEngine::get().CompileAllScripts("assets/scripts");
     
     g_currentScene = this;
 }
@@ -63,12 +64,20 @@ WorldScene::~WorldScene() = default;
 
 void WorldScene::update(float dt)
 {
-//    m_pViewportPanel->update(dt);
+    processPendingStarts();
     
-    for (auto& entity : m_entities)
+    for (auto* component : m_globalUpdatables)
     {
-        if (entity->m_isActive) entity->update(dt);
+        if (component->owner->m_isActive && component->enabled) {
+            component->update(dt);
+        }
     }
+    
+    // 2. СНАЧАЛА зачищаем указатели «смертников» из систем обновлений Сцены
+    cleanupDeadComponents();
+    
+    // 3. И ТОЛЬКО ПОТОМ физически удаляем сущности из памяти а с ними и сами компоненты
+    cleanupDeadEntities();
 }
 
 void WorldScene::draw()
@@ -83,6 +92,7 @@ void WorldScene::draw()
     for (auto& entity : m_entities)
     {
         if (!entity->m_isActive) continue;
+//        if (entity->isPendingKill()) continue;
         
         auto transformComp = entity->getComponent<TransformComponent>();
         auto meshComp = entity->getComponent<MeshComponent>();
@@ -93,14 +103,18 @@ void WorldScene::draw()
         {
             auto animator = entity->getComponent<AnimatorComponent>();
             
-            if (!animator || animator->m_clips.empty()) {
+            if (!animator || animator->m_clips.empty())
+            {
                 meshComp->mesh->draw(model);
-            } else {
+            }
+            else
+            {
                 meshComp->mesh->draw(model, animator->getFinalBoneMatrices());
             }
         }
     }
     
+    // FIXME: установка вьюпорта быть в RenderDevice
     m_pMainView->bind();
     
     if (m_drawSkybox)
@@ -185,7 +199,7 @@ void WorldScene::save()
     file << sceneJson.dump(4);
 }
 
-void DeserializeEntity(const json& entityJson, Entity* entity)
+static void DeserializeEntity(const json& entityJson, Entity* entity)
 {
     auto componentsArray = entityJson.at("components");
     
@@ -299,5 +313,120 @@ Entity *WorldScene::findEntityByName(const std::string &name)
     });
     
     return (it != m_entities.end()) ? it->get() : nullptr;
+}
+
+void WorldScene::loadMap(const std::string &filename)
+{
+    
+}
+
+void WorldScene::registerComponent(Component *component)
+{
+    component->awake(); // Awake вызывается СРАЗУ при создании
+    
+    if (component->HasFlag(Component::RequiresUpdate)) {
+        m_globalUpdatables.push_back(component);
+    }
+    // Точно так же для физики:
+    if (component->HasFlag(Component::RequiresFixedUpdate)) {
+        m_globalFixedUpdatables.push_back(component);
+    }
+    
+    m_globalWaitingForStart.push_back(component);
+}
+
+void WorldScene::unregisterComponent(Component *component)
+{
+    // Убираем из очереди Start, если он еще не успел вызваться
+    m_globalWaitingForStart.erase(std::remove(m_globalWaitingForStart.begin(), m_globalWaitingForStart.end(), component),
+                                  m_globalWaitingForStart.end()
+                                  );
+    
+    m_globalUpdatables.erase(std::remove(m_globalUpdatables.begin(), m_globalUpdatables.end(), component),
+                             m_globalUpdatables.end()
+                             );
+    
+    m_globalFixedUpdatables.erase(std::remove(m_globalFixedUpdatables.begin(), m_globalFixedUpdatables.end(), component),
+                                  m_globalFixedUpdatables.end()
+                                  );
+}
+
+void WorldScene::processPendingStarts()
+{
+    if (m_globalWaitingForStart.empty()) return;
+    
+    auto processingList = std::move(m_globalWaitingForStart);
+    m_globalWaitingForStart.clear();
+    
+    for (auto* component : processingList)
+    {
+        if (component->owner->m_isActive && component->enabled)
+        {
+            component->start();
+        }
+        else
+        {
+            m_globalWaitingForStart.push_back(component);
+        }
+    }
+}
+
+void WorldScene::cleanupDeadComponents()
+{
+    if (m_componentsToDestroy.empty()) return;
+    
+    for (auto comp : m_componentsToDestroy)
+    {
+        unregisterComponent(comp);
+        comp->owner->freeComponentMemory(comp);
+    }
+    
+    // Очищаем буфер смертников для следующего кадра
+    m_componentsToDestroy.clear();
+}
+
+void WorldScene::cleanupDeadEntities()
+{
+    if (m_entitiesToDestroy.empty()) return;
+    
+    // Делаем копию очереди, так как в процессе удаления родителя
+    // могут каскадно вызваться Destroy() для детей, что изменит m_entitiesToDestroy
+    auto processingList = std::move(m_entitiesToDestroy);
+    m_entitiesToDestroy.clear();
+    
+    for (Entity* entity : processingList)
+    {
+        
+//        // 1. Обработка иерархии Unreal-style (остается прежней)
+//        TransformComponent* transform = entity->getTransform();
+//        if (transform)
+//        {
+//            // Вариант А: Уничтожаем детей вместе с родителем (Каскадное удаление)
+//            // Делаем копию вектора детей, так как их Destroy() изменит оригинальный вектор
+//            auto children = transform->getChildren();
+//            
+//            for (TransformComponent* childTransform : children)
+//            {
+//                childTransform->entity->destroy(); // Вызываем Destroy у дочерней Сущности
+//            }
+//            
+//            // Вариант Б: Если вы НЕ хотите удалять детей, а хотите просто "отвязать" их в мир:
+//            // transform->detachAllChildren();
+//            
+//            // Отвязываем сам удаляемый объект от его родителя
+//            transform->setParent(nullptr);
+//        }
+        
+        // 2. Важный момент: Мы НЕ трогаем списки обновлений здесь!
+        // Потому что на этом же кадре (чуть раньше или чуть позже) сработает метод
+        // CleanupDeadComponents(), который аккуратно вычистит все компоненты
+        // этой сущности из m_globalUpdatables, так как они были туда добавлены в Entity::Destroy().
+        
+        // 3. Физически удаляем только контейнер сущности
+        m_entities.erase(std::remove_if(m_entities.begin(), m_entities.end(),
+                                        [entity](const std::unique_ptr<Entity>& e) { return e.get() == entity; }),
+                         m_entities.end()
+                         );
+    }
 }
 

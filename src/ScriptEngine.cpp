@@ -7,6 +7,8 @@
 
 #include "ScriptEngine.h"
 #include "ScriptComponent.h"
+#include "AudioComponent.h"
+#include "TransformComponent.h"
 #include "Entity.h"
 #include "Input.h"
 

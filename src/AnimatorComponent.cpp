@@ -11,7 +11,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-AnimatorComponent::AnimatorComponent() = default;
+AnimatorComponent::AnimatorComponent() : Component(Flags::RequiresUpdate)
+{
+    
+}
+
 AnimatorComponent::~AnimatorComponent() = default;
 
 void AnimatorComponent::setSkeleton(std::shared_ptr<Skeleton> skeleton)

@@ -6,43 +6,66 @@
 //
 
 #include "Entity.h"
-//#include "glm/gtc/quaternion.hpp"
-//#include <glm/gtx/euler_angles.hpp>
-#include "glm/gtc/matrix_transform.hpp"
+#include <iostream>
 
 //#define radians(deg) ((deg) * (M_PI / 180.0f))
 
-Entity::Entity(const std::string &name) : m_name(name), m_isActive(true)
+Entity::Entity(const std::string& name) : m_name(std::move(name))
 {
 }
 
-glm::mat4 TransformComponent::toMat4()
+Entity::~Entity()
 {
-    glm::mat4 model(1.0f);
-    
-    model = glm::translate(model, position);
-    
-    model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1, 0, 0));
-    model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0, 1, 0));
-    model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0, 0, 1));
-    
-    model = glm::scale(model, scale);
-    
-    return model;
+    std::cout << "~Entity(): " << m_name << std::endl;
 }
 
-void AudioComponent::update(float dt)
+void Entity::destroyComponent(Component* component)
 {
-    auto comp = owner->getComponent<TransformComponent>();
-    auto transform = static_cast<TransformComponent*>(comp);
+    if (!component || component->isPendingKill) return;
     
-    ma_sound_set_spatialization_enabled(&m_sound, true);
-    ma_sound_set_positioning(&m_sound, ma_positioning_absolute);
-    ma_sound_set_attenuation_model(&m_sound, ma_attenuation_model_linear);
+    component->isPendingKill = true;
+    component->enabled = false; // Сразу выключаем, чтобы он не апдейтился в этом кадре
     
-    ma_sound_set_rolloff(&m_sound, 1.0f);
-    ma_sound_set_min_distance(&m_sound, 80.0f);
-    ma_sound_set_max_distance(&m_sound, 1250.0f);
+    // Передаем Сцене задачу физически удалить его в конце кадра
+    g_currentScene->queueComponentDestruction(component);
     
-    ma_sound_set_position(&m_sound, transform->position.x, transform->position.y, transform->position.z);
+    // Удаляем из мапы быстрого поиска GetComponents
+    auto range = m_componentMap.equal_range(typeid(*component));
+    for (auto it = range.first; it != range.second; ++it) {
+        if (it->second == component) {
+            m_componentMap.erase(it);
+            break;
+        }
+    }
+}
+
+void Entity::freeComponentMemory(Component* component)
+{
+    // 1. Удаляем из мапы быстрого поиска GetComponents
+    auto range = m_componentMap.equal_range(typeid(*component));
+    for (auto it = range.first; it != range.second; ++it) {
+        if (it->second == component) {
+            m_componentMap.erase(it);
+            break;
+        }
+    }
+    
+    // 2. Освобождаем unique_ptr из вектора
+    m_components.erase(std::remove_if(m_components.begin(), m_components.end(),
+                                      [component](const auto& comp) { return comp.get() == component; }),
+                       m_components.end()
+                       );
+}
+
+void Entity::destroy()
+{
+    if (m_isPendingKill) return;
+    m_isPendingKill = true;
+    
+    for (auto& component : m_components) {
+        destroyComponent(component.get());
+    }
+    
+    // Ставим саму сущность в очередь Сцены на удаление в конце кадра
+    g_currentScene->queueEntityDestruction(this);
 }

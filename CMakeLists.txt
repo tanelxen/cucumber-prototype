@@ -33,19 +33,13 @@ set(SRC_COMMON
         src/Input.cpp
         src/Input.h
         
-        src/DebugRenderer.cpp
-        src/DebugRenderer.h
-        src/Cube.cpp
-        src/Cube.h
-        
         src/Mesh.cpp
         src/Mesh.h
         src/ModelLoader.cpp
         src/ModelLoader.h
         src/Skeleton.h
         src/Animation.h
-        src/AnimatorComponent.cpp
-        src/AnimatorComponent.h
+
 
         src/Viewport.cpp
         src/Viewport.h
@@ -64,6 +58,19 @@ set(SRC_COMMON
         
         src/ScriptEngine.cpp
         src/ScriptEngine.h
+
+)
+
+set(SRC_COMPONENTS
+        src/Component.h
+        src/AnimatorComponent.cpp
+        src/AnimatorComponent.h
+        src/AudioComponent.cpp
+        src/AudioComponent.h
+        src/MeshComponent.cpp
+        src/MeshComponent.h
+        src/TransformComponent.cpp
+        src/TransformComponent.h
         src/ScriptComponent.cpp
         src/ScriptComponent.h
 )
@@ -109,12 +116,14 @@ set(SRC_IMGUI
 
 add_executable( ${PROJECT_NAME}
         ${SRC_COMMON}
+        ${SRC_COMPONENTS}
         ${SRC_RENDERER}
         ${SRC_PANELS}
         ${SRC_IMGUI}
 )
 
 source_group("Common" FILES ${SRC_COMMON})
+source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
 source_group("imgui" FILES ${SRC_IMGUI})

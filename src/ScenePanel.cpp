@@ -272,10 +272,10 @@ void ScenePanel::draw()
                 {
                     if (i < m_scene->m_entities.size())
                     {
-                        m_scene->m_entities[i] = std::move(m_scene->m_entities.back());
-                        m_scene->m_entities.pop_back();
+                        m_scene->m_entities[i]->destroy();
                     }
                     
+                    g_UIManager->setEntity(nullptr);
                     selectedIndex = -2;
                 }
                 
