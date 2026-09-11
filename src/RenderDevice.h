@@ -12,6 +12,7 @@
 #include <glad/glad.h>
 
 struct RenderCommand;
+class Viewport;
 class Camera;
 
 struct VertexLayout;
@@ -30,6 +31,8 @@ namespace RenderDevice {
     
 //    handle_t makeVertexArray(handle_t vertexBuffer, handle_t indexBuffer, const VertexLayout& layout);
 //    handle_t makeVertexArray(handle_t posBuffer, const int posLayout, handle_t nrmBuffer, const int nrmLayout, handle_t indexBuffer);
+    
+//    void setMainViewport(Viewport* viewport);
     
     void startFrame();
     void submit(RenderCommand cmd);

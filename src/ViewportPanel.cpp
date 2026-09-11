@@ -16,6 +16,9 @@
 #include <glad/glad.h>
 #include <imgui.h>
 
+static bool DrawPlayButton();
+static bool DrawStopButton();
+
 ViewportPanel::ViewportPanel(const std::string &name) : EditorPanel(name)
 {
     m_pCamera = new Camera();
@@ -52,6 +55,24 @@ void ViewportPanel::draw()
     ImGui::SameLine();
     ImGui::Checkbox("Sky", &g_currentScene->m_drawSkybox);
     
+    ImGui::SameLine(ImGui::GetWindowWidth() - 48);
+    
+    if (g_currentScene->m_isSimulationMode)
+    {
+        if (DrawStopButton())
+        {
+            g_currentScene->stopSimulation();
+            m_viewport->setCamera(m_pCamera);
+        }
+    }
+    else
+    {
+        if (DrawPlayButton())
+        {
+            g_currentScene->startSimulation(m_viewport);
+        }
+    }
+    
     float fbo_width = (float)m_viewport->getWidth();
     float fbo_height = (float)m_viewport->getHeight();
     
@@ -87,4 +108,97 @@ void ViewportPanel::draw()
     
     ImGui::End();
     ImGui::PopStyleVar();
+}
+
+static bool DrawPlayButton()
+{
+    ImVec4 bgColor          = ImVec4(0.08f, 0.25f, 0.14f, 1.0f);
+    ImVec4 bgHoveredColor   = ImVec4(0.12f, 0.33f, 0.18f, 1.0f);
+    ImVec4 bgActiveColor    = ImVec4(0.05f, 0.18f, 0.10f, 1.0f);
+    ImVec4 borderColor      = ImVec4(0.12f, 0.33f, 0.18f, 1.0f);
+    ImVec4 textColor        = ImVec4(0.85f, 0.95f, 0.88f, 1.0f);
+    
+    // Цветовой код для ручной отрисовки (ImColor принимает ImVec4)
+    ImColor iconColor       = ImColor(ImVec4(0.30f, 0.85f, 0.45f, 1.0f));
+    
+    ImGui::PushStyleColor(ImGuiCol_Button, bgColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, bgHoveredColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, bgActiveColor);
+    ImGui::PushStyleColor(ImGuiCol_Border, borderColor);
+    ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+    
+    // Оставляем место слева под иконку с помощью пробелов перед словом
+    bool pressed = ImGui::Button("##ViewportPlay", ImVec2(32, 32));
+    
+    // Получаем координаты только что отрисованной кнопки
+    ImVec2 min_p = ImGui::GetItemRectMin();
+    ImVec2 max_p = ImGui::GetItemRectMax();
+    
+    // Вычисляем позицию для треугольника Play (внутри кнопки слева)
+    float button_height = max_p.y - min_p.y;
+    float button_width = max_p.x - min_p.x;
+    float icon_size = 12.0f; // Размер иконки в пикселях
+    float icon_left = min_p.x + (button_width - icon_size) * 0.5f + 1; // Отступ слева
+    float icon_top = min_p.y + (button_height - icon_size) * 0.5f;
+    
+    // Координаты трех вершин треугольника
+    ImVec2 p1 = ImVec2(icon_left, icon_top);
+    ImVec2 p2 = ImVec2(icon_left, icon_top + icon_size);
+    ImVec2 p3 = ImVec2(icon_left + icon_size * 0.85f, icon_top + icon_size * 0.5f);
+    
+    // Отрисовываем заполненный треугольник во внутренний слой окна
+    ImGui::GetWindowDrawList()->AddTriangleFilled(p1, p2, p3, iconColor);
+    
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(5);
+    
+    return pressed;
+}
+
+static bool DrawStopButton()
+{
+    ImVec4 bgColor          = ImVec4(0.28f, 0.08f, 0.08f, 1.0f); // Темно-красный фон
+    ImVec4 bgHoveredColor   = ImVec4(0.38f, 0.12f, 0.12f, 1.0f); // Светлее при наведении
+    ImVec4 bgActiveColor    = ImVec4(0.20f, 0.05f, 0.05f, 1.0f); // Темнее при нажатии
+    ImVec4 borderColor      = ImVec4(0.38f, 0.12f, 0.12f, 1.0f); // Светло-розовый/белый текст
+    ImVec4 textColor        = ImVec4(0.95f, 0.85f, 0.85f, 1.0f); // Светло-розовый/белый текст
+    
+    // Цветовой код для ручной отрисовки (ImColor принимает ImVec4)
+    ImColor iconColor       = ImColor(ImVec4(0.85f, 0.30f, 0.30f, 1.0f)); // Ярко-красная иконка
+    
+    ImGui::PushStyleColor(ImGuiCol_Button, bgColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, bgHoveredColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, bgActiveColor);
+    ImGui::PushStyleColor(ImGuiCol_Border, borderColor);
+    ImGui::PushStyleColor(ImGuiCol_Text, textColor);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
+    
+    // Оставляем место слева под иконку с помощью пробелов перед словом
+    bool pressed = ImGui::Button("##ViewportStop", ImVec2(32, 32));
+    
+    // Получаем координаты только что отрисованной кнопки
+    ImVec2 min_p = ImGui::GetItemRectMin();
+    ImVec2 max_p = ImGui::GetItemRectMax();
+    
+    // Вычисляем позицию для треугольника Play (внутри кнопки слева)
+    float button_height = max_p.y - min_p.y;
+    float button_width = max_p.x - min_p.x;
+    float icon_size = 12.0f; // Размер иконки в пикселях
+    float icon_left = min_p.x + (button_width - icon_size) * 0.5f; // Отступ слева
+    float icon_top = min_p.y + (button_height - icon_size) * 0.5f;
+    
+    // Вычисляем углы квадрата Stop
+    ImVec2 rectMin = ImVec2(icon_left, icon_top);
+    ImVec2 rectMax = ImVec2(icon_left + icon_size, icon_top + icon_size);
+    
+    // Рисуем заполненный квадрат Stop (с небольшим скруглением углов для красоты)
+    ImGui::GetWindowDrawList()->AddRectFilled(rectMin, rectMax, iconColor, 2.0f);
+    
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(5);
+    
+    return pressed;
 }

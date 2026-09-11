@@ -391,7 +391,7 @@ static std::vector<Material> loadGLTFMaterials(cgltf_data* data, const std::stri
         cgltf_material& gltfMat = data->materials[i];
         
         Material material;
-        material.m_name = gltfMat.name;
+        material.m_name = gltfMat.name ? gltfMat.name : "<unknown>";
         
         if (gltfMat.has_pbr_metallic_roughness)
         {

@@ -20,6 +20,7 @@
 #include "TransformComponent.h"
 #include "AnimatorComponent.h"
 #include "ScriptComponent.h"
+#include "CameraComponent.h"
 #include "AudioComponent.h"
 #include "MeshComponent.h"
 
@@ -115,17 +116,17 @@ void WorldScene::draw()
     }
     
     // FIXME: установка вьюпорта быть в RenderDevice
-    m_pMainView->bind();
+    m_pAttachedViewport->bind();
     
     if (m_drawSkybox)
     {
-        auto camera = m_pMainView->getCamera();
+        auto camera = m_pAttachedViewport->getCamera();
         g_sky.draw(camera->view, camera->projection);
     }
     
-    RenderDevice::commit(m_pMainView->getCamera());
+    RenderDevice::commit(m_pAttachedViewport->getCamera());
     
-    m_pMainView->unbind();
+    m_pAttachedViewport->unbind();
     
     RenderDevice::endFrame();
 }
@@ -571,3 +572,38 @@ void WorldScene::cleanupDeadEntities()
     }
 }
 
+void WorldScene::startSimulation(Viewport* viewport)
+{
+    if (!viewport) return;
+    
+    m_pAttachedViewport = viewport;
+    m_isSimulationMode = true;
+    
+    // 1. Ищем игровую камеру на сцене
+    Camera* gameCamera = nullptr;
+    
+    for (auto& entity : m_entities) {
+        if (!entity->m_isActive) continue;
+        
+        if (auto cameraComp = entity->getComponent<CameraComponent>()) {
+            gameCamera = &cameraComp->m_camera;
+            break;
+        }
+    }
+    
+    // 2. Если нашли игровую камеру — подменяем её во вьюпорте
+    if (gameCamera) {
+        m_pAttachedViewport->setCamera(gameCamera);
+        // Опционально: отключаем контроллер свободной камеры вьюпорта,
+        // чтобы мышь/WASD редактора не двигали игровую камеру
+//        m_pAttachedViewport->getCameraController()->setActive(false);
+    }
+    
+    // 3. Запускаем логику симуляции (например, вызов функций Start у скриптов)
+    // onSimulationStart();
+}
+
+void WorldScene::stopSimulation()
+{
+    m_isSimulationMode = false;
+}

@@ -1,6 +1,6 @@
 class Player : MonoBehaviour
 {
-    float speed = 6.0f;
+    float speed = 200.0f;
 
     Weapon@ weapon;
 

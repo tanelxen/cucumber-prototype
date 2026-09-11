@@ -75,6 +75,8 @@ set(SRC_COMPONENTS
         src/TransformComponent.h
         src/ScriptComponent.cpp
         src/ScriptComponent.h
+        src/CameraComponent.cpp
+        src/CameraComponent.h
 )
 
 set(SRC_RENDERER

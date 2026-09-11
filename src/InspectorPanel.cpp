@@ -14,6 +14,7 @@
 #include "Entity.h"
 #include "TransformComponent.h"
 #include "AnimatorComponent.h"
+#include "CameraComponent.h"
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
 #include "MeshComponent.h"
@@ -319,7 +320,7 @@ void InspectorPanel::draw()
         if (ImGui::MenuItem("Transform"))   { m_entity->addComponent<TransformComponent>(); }
         if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
         if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
-//        if (ImGui::MenuItem("Script"))       { m_entity->addComponent<ScriptComponent>(); }
+        if (ImGui::MenuItem("Camera"))       { m_entity->addComponent<CameraComponent>(); }
         
         if (ImGui::BeginMenu("Scripts")) {
             // Получаем актуальный список классов из AngelScript

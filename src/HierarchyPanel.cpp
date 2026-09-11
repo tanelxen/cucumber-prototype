@@ -54,11 +54,23 @@ void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& sel
 {
     ImGui::Begin("Hierarchy");
     
-    // Отрисовываем только корневые сущности (у которых нет родителя)
-    for (Entity* entity : rootEntities) {
-        if (entity->parent == nullptr) {
-            DrawEntityNode(entity, selectedEntity);
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
+    
+//    if (selectedIndex == -1) {
+//        flags |= ImGuiTreeNodeFlags_Selected;
+//    }
+    
+    if (ImGui::TreeNodeEx(&g_currentScene, flags, "Scene"))
+    {
+        
+        // Отрисовываем только корневые сущности (у которых нет родителя)
+        for (Entity* entity : rootEntities) {
+            if (entity->parent == nullptr) {
+                DrawEntityNode(entity, selectedEntity);
+            }
         }
+        
+        ImGui::TreePop();
     }
     
     // Drop-зона на пустое место панели (чтобы сделать объект снова корневым)
@@ -79,10 +91,10 @@ void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& sel
 
 void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
 {
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DrawLinesToNodes;
     
     if (selectedEntity == entity) flags |= ImGuiTreeNodeFlags_Selected;
-    if (entity->children.empty())  flags |= ImGuiTreeNodeFlags_Leaf;
+    if (entity->children.empty())  flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
     
     // Отрисовываем узел дерева
     bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, "%s", entity->m_name.c_str());

@@ -8,6 +8,8 @@
 #include "UIManager.h"
 
 #include "Application.h"
+#include "RenderDevice.h"
+
 #include "ViewportPanel.h"
 #include "InspectorPanel.h"
 #include "MaterialPanel.h"
@@ -29,6 +31,8 @@ UIManager::UIManager()
 {
     m_pMainView = new Viewport();
     m_pMainView->init();
+    
+//    RenderDevice::setMainViewport(m_pMainView);
     
     m_pViewportPanel = new ViewportPanel("Perspective");
     m_pViewportPanel->setViewport(m_pMainView);
@@ -116,7 +120,7 @@ void UIManager::draw()
 void UIManager::setScene(WorldScene *scene)
 {
     m_pScenePanel->setScene(scene);
-    scene->m_pMainView = m_pMainView;
+    scene->m_pAttachedViewport = m_pMainView;
 }
 
 void UIManager::init(struct GLFWwindow *window)
@@ -154,6 +158,11 @@ void UIManager::init(struct GLFWwindow *window)
     // Size
     ImGui::GetStyle().GrabMinSize = 11.0;
     
+    ImGui::GetStyle().TabBarOverlineSize = 0.0f;
+    
+    ImGui::GetStyle().DragDropTargetRounding = 0;
+    ImGui::GetStyle().DragDropTargetBorderSize = 1;
+    
     // Show/Hide
     ImGui::GetStyle().WindowMenuButtonPosition = ImGuiDir::ImGuiDir_None;
     
@@ -189,7 +198,7 @@ void UIManager::init(struct GLFWwindow *window)
     colors[ImGuiCol_Tab]                 = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 0.0);
     colors[ImGuiCol_TabHovered]          = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
     colors[ImGuiCol_TabActive]           = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
-    //    colors[ImGuiCol_TabUnfocused]        = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
+    colors[ImGuiCol_TabUnfocused]        = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 0.0);
     colors[ImGuiCol_TabUnfocusedActive]  = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
     
     // Title
@@ -257,6 +266,13 @@ void UIManager::drawMenuBar()
             
             ImGui::EndMenu();
         }
+        
+        
+        char fps_text[32];
+        snprintf(fps_text, sizeof(fps_text), "FPS: %.1f", ImGui::GetIO().Framerate);
+        ImGui::SameLine(ImGui::GetWindowWidth() - 64 - 8);
+        ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "%s", fps_text);
+        
         
         ImGui::EndMainMenuBar();
     }

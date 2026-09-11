@@ -16,6 +16,7 @@
 #include "Shader.h"
 #include "ShaderVariant.h"
 #include "Camera.h"
+//#include "Viewport.h"
 
 namespace RenderDevice {
     
@@ -29,7 +30,7 @@ namespace RenderDevice {
     handle_t whiteTextureId;
     handle_t normalTextureId;
     
-    
+//    static Viewport* mainViewport = nullptr;
     
     void init()
     {
@@ -238,6 +239,11 @@ namespace RenderDevice {
         }
     }
     
+//    void setMainViewport(Viewport* viewport)
+//    {
+//        mainViewport = viewport;
+//    }
+    
     void startFrame()
     {
         glEnable(GL_DEPTH_TEST);
@@ -255,7 +261,10 @@ namespace RenderDevice {
     
     void commit(Camera* camera)
     {
+//        if (mainViewport == nullptr) return;
         if (camera == nullptr) return;
+        
+//        mainViewport->bind();
         
         glm::mat4x4 viewProj = camera->projection * camera->view;
         
@@ -266,6 +275,8 @@ namespace RenderDevice {
         draw(viewProj, transparentPass);
         
         glDepthMask(GL_TRUE);
+        
+//        mainViewport->unbind();
     }
     
     void endFrame()

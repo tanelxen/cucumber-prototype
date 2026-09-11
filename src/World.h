@@ -27,6 +27,9 @@ public:
     void update(float dt);
     void draw();
     
+    void startSimulation(Viewport* viewport);
+    void stopSimulation();
+    
     void selectEntityAtIndex(int index);
     
     void save();
@@ -46,7 +49,7 @@ public:
         }
     }
     
-    Viewport* m_pMainView;
+    Viewport* m_pAttachedViewport;
     
     std::vector<std::unique_ptr<Entity>> m_entities;
     
@@ -54,6 +57,8 @@ public:
     
     bool m_drawGrid = true;
     bool m_drawSkybox = true;
+    
+    bool m_isSimulationMode = false;
     
 private:
     std::vector<Component*> m_globalUpdatables;
