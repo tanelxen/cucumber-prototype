@@ -13,6 +13,7 @@
 #include "MaterialPanel.h"
 #include "AssetsPanel.h"
 #include "ScenePanel.h"
+#include "HierarchyPanel.h"
 #include "Viewport.h"
 #include "World.h"
 
@@ -36,6 +37,9 @@ UIManager::UIManager()
     m_pScenePanel = new ScenePanel();
     m_pScenePanel->m_manager = this;
     
+    m_pHierarchyPanel = new HierarchyPanel();
+    m_pHierarchyPanel->m_manager = this;
+    
     m_pInspectorPanel = new InspectorPanel();
     m_pInspectorPanel->m_manager = this;
     
@@ -48,6 +52,7 @@ UIManager::UIManager()
     
     m_panels.push_back(m_pViewportPanel);
     m_panels.push_back(m_pScenePanel);
+    m_panels.push_back(m_pHierarchyPanel);
     m_panels.push_back(m_pInspectorPanel);
     m_panels.push_back(m_pMaterialPanel);
     m_panels.push_back(m_pAssetsPanel);

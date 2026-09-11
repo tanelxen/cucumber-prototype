@@ -58,7 +58,9 @@ set(SRC_COMMON
         
         src/ScriptEngine.cpp
         src/ScriptEngine.h
-
+        
+        scr/UID.cpp
+        src/UID.h
 )
 
 set(SRC_COMPONENTS
@@ -106,6 +108,8 @@ set(SRC_PANELS
         src/AssetsPanel.h
         src/MaterialPanel.cpp
         src/MaterialPanel.h
+        src/HierarchyPanel.cpp
+        src/HierarchyPanel.h
 )
 
 set(SRC_IMGUI

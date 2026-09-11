@@ -160,9 +160,129 @@ void to_json(json& entityJson, const Entity& entity)
     entityJson["components"] = componentsJson;
 }
 
+static constexpr uint8_t uuid_characters[] = {
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8'
+};
+
+template <typename T, size_t SIZE>
+constexpr size_t std_size(const T (&)[SIZE]) {
+    return SIZE;
+}
+
+static constexpr uint32_t base = std_size(uuid_characters); // Строго 34
+static constexpr uint32_t max_uuid_number_length = 13;
+
+std::string id_to_text(int64_t p_id)
+{
+    if (p_id < 0) {
+        return "uid://<invalid>";
+    }
+    
+    char32_t tmp[max_uuid_number_length];
+    uint32_t tmp_size = 0;
+    
+    uint64_t remaining_id = static_cast<uint64_t>(p_id);
+    
+    do {
+        uint32_t c = remaining_id % base;
+        tmp[tmp_size] = uuid_characters[c];
+        remaining_id /= base;
+        ++tmp_size;
+    } while (remaining_id);
+    
+    std::string txt;
+    // +6 для "uid://" и +1 для '\0' (resize не требует +1 для '\0', но мы заполняем вручную)
+    txt.resize(tmp_size + 6);
+    
+    txt[0] = 'u';
+    txt[1] = 'i';
+    txt[2] = 'd';
+    txt[3] = ':';
+    txt[4] = '/';
+    txt[5] = '/';
+    
+    uint32_t size = 6;
+    for (uint32_t i = 0; i < tmp_size; ++i) {
+        txt[size++] = tmp[tmp_size - i - 1];
+    }
+    
+    return txt;
+}
+
+int64_t text_to_id(const std::string &p_text)
+{
+    // Проверяем префикс и минимальную длину (хотя бы 1 символ после "uid://")
+    if (p_text.length() <= 6 || !p_text.starts_with("uid://") || p_text == "uid://<invalid>") {
+        return -1; // Возвращаем -1 (или 0) для невалидного ID
+    }
+    
+    uint32_t l = p_text.length();
+    uint64_t uid = 0;
+    
+    for (uint32_t i = 6; i < l; i++) {
+        uint32_t c = p_text[i];
+        
+        // Ищем символ в нашем же массиве алфавита
+        const uint8_t* slot = std::find(std::begin(uuid_characters), std::end(uuid_characters), c);
+        
+        if (slot == std::end(uuid_characters)) {
+            return -1; // Найден символ, которого нет в алфавите
+        }
+        
+        uint32_t index = std::distance(std::begin(uuid_characters), slot);
+        
+        uid *= base;
+        uid += index;
+    }
+    
+    // Возвращаем как int64_t, маскируя старший бит для безопасности знака
+    return static_cast<int64_t>(uid & 0x7FFFFFFFFFFFFFFF);
+}
+
+// Алфавит Base32 (32 символа, исключены опасные 0, 1, 8, 9)
+const char BASE32_ALPHABET[] = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+
+// Кодирование uint64_t в Base32 строку
+std::string ToBase32(uint64_t value) {
+    if (value == 0) return std::string(1, BASE32_ALPHABET[0]);
+    
+    std::string result;
+    result.reserve(13); // Максимум 13 символов для uint64_t
+    
+    while (value > 0) {
+        result.push_back(BASE32_ALPHABET[value & 0x1F]); // Берем последние 5 бит (32 значения)
+        value >>= 5; // Сдвигаем на 5 бит вправо
+    }
+    
+    // Разворачиваем строку, так как мы читали с конца
+    std::reverse(result.begin(), result.end());
+    return result;
+}
+
+// Декодирование обратно в uint64_t
+uint64_t FromBase32(const std::string& str) {
+    uint64_t result = 0;
+    for (char c : str) {
+        // Приводим к верхнему регистру (для регистронезависимости)
+        char up_c = std::toupper(c);
+        
+        // Ищем индекс символа в алфавите
+        const char* slot = std::find(std::begin(BASE32_ALPHABET), std::end(BASE32_ALPHABET), up_c);
+        if (slot == std::end(BASE32_ALPHABET)) continue; // Пропускаем невалидные символы
+        
+        size_t index = std::distance(std::begin(BASE32_ALPHABET), slot);
+        result = (result << 5) | (index & 0x1F);
+    }
+    return result;
+}
+
 void SerializeEntity(json& entityJson, const Entity* entity)
 {
     entityJson["name"] = entity->m_name;
+    entityJson["uid"] = entity->uid;
+    entityJson["parent"] = entity->parent ? entity->parent->uid : UID::Invalid();
     
     json componentsArray = json::array();
     
@@ -286,6 +406,8 @@ void WorldScene::load()
         return;
     }
     
+    std::unordered_map<UID, Entity*> entityMap;
+    
     // ==========================================
     // ПРОХОД 1: Создание Entity и их компонентов
     // ==========================================
@@ -295,13 +417,32 @@ void WorldScene::load()
         std::cout << "Load " << name << std::endl;
 
         auto entity = std::make_unique<Entity>(name);
+        entity->uid = entityJson.at("uid").get<UID>();
         
         if (entityJson.contains("components"))
         {
             DeserializeEntity(entityJson, entity.get());
         }
         
+        entityMap[entity->uid] = entity.get();
         m_entities.push_back(std::move(entity));
+    }
+    
+    // ВТОРОЙ ПРОХОД: Восстанавливаем связи иерархии Parent-Child по ID
+    for (const auto& j : sceneJson["entities"])
+    {
+        UID entityId = j.at("uid").get<UID>();
+        UID parentId = j.at("parent").get<UID>();
+        
+        if (parentId != 0)
+        {
+            Entity* child = entityMap[entityId];
+            Entity* parent = entityMap[parentId];
+            
+            if (child && parent) {
+                child->setParent(parent); // Связываем их!
+            }
+        }
     }
 }
 

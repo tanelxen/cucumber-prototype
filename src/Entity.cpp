@@ -7,11 +7,13 @@
 
 #include "Entity.h"
 #include <iostream>
+#include <random>
 
 //#define radians(deg) ((deg) * (M_PI / 180.0f))
 
 Entity::Entity(const std::string& name) : m_name(std::move(name))
 {
+
 }
 
 Entity::~Entity()
@@ -68,4 +70,20 @@ void Entity::destroy()
     
     // Ставим саму сущность в очередь Сцены на удаление в конце кадра
     g_currentScene->queueEntityDestruction(this);
+}
+
+void Entity::setParent(Entity* newParent)
+{
+    // Если у объекта уже был родитель, удаляем себя из его списка детей
+    if (parent) {
+        auto& pChildren = parent->children;
+        pChildren.erase(std::remove(pChildren.begin(), pChildren.end(), this), pChildren.end());
+    }
+    
+    parent = newParent;
+    
+    // Добавляем себя новому родителю
+    if (parent) {
+        parent->children.push_back(this);
+    }
 }

@@ -12,8 +12,6 @@
 
 struct TransformComponent : public Component
 {
-    ~TransformComponent();
-    
     glm::vec3 position = { 0.0f, 0.0f, 0.0f };
     glm::vec3 rotation = { 0.0f, 0.0f, 0.0f };
     glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
@@ -22,24 +20,12 @@ struct TransformComponent : public Component
     
     const std::string getTypeName() const override { return "TransformComponent"; }
     
-    void save(nlohmann::json& j) const override
-    {
-        j = nlohmann::json {
-            {"position", {position.x, position.y, position.z}},
-            {"rotation", {rotation.x, rotation.y, rotation.z}},
-            {"scale",    {scale.x,    scale.y,    scale.z}}
-        };
-    }
+    void save(nlohmann::json& j) const override;
+    void load(const nlohmann::json& j) override;
     
-    void load(const nlohmann::json& j) override
-    {
-        auto pos = j.at("position").get<std::vector<float>>();
-        position = glm::vec3(pos[0], pos[1], pos[2]);
-        
-        auto rot = j.at("rotation").get<std::vector<float>>();
-        rotation = glm::vec3(rot[0], rot[1], rot[2]);
-        
-        auto scl = j.at("scale").get<std::vector<float>>();
-        scale = glm::vec3(scl[0], scl[1], scl[2]);
-    }
+private:
+    glm::mat4 getLocalMat4() const;
+    
+    glm::mat4 m_worldMatrix;
+    bool m_isDirty = true;
 };

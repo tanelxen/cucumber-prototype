@@ -15,6 +15,7 @@ class ViewportPanel;
 class InspectorPanel;
 class AssetsPanel;
 class ScenePanel;
+class HierarchyPanel;
 class MaterialPanel;
 class Viewport;
 
@@ -52,6 +53,7 @@ private:
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
     MaterialPanel* m_pMaterialPanel;
+    HierarchyPanel* m_pHierarchyPanel;
     
 private:
     void drawMenuBar();

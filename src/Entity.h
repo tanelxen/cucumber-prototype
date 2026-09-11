@@ -10,6 +10,8 @@
 #include "Component.h"
 #include "World.h"
 
+#include "UID.h"
+
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -23,7 +25,12 @@ public:
     ~Entity();
     
     std::string m_name;
+    UID uid;
+    
     bool m_isActive = true;
+    
+    Entity* parent = nullptr;
+    std::vector<Entity*> children;
     
     // Добавление компонента
     template<typename T, typename... TArgs>
@@ -74,6 +81,8 @@ public:
         }
         return result;
     }
+    
+    void setParent(Entity* newParent);
     
     const std::vector<std::unique_ptr<Component>>& getComponents() const { return m_components; }
     const bool isPendingKill() const { return m_isPendingKill; }

@@ -297,6 +297,7 @@ void InspectorPanel::draw()
         name = buffer;
     }
     
+    ImGui::TextDisabled("uuid: %s", m_entity->uid.toText().c_str());
     
     ImGui::Separator();
     
