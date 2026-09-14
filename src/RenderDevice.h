@@ -68,6 +68,7 @@ namespace ShaderFeature
     constexpr FeatureMask HasSkinning     = 1 << 2;
     constexpr FeatureMask HasShadows      = 1 << 3;
     constexpr FeatureMask HasSpherical    = 1 << 4;
+    constexpr FeatureMask HasLightMap     = 1 << 5;
 }
 
 struct RenderCommand
@@ -82,7 +83,9 @@ struct RenderCommand
     PipelineType pipeline;
     FeatureMask featureMask;
     RenderDevice::handle_t baseTexture;
+    RenderDevice::handle_t lightMap;
     BlendMode blendMode = BlendMode::Opaque;
+    bool reverseWinding = false;
     glm::vec4 color = {1, 1, 1, 1};
     
     glm::mat4 transform = glm::mat4(1);

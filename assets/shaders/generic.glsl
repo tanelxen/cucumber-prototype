@@ -15,6 +15,11 @@ layout (location = 4) in vec4 boneWights;
 uniform mat4 uBones[128];
 #endif
 
+#ifdef HAS_LIGHT_MAP
+layout (location = 5) in vec2 texCoord2;
+out vec2 g_TexCoord2;
+#endif
+
 out vec3 v_Normal;
 
 //uniform mat4 MVP;
@@ -41,6 +46,10 @@ void main()
 #ifdef HAS_ALBEDO_MAP
     g_TexCoord = texCoord;
 #endif
+
+#ifdef HAS_LIGHT_MAP
+    g_TexCoord2 = texCoord2;
+#endif
     
     gl_Position = uVP * uModel * localPosition;
 }
@@ -50,6 +59,11 @@ void main()
 #ifdef HAS_ALBEDO_MAP
 in vec2 g_TexCoord;
 uniform sampler2D s_baseTexture;
+#endif
+
+#ifdef HAS_LIGHT_MAP
+in vec2 g_TexCoord2;
+uniform sampler2D s_lightMap;
 #endif
 
 #ifdef HAS_SH_LIGHT
@@ -62,6 +76,8 @@ uniform vec4 color;
 
 //final color
 out vec4 FragColor;
+
+vec3 adjustExposure(vec3 color, float value);
 
 void main()
 {
@@ -92,6 +108,22 @@ void main()
     irradiance = max(irradiance, vec3(0.0));
     ambient = (irradiance / 3.14159265);
 #endif
+
+#ifdef HAS_LIGHT_MAP
+    vec4 lightMap = texture(s_lightMap, g_TexCoord2);
+    baseColor = baseColor * lightMap;
+
+    float overbight = 10;
+    baseColor.rgb = baseColor.rgb * overbight;
+    //baseColor.rgb = pow(baseColor.rgb, vec3(1.0f/1.2f));
+#endif
     
     FragColor = baseColor * color * vec4(ambient, 1);
+
+    // simple tonemapping
+    FragColor.rgb = FragColor.rgb / (FragColor.rgb + vec3(1.0f));
+}
+
+vec3 adjustExposure(vec3 color, float value) {
+    return (1.0 + value) * color;
 }

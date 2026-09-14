@@ -32,6 +32,9 @@
 
 #include "Sky.h"
 
+#include "q3/Q3BSPAsset.h"
+#include "q3/Q3BspMesh.h"
+
 #include "../vendor/json.hpp"
 
 #include <iostream>
@@ -39,6 +42,8 @@
 
 static Grid g_grid;
 static Sky g_sky;
+
+static Q3BspMesh g_mesh;
 
 WorldScene::WorldScene()
 {
@@ -55,6 +60,7 @@ WorldScene::WorldScene()
         std::cerr << "Failed to init AngelScript!" << std::endl;
     }
     
+    loadMap("assets/wolf/maps/escape2.bsp");
     
     g_currentScene = this;
 }
@@ -89,6 +95,8 @@ void WorldScene::draw()
     {
         g_grid.draw();
     }
+    
+    g_mesh.draw();
     
     for (auto& entity : m_entities)
     {
@@ -459,7 +467,13 @@ Entity *WorldScene::findEntityByName(const std::string &name)
 
 void WorldScene::loadMap(const std::string &filename)
 {
+    Q3BSPAsset bsp;
     
+    if (!bsp.initFromFile(filename.c_str())) {
+        return;
+    }
+    
+    g_mesh.initFromBsp(&bsp);
 }
 
 void WorldScene::registerComponent(Component *component)

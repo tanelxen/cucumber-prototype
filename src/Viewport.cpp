@@ -88,6 +88,7 @@ void Viewport::bind()
     
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_FRAMEBUFFER_SRGB);
+//    glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 void Viewport::unbind()

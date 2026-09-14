@@ -59,7 +59,7 @@ set(SRC_COMMON
         src/ScriptEngine.cpp
         src/ScriptEngine.h
         
-        scr/UID.cpp
+        src/UID.cpp
         src/UID.h
 )
 
@@ -114,6 +114,24 @@ set(SRC_PANELS
         src/HierarchyPanel.h
 )
 
+set(SRC_Q3
+        src/q3/Q3BSPAsset.cpp
+        src/q3/Q3BSPAsset.h
+        src/q3/Q3BSPTypes.h
+        src/q3/Q3BspMesh.cpp
+        src/q3/Q3BspMesh.h
+        src/q3/Q3BspCollision.cpp
+        src/q3/Q3BspCollision.h
+        src/q3/Q3Bezier.cpp
+        src/q3/Q3Bezier.h
+        src/q3/Q3LightGrid.cpp
+        src/q3/Q3LightGrid.h
+        src/q3/Q3Shaders.cpp
+        src/q3/Q3Shaders.h
+        src/q3/TextureAtlas.cpp
+        src/q3/TextureAtlas.h
+)
+
 set(SRC_IMGUI
         vendor/imgui/backends/imgui_impl_glfw.cpp
         vendor/imgui/backends/imgui_impl_opengl3.cpp
@@ -122,6 +140,7 @@ set(SRC_IMGUI
 
 add_executable( ${PROJECT_NAME}
         ${SRC_COMMON}
+        ${SRC_Q3}
         ${SRC_COMPONENTS}
         ${SRC_RENDERER}
         ${SRC_PANELS}
@@ -129,6 +148,7 @@ add_executable( ${PROJECT_NAME}
 )
 
 source_group("Common" FILES ${SRC_COMMON})
+source_group("Quake 3" FILES ${SRC_Q3})
 source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
@@ -192,6 +212,7 @@ target_include_directories(angelscript_addons PUBLIC ${angelscript_SOURCE_DIR}/s
 
 
 target_include_directories(${PROJECT_NAME} PRIVATE
+    src
     vendor/glm
     ${angelscript_SOURCE_DIR}/sdk/angelscript/include
 )

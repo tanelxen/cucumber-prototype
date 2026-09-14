@@ -37,8 +37,15 @@ public:
     
     void save(nlohmann::json& j) const override
     {
-        auto clip = m_clips[m_currentClipIndex];
-        j = nlohmann::json{ {"clip", clip->name} };
+        if (m_currentClipIndex > -1)
+        {
+            auto clip = m_clips[m_currentClipIndex];
+            j = nlohmann::json{ {"clip", clip->name} };
+        }
+        else
+        {
+            j = nlohmann::json{ {"clip", "<none>"} };
+        }
     }
     
     void load(const nlohmann::json& j) override

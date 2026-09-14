@@ -146,7 +146,7 @@ namespace RenderDevice {
         handle_t lastIBO = -1;
         handle_t lastProgram = -1;
         handle_t lastBaseTexture = -1;
-        handle_t lastLightmapTexture = -1;
+        handle_t lastLightmap = -1;
         
         for (auto cmd : commands)
         {
@@ -175,6 +175,8 @@ namespace RenderDevice {
             
             shader->setUniform("uModel", cmd.transform);
             shader->setUniform("uVP", viewProj);
+            
+            cmd.reverseWinding ? glCullFace(GL_FRONT) : glCullFace(GL_BACK);
             
             switch (cmd.blendMode)
             {
@@ -211,6 +213,16 @@ namespace RenderDevice {
                 glBindTexture(GL_TEXTURE_2D, cmd.baseTexture);
                 
                 lastBaseTexture = cmd.baseTexture;
+            }
+            
+            if (cmd.featureMask & ShaderFeature::HasLightMap && lastLightmap != cmd.lightMap)
+            {
+                shader->setUniform("s_lightMap", 1);
+                
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, cmd.lightMap);
+                
+                lastLightmap = cmd.lightMap;
             }
             
             if (cmd.pipeline != PipelineType::Grid)
@@ -250,7 +262,7 @@ namespace RenderDevice {
         glDepthFunc(GL_LESS);
         
         //        glCullFace(GL_FRONT);
-        glCullFace(GL_BACK);
+//        glCullFace(GL_BACK);
         
         glClearColor(0.01, 0.01, 0.01, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

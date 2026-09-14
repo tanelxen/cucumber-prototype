@@ -21,7 +21,9 @@ enum VertexAttributeLocation : uint32_t
     Normal   = 1,
     TexCoord = 2,
     BoneIndices = 3,
-    BoneWeights = 4
+    BoneWeights = 4,
+    TexCoord2 = 5,
+    Color = 6
 };
 
 struct VertexAttribute
