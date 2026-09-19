@@ -10,110 +10,139 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-glm::mat4 TransformComponent::toMat4()
-{
-    glm::mat4 localMatrix = getLocalMat4();
-    
-    // Если у нашей сущности есть родитель, умножаем его мировую матрицу на нашу локальную
-    if (owner && owner->parent)
-    {
-        if (auto* parentTransform = owner->parent->getComponent<TransformComponent>())
-        {
-            return parentTransform->toMat4() * localMatrix;
-        }
-    }
-    
-    return localMatrix;
-}
-
-glm::mat4 TransformComponent::getLocalMat4() const
-{
-    glm::mat4 model(1.0f);
-    
-    model = glm::translate(model, position);
-    
-    model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0, 1, 0));
-    model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1, 0, 0));
-    model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0, 0, 1));
-    
-    model = glm::scale(model, scale);
-    
-    return model;
-}
-
 void TransformComponent::save(nlohmann::json& j) const
 {
     j = nlohmann::json {
-        {"position", {position.x, position.y, position.z}},
-        {"rotation", {rotation.x, rotation.y, rotation.z}},
-        {"scale",    {scale.x,    scale.y,    scale.z}}
+        {"position", {m_position.x, m_position.y,   m_position.z}},
+        {"rotation", {m_euler.x,    m_euler.y,      m_euler.z}},
+        {"scale",    {m_scale.x,    m_scale.y,      m_scale.z}}
     };
 }
 
 void TransformComponent::load(const nlohmann::json& j)
 {
     auto pos = j.at("position").get<std::vector<float>>();
-    position = glm::vec3(pos[0], pos[1], pos[2]);
+    m_position = glm::vec3(pos[0], pos[1], pos[2]);
     
     auto rot = j.at("rotation").get<std::vector<float>>();
-    rotation = glm::vec3(rot[0], rot[1], rot[2]);
+    m_euler = glm::vec3(rot[0], rot[1], rot[2]);
     
     auto scl = j.at("scale").get<std::vector<float>>();
-    scale = glm::vec3(scl[0], scl[1], scl[2]);
+    m_scale = glm::vec3(scl[0], scl[1], scl[2]);
 }
 
+// Вектора направлений берутся из актуальной мировой матрицы
 glm::vec3 TransformComponent::getForward()
 {
-//    // Переводим углы из градусов в радианы и создаем матрицу поворота
-//    glm::vec3 rads = glm::radians(rotation);
-//    glm::mat4 transform(1.0f);
-//    
-//    // Порядок применения вращений важен (например, Yaw -> Pitch -> Roll или YXZ)
-//    transform = glm::rotate(transform, rads.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Yaw (Y)
-//    transform = glm::rotate(transform, rads.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
-//    transform = glm::rotate(transform, rads.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Roll (Z)
-//    
-//    // Извлекаем вектора из столбцов матрицы (для правой системы координат OpenGL)
-//    // Если ваш базовый forward в покое смотрит по -Z:
-//    return glm::normalize(glm::vec3(transform * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
-    
-    float pitch = glm::radians(rotation.x);
-    float yaw   = glm::radians(rotation.y);
-    
-    // Корректный расчет forward для стандартной камеры OpenGL (взгляд изначально вдоль -Z)
-    glm::vec3 forward;
-    forward.x = -sin(yaw) * cos(pitch);
-    forward.y =  sin(pitch);
-    forward.z = -cos(yaw) * cos(pitch);
-    
-    return glm::normalize(forward);
+    return glm::normalize(-glm::vec3(getWorldMatrix()[2]));
 }
 
 glm::vec3 TransformComponent::getRight()
 {
-//    // Переводим углы из градусов в радианы и создаем матрицу поворота
-//    glm::vec3 rads = glm::radians(rotation);
-//    glm::mat4 transform(1.0f);
-//    
-//    // Порядок применения вращений важен (например, Yaw -> Pitch -> Roll или YXZ)
-//    transform = glm::rotate(transform, rads.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Yaw (Y)
-//    transform = glm::rotate(transform, rads.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
-//    transform = glm::rotate(transform, rads.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Roll (Z)
-//    
-//    // Извлекаем вектора из столбцов матрицы (для правой системы координат OpenGL)
-//    // Если ваш базовый forward в покое смотрит по -Z:
-////    return glm::normalize(glm::vec3(transform * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
-//    return glm::normalize(glm::vec3(transform * glm::vec4(1.0f, 0.0f,  0.0f, 0.0f)));
+    return glm::normalize(glm::vec3(getWorldMatrix()[0]));
+}
+
+glm::vec3 TransformComponent::getUp()
+{
+    return glm::normalize(glm::vec3(getWorldMatrix()[1]));
+}
+
+glm::mat4 TransformComponent::getWorldMatrix()
+{
+    if (m_isDirty)
+    {
+        updateLocalMatrix();
+        
+        if (owner->parent == nullptr)
+        {
+            // Если корней нет, мировая матрица равна локальной
+            m_worldMatrix = m_localMatrix;
+        }
+        else
+        {
+            auto& parentTransform = owner->parent->getTransform();
+            
+            if (enabled)
+            {
+                // Рекурсивный подъем вверх к корню и расчет на обратном пути
+                m_worldMatrix = parentTransform.getWorldMatrix() * m_localMatrix;
+            }
+            else
+            {
+                // Выключенный компонент становится транзитным
+                m_worldMatrix = parentTransform.getWorldMatrix();
+            }
+        }
+        
+        m_isDirty = false;
+    }
     
-    float pitch = glm::radians(rotation.x);
-    float yaw   = glm::radians(rotation.y);
+    return m_worldMatrix;
+}
+
+void TransformComponent::updateLocalMatrix()
+{
+    m_localMatrix = glm::identity<glm::mat4>();
     
-    // Корректный расчет right (взгляд изначально вдоль +X)
-    glm::vec3 right;
-    right.x =  cos(yaw);
-    right.y =  0.0f;
-    right.z = -sin(yaw);
+    if (enabled)
+    {
+        m_localMatrix = glm::translate(m_localMatrix, m_position);
+        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.y), glm::vec3(0, 1, 0));
+        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.x), glm::vec3(1, 0, 0));
+        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.z), glm::vec3(0, 0, 1));
+        m_localMatrix = glm::scale(m_localMatrix, m_scale);
+    }
     
-    return glm::normalize(right);
+    // Для кватернионного m_rotation
+    /*
+     glm::mat4 translationM = glm::translate(glm::mat4(1.0f), m_position);
+     glm::mat4 rotationM    = glm::toMat4(m_rotation);
+     glm::mat4 scaleM       = glm::scale(glm::mat4(1.0f), m_scale);
+     m_localMatrix = translationM * rotationM * scaleM;
+     */
+}
+
+void TransformComponent::setPosition(const glm::vec3 &pos)
+{
+    m_position = pos;
+    
+    if (owner) {
+        owner->invalidateTransform();
+    }
+}
+
+glm::vec3 TransformComponent::getPosition() const
+{
+    return m_position;
+}
+
+void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
+{
+    m_euler = eulerDegrees;
+    m_rotation = glm::quat(glm::radians(eulerDegrees));
+    
+    if (owner) {
+        owner->invalidateTransform();
+    }
+}
+
+glm::vec3 TransformComponent::getRotation() const
+{
+//    glm::eulerAngles(m_rotation);
+    return m_euler;
+}
+
+void TransformComponent::setScale(const glm::vec3 &scale)
+{
+    m_scale = scale;
+    
+    if (owner) {
+        owner->invalidateTransform();
+    }
+}
+
+glm::vec3 TransformComponent::getScale() const
+{
+    return m_scale;
 }
 

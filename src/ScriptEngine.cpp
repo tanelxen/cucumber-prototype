@@ -339,11 +339,15 @@ void RegisterTransformComponent(asIScriptEngine* engine)
     // что AngelScript не управляет временем жизни этого C++ объекта (вы им управляете сами)
     r = engine->RegisterObjectType("TransformComponent", 0, asOBJ_REF | asOBJ_NOCOUNT); assert(r >= 0);
     
-    // Регистрируем свойства как методы-геттеры/сеттеры или напрямую, если тип зарегистрирован.
-    // Так как Vector3 зарегистрирован как Value-тип, можно дать прямой доступ к полям:
-    r = engine->RegisterObjectProperty("TransformComponent", "Vector3 position", asOFFSET(TransformComponent, position)); assert(r >= 0);
-    r = engine->RegisterObjectProperty("TransformComponent", "Vector3 rotation", asOFFSET(TransformComponent, rotation)); assert(r >= 0);
-    r = engine->RegisterObjectProperty("TransformComponent", "Vector3 scale",    asOFFSET(TransformComponent, scale));    assert(r >= 0);
+    // Регистрируем позицию как свойство "position"
+    r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetPosition() const", asMETHOD(TransformComponent, getPosition), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void SetPosition(const Vector3 &in)", asMETHOD(TransformComponent, setPosition), asCALL_THISCALL); assert(r >= 0);
+    
+    // Скрываем кватернион! Регистрируем углы Эйлера как свойство "rotation"
+    r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRotation() const", asMETHOD(TransformComponent, getRotation), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void SetRotation(const Vector3 &in)", asMETHOD(TransformComponent, setRotation), asCALL_THISCALL); assert(r >= 0);
+    
+    // FIXME: Сеттеры и геттеры (set_position и get_position) срабатывают некорректно для цепочек вида transform.position += velocity * dt;
     
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetForward()", asMETHOD(TransformComponent, getForward), asCALL_THISCALL); assert(r >= 0);
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRight()", asMETHOD(TransformComponent, getRight), asCALL_THISCALL); assert(r >= 0);

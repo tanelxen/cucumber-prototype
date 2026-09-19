@@ -103,22 +103,21 @@ void WorldScene::draw()
         if (!entity->m_isActive) continue;
 //        if (entity->isPendingKill()) continue;
         
-        auto transformComp = entity->getComponent<TransformComponent>();
         auto meshComp = entity->getComponent<MeshComponent>();
-        
-        auto model = transformComp ? transformComp->toMat4() : glm::mat4(1.0);
         
         if (meshComp && meshComp->mesh)
         {
+            auto worldMatrix = entity->getTransform().getWorldMatrix();
+            
             auto animator = entity->getComponent<AnimatorComponent>();
             
             if (!animator || animator->m_clips.empty())
             {
-                meshComp->mesh->draw(model);
+                meshComp->mesh->draw(worldMatrix);
             }
             else
             {
-                meshComp->mesh->draw(model, animator->getFinalBoneMatrices());
+                meshComp->mesh->draw(worldMatrix, animator->getFinalBoneMatrices());
             }
         }
     }
@@ -342,7 +341,8 @@ static void DeserializeEntity(const json& entityJson, Entity* entity)
         // Фабрика компонентов по их текстовому имени
         if (compName == "TransformComponent")
         {
-            newComp = entity->addComponent<TransformComponent>();
+//            newComp = entity->addComponent<TransformComponent>();
+            newComp = &entity->getTransform();
         }
         else if (compName == "MeshComponent")
         {
@@ -380,6 +380,10 @@ static void DeserializeEntity(const json& entityJson, Entity* entity)
         else if (compName == "ScriptComponent")
         {
             newComp = entity->addComponent<ScriptComponent>();
+        }
+        else if (compName == "CameraComponent")
+        {
+            newComp = entity->addComponent<CameraComponent>();
         }
         
         // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
@@ -449,7 +453,7 @@ void WorldScene::load()
             Entity* parent = entityMap[parentId];
             
             if (child && parent) {
-                child->setParent(parent); // Связываем их!
+                child->setParent(parent, false); // Связываем их!
             }
         }
     }

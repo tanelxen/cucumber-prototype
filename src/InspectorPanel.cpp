@@ -105,7 +105,7 @@ void InspectorPanel::setEntity(Entity *entity)
     RegisterUI();
 }
 
-bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth);
+void DrawTransformComponent(TransformComponent* transform);
 void DrawAudioComponentInspector(AudioComponent* component);
 void DrawScriptProperties(asITypeInfo* type);
 
@@ -115,9 +115,7 @@ static void RegisterUI()
     
     inspector.Register<TransformComponent>("Transform", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<TransformComponent*>(c);
-        DrawVec3Control("Position", comp->position, 0, 100);
-        DrawVec3Control("Rotation", comp->rotation, 0, 100);
-        DrawVec3Control("Scale", comp->scale, 1, 100);
+        DrawTransformComponent(comp);
     });
     
     inspector.Register<MeshComponent>("Mesh", [](Component* c, InspectorPanel* p) {
@@ -302,6 +300,9 @@ void InspectorPanel::draw()
     
     ImGui::Separator();
     
+    ComponentInspector::Get().Render(&m_entity->getTransform(), this);
+    ImGui::Spacing();
+    
     for (auto& component : m_entity->getComponents())
     {
         ComponentInspector::Get().Render(component.get(), this);
@@ -317,10 +318,10 @@ void InspectorPanel::draw()
     
     if (ImGui::BeginPopup("AddComponentPopup"))
     {
-        if (ImGui::MenuItem("Transform"))   { m_entity->addComponent<TransformComponent>(); }
+//        if (ImGui::MenuItem("Transform"))   { m_entity->addComponent<TransformComponent>(); }
         if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
         if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
-        if (ImGui::MenuItem("Camera"))       { m_entity->addComponent<CameraComponent>(); }
+        if (ImGui::MenuItem("Camera"))      { m_entity->addComponent<CameraComponent>(); }
         
         if (ImGui::BeginMenu("Scripts")) {
             // Получаем актуальный список классов из AngelScript
@@ -446,6 +447,29 @@ bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetVal
     return isChangedX || isChangedY || isChangedZ;
 }
 
+void DrawTransformComponent(TransformComponent* transform)
+{
+    // 1. ПОЗИЦИЯ
+    glm::vec3 pos = transform->getPosition();
+    // Передаем копию. Если пользователь покрутил ползунок, функция вернет true
+    if (DrawVec3Control("Position", pos, 0.0f, 100.0f)) {
+        transform->setPosition(pos); // Срабатывает сеттер и инвалидация!
+    }
+    
+    // 2. ПОВОРОТ (Скрываем кватернион, показываем углы Эйлера)
+    // Извлекаем углы из трансформера (или используем сохраненный m_eulerDegrees, как обсуждали ранее)
+    glm::vec3 eulerAngles = transform->getRotation();
+    
+    if (DrawVec3Control("Rotation", eulerAngles, 0.0f, 100.0f)) {
+        transform->setRotation(eulerAngles); // Сеттер переведет в кватернион и сбросит кэш
+    }
+    
+    // 3. МАСШТАБ
+    glm::vec3 scale = transform->getScale();
+    if (DrawVec3Control("Scale", scale, 1.0f, 100.0f)) {
+        transform->setScale(scale);
+    }
+}
 
 void DrawAudioComponentInspector(AudioComponent* component)
 {

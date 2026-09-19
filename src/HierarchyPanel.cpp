@@ -80,7 +80,7 @@ void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& sel
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY")) {
             Entity* draggedEntity = *static_cast<Entity**>(payload->Data);
             if (draggedEntity) {
-                draggedEntity->setParent(nullptr); // Отцепляем от родителя
+                draggedEntity->setParent(nullptr, true); // Отцепляем от родителя
             }
         }
         ImGui::EndDragDropTarget();
@@ -119,7 +119,7 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
             // Защита: объект не может стать родителем самого себя
             // И не может стать ребенком своего собственного ребенка (цикл)
             if (draggedEntity && draggedEntity != entity && !IsChildOf(entity, draggedEntity)) {
-                draggedEntity->setParent(entity);
+                draggedEntity->setParent(entity, true);
             }
         }
         ImGui::EndDragDropTarget();

@@ -48,19 +48,20 @@ class Player : MonoBehaviour
         Vector3 direction(0, 0, 0);
         direction += forward * forwardmove * move_speed;
         direction += right * rightmove * move_speed;
-        transform.position += direction * dt;
+        Vector3 newPosition = transform.GetPosition() + direction * dt;
+        transform.SetPosition(newPosition);
 
         if (Input::GetRightMouseButton())
         {
             Input::SetCursorEnabled(false);
 
             float mouseX = Input::GetMouseOffsetX();
-            transform.rotation.y -= mouseX * mouse_speed * dt;
+            transform.SetRotation(transform.GetRotation() - Vector3(0, mouseX * mouse_speed * dt, 0));
 
             if (headTransform != null)
             {
                 float mouseY = Input::GetMouseOffsetY();
-                headTransform.rotation.x -= mouseY * mouse_speed * dt;
+                headTransform.SetRotation(headTransform.GetRotation() - Vector3(mouseY * mouse_speed * dt, 0, 0));
             }
         }
         else

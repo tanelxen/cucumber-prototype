@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Component.h"
+#include "TransformComponent.h"
 #include "World.h"
 
 #include "UID.h"
@@ -51,9 +51,20 @@ public:
     }
     
     // Получение ПЕРВОГО попавшегося компонента типа
+//    template<typename T>
+//    T* getComponent() const
+//    {
+//        auto it = m_componentMap.find(typeid(T));
+//        return (it != m_componentMap.end()) ? static_cast<T*>(it->second) : nullptr;
+//    }
+    
     template<typename T>
-    T* getComponent() const
+    T* getComponent()
     {
+        if constexpr (std::same_as<T, TransformComponent>) {
+            return &m_transform;
+        }
+        
         auto it = m_componentMap.find(typeid(T));
         return (it != m_componentMap.end()) ? static_cast<T*>(it->second) : nullptr;
     }
@@ -82,7 +93,10 @@ public:
         return result;
     }
     
-    void setParent(Entity* newParent);
+    TransformComponent& getTransform() { return m_transform; }
+    
+    void setParent(Entity* newParent, bool keepRelative);
+    void invalidateTransform();
     
     const std::vector<std::unique_ptr<Component>>& getComponents() const { return m_components; }
     const bool isPendingKill() const { return m_isPendingKill; }
@@ -100,4 +114,6 @@ private:
     std::vector<std::unique_ptr<Component>> m_components;
     std::unordered_multimap<std::type_index, Component*> m_componentMap;
     bool m_isPendingKill = false;
+    
+    TransformComponent m_transform;
 };
