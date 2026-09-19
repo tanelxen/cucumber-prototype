@@ -94,6 +94,7 @@ public:
     }
     
     TransformComponent& getTransform() { return m_transform; }
+    TransformComponent* getTransformPtr() const { return (TransformComponent*)&m_transform; }
     
     void setParent(Entity* newParent, bool keepRelative);
     void invalidateTransform();

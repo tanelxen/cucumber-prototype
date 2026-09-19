@@ -17,6 +17,7 @@ set(CMAKE_XCODE_GENERATE_SCHEME OFF)
 add_subdirectory( vendor/glad )
 add_subdirectory( vendor/glfw )
 add_subdirectory( vendor/imgui )
+add_subdirectory( vendor/ImGuizmo )
 
 set(SRC_COMMON
         src/main.cpp
@@ -214,10 +215,11 @@ target_include_directories(angelscript_addons PUBLIC ${angelscript_SOURCE_DIR}/s
 target_include_directories(${PROJECT_NAME} PRIVATE
     src
     vendor/glm
+    #vendor/ImGuizmo
     ${angelscript_SOURCE_DIR}/sdk/angelscript/include
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui miniaudio angelscript angelscript_addons)
+target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui ImGuizmo miniaudio angelscript angelscript_addons)
 
 
 

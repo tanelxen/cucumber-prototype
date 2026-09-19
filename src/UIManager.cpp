@@ -302,6 +302,7 @@ void UIManager::drawPanels()
 void UIManager::setEntity(Entity *entity)
 {
     m_pInspectorPanel->setEntity(entity);
+    m_pViewportPanel->setEntity(entity);
 }
 
 void UIManager::setMaterial(Material* material)

@@ -10,6 +10,7 @@
 #include "EditorPanel.h"
 
 class Viewport;
+class Entity;
 
 class ViewportPanel: public EditorPanel
 {
@@ -18,6 +19,7 @@ public:
 //    ~Viewport();
     
     void setViewport(Viewport* viewport);
+    void setEntity(Entity* entity);
     
     void update(float dt) override;
     void draw() override;
@@ -26,7 +28,8 @@ public:
     inline bool isHovered() { return m_isHovered; }
     
 private:
-    Viewport* m_viewport;
+    Viewport* m_viewport = nullptr;
+    Entity* m_entity = nullptr;
     
     class Camera* m_pCamera;
     class CameraController* m_pCameraController;

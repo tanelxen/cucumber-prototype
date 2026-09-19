@@ -12,12 +12,17 @@
 #include "Camera.h"
 
 #include "World.h"
+#include "Entity.h"
 
 #include <glad/glad.h>
 #include <imgui.h>
 
+#include <ImGuizmo.h>
+
 static bool DrawPlayButton();
 static bool DrawStopButton();
+
+static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const ImVec2& contentPos, const ImVec2& contentSize);
 
 ViewportPanel::ViewportPanel(const std::string &name) : EditorPanel(name)
 {
@@ -31,6 +36,11 @@ void ViewportPanel::setViewport(Viewport *viewport)
 {
     m_viewport = viewport;
     m_viewport->setCamera(m_pCamera);
+}
+
+void ViewportPanel::setEntity(Entity *entity)
+{
+    m_entity = entity;
 }
 
 void ViewportPanel::update(float dt)
@@ -93,6 +103,9 @@ void ViewportPanel::draw()
         }
     }
     
+    ImVec2 contentPos = ImGui::GetCursorScreenPos();
+    ImVec2 contentSize = ImGui::GetContentRegionAvail();
+    
     ImGui::Image((ImTextureID)(intptr_t)m_viewport->getTexture(),
                  current_avail_size,
                  ImVec2(0, 1),
@@ -105,6 +118,9 @@ void ViewportPanel::draw()
     {
         ImGui::SetWindowFocus();
     }
+    
+    auto camera = m_viewport->getCamera();
+    DrawGizmo(m_entity, camera->view, camera->projection, contentPos, contentSize);
     
     ImGui::End();
     ImGui::PopStyleVar();
@@ -201,4 +217,49 @@ static bool DrawStopButton()
     ImGui::PopStyleColor(5);
     
     return pressed;
+}
+
+
+
+// Глобальные или переданные настройки гизмо в редакторе
+static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
+static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL); // или ImGuizmo::WORLD
+
+static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const ImVec2& contentPos, const ImVec2& contentSize)
+{
+    if (!selectedNode) return;
+    
+    // 1. Инициализация ImGuizmo для текущего кадра
+    ImGuizmo::SetOrthographic(false); // true, если у вас ортографическая камера
+    ImGuizmo::BeginFrame();
+    ImGuizmo::SetDrawlist();
+    
+    ImVec2 current_avail_size = ImGui::GetContentRegionAvail();
+    
+    // 2. Задаем область рисования гизмо (должна совпадать с размерами окна вашего вьюпорта)
+//    ImVec2 windowPos = ImGui::GetWindowPos();
+//    ImVec2 windowSize = ImGui::GetWindowSize();
+    ImGuizmo::SetRect(contentPos.x, contentPos.y, contentSize.x, contentSize.y);
+    
+    // 3. Получаем ТЕКУЩУЮ мировую матрицу объекта
+    auto& transform = selectedNode->getTransform();
+    glm::mat4 worldMatrix = transform.getWorldMatrix(); // Заберет из кэша или посчитает
+    
+    // Вспомогательный массив, так как ImGuizmo принимает сырые float*
+    const float* viewPtr = &viewMatrix[0][0];
+    const float* projPtr = &projectionMatrix[0][0];
+    float* matrixPtr = &worldMatrix[0][0];
+    
+    // 4. Отрисовка и манипуляция гизмо
+    // Эта функция сама проверяет ввод мыши и модифицирует matrixPtr (worldMatrix)
+    ImGuizmo::Manipulate(viewPtr, projPtr,
+                         mCurrentGizmoOperation, mCurrentGizmoMode,
+                         matrixPtr);
+    
+    // 5. Если пользователь потянул за стрелочку — применяем изменения
+    if (ImGuizmo::IsUsing())
+    {
+        // Передаем измененную мировую матрицу обратно в трансформ
+        transform.setWorldMatrix(worldMatrix);
+    }
 }

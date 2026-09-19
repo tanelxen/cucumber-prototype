@@ -10,6 +10,9 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/matrix_decompose.hpp>
+
 void TransformComponent::save(nlohmann::json& j) const
 {
     j = nlohmann::json {
@@ -80,6 +83,30 @@ glm::mat4 TransformComponent::getWorldMatrix()
     return m_worldMatrix;
 }
 
+void TransformComponent::setWorldMatrix(const glm::mat4& newWorldMatrix)
+{
+    glm::mat4 newLocalMatrix = newWorldMatrix;
+    
+    // Если есть родитель, пересчитываем мировую матрицу в локальную
+    Entity* parentNode = owner->parent;
+    
+    if (parentNode) {
+        glm::mat4 inverseParentMatrix = glm::inverse(parentNode->getTransform().getWorldMatrix());
+        newLocalMatrix = inverseParentMatrix * newWorldMatrix;
+    }
+    
+    // Раскладываем локальную матрицу на компоненты
+    glm::vec3 skew;
+    glm::vec4 perspective;
+    glm::decompose(newLocalMatrix, m_scale, m_rotation, m_position, skew, perspective);
+    
+    // Обновляем сохраненные углы Эйлера для UI
+    m_euler = glm::degrees(glm::eulerAngles(m_rotation));
+    
+    // Инвалидируем кэш для всех дочерних объектов
+    owner->invalidateTransform();
+}
+
 void TransformComponent::updateLocalMatrix()
 {
     m_localMatrix = glm::identity<glm::mat4>();
@@ -128,7 +155,6 @@ void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
 
 glm::vec3 TransformComponent::getRotation() const
 {
-//    glm::eulerAngles(m_rotation);
     return m_euler;
 }
 

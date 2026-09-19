@@ -41,6 +41,7 @@ struct TransformComponent : public Component
     glm::vec3 getUp();
     
     glm::mat4 getWorldMatrix();
+    void setWorldMatrix(const glm::mat4& worldMatrix);
     
     bool isDirty() const { return m_isDirty; }
     void setDirty() { m_isDirty = true; }

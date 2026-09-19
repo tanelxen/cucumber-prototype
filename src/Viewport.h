@@ -20,7 +20,7 @@ public:
     void init();
     void setCamera(Camera* camera);
     void resize(int width, int height);
-    void updateBounds(float minX, float minY, float maxX, float maxY);
+//    void updateBounds(float minX, float minY, float maxX, float maxY);
     
     void bind();
     void unbind();
@@ -31,7 +31,7 @@ public:
     
     Camera* getCamera() { return m_camera; }
     
-    glm::vec2 getMousePosition();
+//    glm::vec2 getMousePosition();
     
 private:
     unsigned int m_fbo = 0;
@@ -42,8 +42,8 @@ private:
     int m_height = 1;
     float m_scale = 2;
     
-    glm::vec2 minBounds;
-    glm::vec2 maxBounds;
+//    glm::vec2 minBounds;
+//    glm::vec2 maxBounds;
     
     Camera* m_camera;
 };

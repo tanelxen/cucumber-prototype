@@ -156,6 +156,12 @@ void to_json(json& entityJson, const Entity& entity)
     
     json componentsJson = json::object();
     
+    {
+        json compData;
+        entity.getTransformPtr()->save(compData);
+        componentsJson[entity.getTransformPtr()->getTypeName()] = compData;
+    }
+    
     for (const auto& comp : entity.getComponents())
     {
         json compData;
@@ -351,7 +357,7 @@ static void DeserializeEntity(const json& entityJson, Entity* entity)
             // После создания компонента, не забудьте накатить на него ресурсы!
             // Берём путь к glb, который прочитается внутри Deserialize, и грузим через ResourceManager
             std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel(path);
+            ModelResource model = ModelLoader::LoadModel("assets/" + path);
             
             auto meshComp = static_cast<MeshComponent*>(newComp);
             meshComp->mesh = model.mesh;
@@ -362,7 +368,7 @@ static void DeserializeEntity(const json& entityJson, Entity* entity)
             newComp = entity->addComponent<AnimatorComponent>();
             
             std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel(path);
+            ModelResource model = ModelLoader::LoadModel("assets/" + path);
             
             auto animComp = static_cast<AnimatorComponent*>(newComp);
             animComp->setSkeleton(model.skeleton);
@@ -375,7 +381,7 @@ static void DeserializeEntity(const json& entityJson, Entity* entity)
             std::string path = compData.at("source");
             
             auto audioComp = static_cast<AudioComponent*>(newComp);
-            audioComp->init(path);
+            audioComp->init("assets/" + path);
         }
         else if (compName == "ScriptComponent")
         {
