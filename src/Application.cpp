@@ -85,7 +85,7 @@ Application::~Application()
 
 void Application::run()
 {
-    double lastTime = 0;
+    double lastTime = glfwGetTime();
     const double desiredFrameTime = 1.0 / 60;
     
     while (!glfwWindowShouldClose(m_pWindow))
@@ -93,14 +93,31 @@ void Application::run()
         double currTime = glfwGetTime();
         double elapsedTime = currTime - lastTime;
         
-        if (elapsedTime < desiredFrameTime)
-        {
-            long long diff = (desiredFrameTime - elapsedTime) * 1000;
-            std::this_thread::sleep_for(std::chrono::milliseconds(diff));
-            continue;
+        // Ограничитель FPS
+        if (elapsedTime < desiredFrameTime) {
+            double timeToWait = desiredFrameTime - elapsedTime;
+            
+            // Спим только если ждать нужно дольше 2 мс
+            if (timeToWait > 0.003) {
+                long long sleepMs = static_cast<long long>((timeToWait - 0.003) * 1000.0);
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+            }
+            
+            // Точное дожигание остатка времени
+            while (glfwGetTime() - lastTime < desiredFrameTime) {
+#if defined(_M_X64) || defined(__x86_64__)
+                _mm_pause();
+#endif
+            }
         }
         
-        lastTime = currTime;
+        // --- ТОЧКА НАЧАЛА НОВОГО КАДРА ---
+        double now = glfwGetTime();
+        elapsedTime = now - lastTime; // Истинное время, прошедшее с ПРОШЛОГО кадра
+        lastTime = now;      // Фиксируем для следующей итерации
+        
+        glfwPollEvents();
+        updateInputState();
         
         m_pUIManager->update(elapsedTime);
 
@@ -112,9 +129,6 @@ void Application::run()
         m_pUIManager->draw();
 
         glfwSwapBuffers(m_pWindow);
-        
-        glfwPollEvents();
-        updateInputState();
     }
 }
 
