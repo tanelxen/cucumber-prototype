@@ -30,6 +30,8 @@ struct Input
     static float getMousePositionX();
     static float getMousePositionY();
     
+    static void setCursorEnabled(bool state);
+    
 private:
     static Input& getInstance()
     {

@@ -19,6 +19,7 @@
 #include <scriptstdstring/scriptstdstring.h>
 #include <scriptbuilder/scriptbuilder.h>
 #include <scripthandle/scripthandle.h>
+#include <scripthelper/scripthelper.h>
 
 #include <filesystem>
 #include <iostream>
@@ -241,12 +242,45 @@ std::vector<std::string> ScriptEngine::GetMetadataForTypeProperty(int typeId, in
     return g_builder.GetMetadataForTypeProperty(typeId, varIdx);
 }
 
+// Для asCALL_CDECL_OBJFIRST:
+// Сначала идет ВЕКТОР (объект), затем аргумент из скрипта (float f)
+glm::vec3 Vec3MulFloat_ObjFirst(const glm::vec3& v, float f)
+{
+    return v * f;
+}
+
+// Для asCALL_CDECL_OBJLAST:
+// Сначала идет аргумент из скрипта (float f), и только ПОТОМ ВЕКТОР (объект)
+glm::vec3 FloatMulVec3_ObjLast(float f, const glm::vec3& v)
+{
+    return f * v;
+}
+
+// Умножение на число с присваиванием: vec *= float
+// Возвращаем ссылку на vec& для поддержки цепочек вызовов в C++,
+// но AngelScript ожидает возвращаемое значение в соответствии с сигнатурой.
+glm::vec3& Vec3MulAssignFloat(float f, glm::vec3& v)
+{
+    v *= f;
+    return v;
+}
+
+// Операции между векторами (по значению)
+glm::vec3 Vec3AddVec3(const glm::vec3& v1, const glm::vec3& v2) { return v1 + v2; }
+glm::vec3 Vec3SubVec3(const glm::vec3& v1, const glm::vec3& v2) { return v1 - v2; }
+glm::vec3 Vec3MulVec3(const glm::vec3& v1, const glm::vec3& v2) { return v1 * v2; } // Покомпонентное
+
+// С присваиванием (межвекторные)
+glm::vec3& Vec3AddAssignVec3(const glm::vec3& v2, glm::vec3& v1) { v1 += v2; return v1; }
+glm::vec3& Vec3SubAssignVec3(const glm::vec3& v2, glm::vec3& v1) { v1 -= v2; return v1; }
+
 void RegisterMath(asIScriptEngine* engine)
 {
     int r;
     
     // 1. Регистрируем тип Vector3 (сопоставляем с glm::vec3)
-    r = engine->RegisterObjectType("Vector3", sizeof(glm::vec3), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C); assert(r >= 0);
+    r = engine->RegisterObjectType("Vector3", sizeof(glm::vec3),
+                                   asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS); assert(r >= 0);
     
     // 2. Регистрируем свойства (поля x, y, z)
     r = engine->RegisterObjectProperty("Vector3", "float x", asOFFSET(glm::vec3, x)); assert(r >= 0);
@@ -261,6 +295,40 @@ void RegisterMath(asIScriptEngine* engine)
     // Конструктор с параметрами Vector3(x, y, z)
     r = engine->RegisterObjectBehaviour("Vector3", asBEHAVE_CONSTRUCT, "void f(float, float, float)",
                                         asFUNCTION(+[](float x, float y, float z, void* memory) { new(memory) glm::vec3(x, y, z); }), asCALL_CDECL_OBJLAST); assert(r >= 0);
+    
+    // Vec3 * float (Объект Vec3 слева, значит OBJFIRST. В C++ функции: Vec3, затем float)
+    engine->RegisterObjectMethod("Vector3", "Vector3 opMul(float) const",
+                                 asFUNCTION(Vec3MulFloat_ObjFirst), asCALL_CDECL_OBJFIRST);
+    
+    // float * Vec3 (Объект Vec3 справа от знака *, но для AngelScript это opMul_r.
+    // Флаг OBJLAST заставит AngelScript передать Vec3 ПОСЛЕДНИМ аргументом в C++ функцию: float, затем Vec3)
+    engine->RegisterObjectMethod("Vector3", "Vector3 opMul_r(float) const",
+                                 asFUNCTION(FloatMulVec3_ObjLast), asCALL_CDECL_OBJLAST);
+
+    
+    // --- 2. Операции МЕЖДУ векторами ---
+    
+    // Сложение (v1 + v2)
+    r = engine->RegisterObjectMethod("Vector3", "Vector3 opAdd(const Vector3 &in) const",
+                                     asFUNCTION(Vec3AddVec3), asCALL_CDECL_OBJFIRST); assert(r >= 0);
+    
+    // Вычитание (v1 - v2)
+    r = engine->RegisterObjectMethod("Vector3", "Vector3 opSub(const Vector3 &in) const",
+                                     asFUNCTION(Vec3SubVec3), asCALL_CDECL_OBJFIRST); assert(r >= 0);
+    
+    // Покомпонентное умножение (v1 * v2)
+    r = engine->RegisterObjectMethod("Vector3", "Vector3 opMul(const Vector3 &in) const",
+                                     asFUNCTION(Vec3MulVec3), asCALL_CDECL_OBJFIRST); assert(r >= 0);
+    
+    // --- 3. Операции между векторами с присваиванием (+=, -=) ---
+    
+    // v1 += v2
+    r = engine->RegisterObjectMethod("Vector3", "Vector3& opAddAssign(const Vector3 &in)",
+                                     asFUNCTION(Vec3AddAssignVec3), asCALL_CDECL_OBJLAST); assert(r >= 0);
+    
+    // v1 -= v2
+    r = engine->RegisterObjectMethod("Vector3", "Vector3& opSubAssign(const Vector3 &in)",
+                                     asFUNCTION(Vec3SubAssignVec3), asCALL_CDECL_OBJLAST); assert(r >= 0);
 }
 
 void RegisterTransformComponent(asIScriptEngine* engine)
@@ -276,6 +344,9 @@ void RegisterTransformComponent(asIScriptEngine* engine)
     r = engine->RegisterObjectProperty("TransformComponent", "Vector3 position", asOFFSET(TransformComponent, position)); assert(r >= 0);
     r = engine->RegisterObjectProperty("TransformComponent", "Vector3 rotation", asOFFSET(TransformComponent, rotation)); assert(r >= 0);
     r = engine->RegisterObjectProperty("TransformComponent", "Vector3 scale",    asOFFSET(TransformComponent, scale));    assert(r >= 0);
+    
+    r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetForward()", asMETHOD(TransformComponent, getForward), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRight()", asMETHOD(TransformComponent, getRight), asCALL_THISCALL); assert(r >= 0);
 }
 
 void RegisterAudioComponent(asIScriptEngine* engine)
@@ -339,7 +410,12 @@ void RegisterInputSystem(asIScriptEngine* engine)
     r = engine->RegisterGlobalFunction("bool GetKeyDown(KeyCode key)", asFUNCTION(Input::isKeyClicked), asCALL_CDECL); assert(r >= 0);
     
     // Регистрация позиции мыши (возвращает Vector3 по значению)
-//    r = engine->RegisterGlobalFunction("Vector3 GetMousePosition()", asFUNCTION(EngineInput::GetMousePosition), asCALL_CDECL); assert(r >= 0);
+    r = engine->RegisterGlobalFunction("float GetMouseOffsetX()", asFUNCTION(Input::getMouseOffsetX), asCALL_CDECL); assert(r >= 0);
+    r = engine->RegisterGlobalFunction("float GetMouseOffsetY()", asFUNCTION(Input::getMouseOffsetY), asCALL_CDECL); assert(r >= 0);
+    
+    r = engine->RegisterGlobalFunction("bool GetRightMouseButton()", asFUNCTION(Input::isRightMouseButtonPressed), asCALL_CDECL); assert(r >= 0);
+    
+    r = engine->RegisterGlobalFunction("void SetCursorEnabled(bool state)", asFUNCTION(Input::setCursorEnabled), asCALL_CDECL); assert(r >= 0);
     
     // Сбрасываем пространство имен обратно в глобальное, чтобы не сломать регистрацию других систем
     r = engine->SetDefaultNamespace(""); assert(r >= 0);

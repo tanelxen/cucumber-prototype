@@ -28,7 +28,7 @@ void CameraController::update(float dt)
     {
         Application::setCursorEnabled(false);
         
-        yaw += Input::getMouseOffsetX() * kMouseSense * dt;
+        yaw -= Input::getMouseOffsetX() * kMouseSense * dt;
         pitch -= Input::getMouseOffsetY() * kMouseSense * dt;
         
         m_isFlyMode = true;
@@ -43,14 +43,14 @@ void CameraController::update(float dt)
     else if (pitch < -1.5) pitch = -1.5;
     
     
-    forward.x = cos(yaw) * cos(pitch);
-    forward.y = sin(pitch);
-    forward.z = sin(yaw) * cos(pitch);
+    forward.x = -sin(yaw) * cos(pitch);
+    forward.y =  sin(pitch);
+    forward.z = -cos(yaw) * cos(pitch);
     forward = glm::normalize(forward);
     
-    glm::vec3 unit_up = {0, 1, 0};
-    
-    right = glm::cross(forward, unit_up);
+    right.x =  cos(yaw);
+    right.y =  0.0f;
+    right.z = -sin(yaw);
     right = glm::normalize(right);
     
     up = glm::cross(right, forward);

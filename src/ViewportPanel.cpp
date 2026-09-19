@@ -40,10 +40,10 @@ void ViewportPanel::update(float dt)
 //        m_pCameraController->update(dt);
 //    }
     
-//    if (m_isHovered)
-//    {
+    if (g_currentScene->m_isSimulationMode == false)
+    {
         m_pCameraController->update(dt);
-//    }
+    }
 }
 
 void ViewportPanel::draw()

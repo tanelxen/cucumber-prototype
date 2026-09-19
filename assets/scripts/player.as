@@ -1,8 +1,12 @@
 class Player : MonoBehaviour
 {
-    float speed = 200.0f;
+    float move_speed = 400.0f;
+    float mouse_speed = 8.0f;
 
-    Weapon@ weapon;
+    float forwardmove = 0;
+    float rightmove = 0;
+
+    TransformComponent@ headTransform;
 
     void start()
     {
@@ -14,31 +18,54 @@ class Player : MonoBehaviour
         TransformComponent@ transform = GetTransform();
         if (transform == null) return;
 
-        if (Input::GetKey(KeyCode::D))
-        {
-            transform.position.x += speed * dt;
-        }
-
-        if (Input::GetKey(KeyCode::A))
-        {
-            transform.position.x -= speed * dt;
-        }
+        forwardmove = 0;
+        rightmove = 0;
 
         if (Input::GetKey(KeyCode::W))
         {
-            transform.position.z -= speed * dt;
+            forwardmove += 1;
         }
-
+        
         if (Input::GetKey(KeyCode::S))
         {
-            transform.position.z += speed * dt;
+            forwardmove -= 1;
+        }
+        
+        if (Input::GetKey(KeyCode::D))
+        {
+            rightmove += 1;
+        }
+        
+        if (Input::GetKey(KeyCode::A))
+        {
+            rightmove -= 1;
         }
 
-        if (Input::GetKeyDown(KeyCode::Space))
+
+        Vector3 forward = transform.GetForward();
+        Vector3 right = transform.GetRight();
+
+        Vector3 direction(0, 0, 0);
+        direction += forward * forwardmove * move_speed;
+        direction += right * rightmove * move_speed;
+        transform.position += direction * dt;
+
+        if (Input::GetRightMouseButton())
         {
-            if (weapon != null) {
-                weapon.Fire();
+            Input::SetCursorEnabled(false);
+
+            float mouseX = Input::GetMouseOffsetX();
+            transform.rotation.y -= mouseX * mouse_speed * dt;
+
+            if (headTransform != null)
+            {
+                float mouseY = Input::GetMouseOffsetY();
+                headTransform.rotation.x -= mouseY * mouse_speed * dt;
             }
+        }
+        else
+        {
+            Input::SetCursorEnabled(true);
         }
     }
 }

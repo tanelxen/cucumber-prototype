@@ -18,6 +18,9 @@ struct TransformComponent : public Component
     
     glm::mat4 toMat4();
     
+    glm::vec3 getForward();
+    glm::vec3 getRight();
+    
     const std::string getTypeName() const override { return "TransformComponent"; }
     
     void save(nlohmann::json& j) const override;

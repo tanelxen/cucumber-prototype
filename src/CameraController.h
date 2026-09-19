@@ -25,8 +25,8 @@ public:
     glm::vec3 right = {0, 0, 0};
     glm::vec3 up = {0, 0, 0};
     
-    float pitch = -0.5;
-    float yaw = -1.57;
+    float pitch = 0;
+    float yaw = 0;
     
     bool isFlyMode() { return m_isFlyMode; }
 

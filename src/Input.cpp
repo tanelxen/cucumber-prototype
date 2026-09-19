@@ -6,7 +6,7 @@
 //
 
 #include "Input.h"
-
+#include "Application.h"
 
 bool Input::isKeyPressed(int keyNum)
 {
@@ -58,4 +58,9 @@ float Input::getMousePositionX()
 float Input::getMousePositionY()
 {
     return getInstance().m_mouseY;
+}
+
+void Input::setCursorEnabled(bool state)
+{
+    Application::setCursorEnabled(state);
 }
