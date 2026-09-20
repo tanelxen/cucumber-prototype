@@ -9,6 +9,8 @@
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
 #include "TransformComponent.h"
+#include "MovementComponent.h"
+
 #include "Entity.h"
 #include "Input.h"
 
@@ -101,6 +103,7 @@ void ScriptEngine::MessageCallback(const asSMessageInfo* msg, void* param)
 void RegisterMath(asIScriptEngine* engine);
 void RegisterTransformComponent(asIScriptEngine* engine);
 void RegisterAudioComponent(asIScriptEngine* engine);
+void RegisterMovementComponent(asIScriptEngine* engine);
 void RegisterEntity(asIScriptEngine* engine);
 
 void RegisterInputSystem(asIScriptEngine* engine);
@@ -123,6 +126,7 @@ void ScriptEngine::RegisterEngineAPI()
     RegisterMath(m_asEngine);
     RegisterTransformComponent(m_asEngine);
     RegisterAudioComponent(m_asEngine);
+    RegisterMovementComponent(m_asEngine);
     
     RegisterEntity(m_asEngine);
     m_asEngine->RegisterGlobalFunction("ref@ _GetScript(Entity@, const string &in)", asFUNCTION(GetScriptOnEntity), asCALL_CDECL);
@@ -363,6 +367,16 @@ void RegisterAudioComponent(asIScriptEngine* engine)
                                  asMETHOD(AudioComponent, play), asCALL_THISCALL);
 }
 
+void RegisterMovementComponent(asIScriptEngine* engine)
+{
+    // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
+    engine->RegisterObjectType("MovementComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
+    
+    // Регистрируем метод получения TransformComponent у Entity
+    engine->RegisterObjectMethod("MovementComponent", "void SetInput(float, float, bool)",
+                                 asMETHOD(MovementComponent, setInput), asCALL_THISCALL);
+}
+
 void RegisterEntity(asIScriptEngine* engine)
 {
     // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
@@ -374,6 +388,9 @@ void RegisterEntity(asIScriptEngine* engine)
     
     engine->RegisterObjectMethod("Entity", "AudioComponent@ GetAudio()",
                                  asMETHOD(Entity, getComponent<AudioComponent>), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("Entity", "MovementComponent@ GetMovement()",
+                                 asMETHOD(Entity, getComponent<MovementComponent>), asCALL_THISCALL);
     
     engine->RegisterObjectMethod("Entity", "string GetName() const",
                                  asMETHOD(Entity, GetName), asCALL_THISCALL);

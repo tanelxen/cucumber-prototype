@@ -19,6 +19,9 @@
 #include "AudioComponent.h"
 #include "MeshComponent.h"
 
+#include "q3/Q3BspCollision.h"
+#include "MovementComponent.h"
+
 #include "ScriptEngine.h"
 
 #include <imgui.h>
@@ -37,6 +40,8 @@
 #include "../vendor/stb_image.h"
 
 std::vector<std::string> GetAvailableScriptClasses();
+
+extern Q3BspCollision g_collision;
 
 class ComponentInspector
 {
@@ -322,6 +327,7 @@ void InspectorPanel::draw()
         if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
         if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
         if (ImGui::MenuItem("Camera"))      { m_entity->addComponent<CameraComponent>(); }
+        if (ImGui::MenuItem("Movement"))    { m_entity->addComponent<MovementComponent>(&g_collision); }
         
         if (ImGui::BeginMenu("Scripts")) {
             // Получаем актуальный список классов из AngelScript

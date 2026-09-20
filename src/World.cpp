@@ -34,6 +34,8 @@
 
 #include "q3/Q3BSPAsset.h"
 #include "q3/Q3BspMesh.h"
+#include "q3/Q3BspCollision.h"
+#include "MovementComponent.h"
 
 #include "../vendor/json.hpp"
 
@@ -44,6 +46,7 @@ static Grid g_grid;
 static Sky g_sky;
 
 static Q3BspMesh g_mesh;
+Q3BspCollision g_collision;
 
 WorldScene::WorldScene()
 {
@@ -145,33 +148,6 @@ void WorldScene::selectEntityAtIndex(int index)
         Entity* rawPtr = m_entities[index].get();
         Application::currentInstance->m_pUIManager->setEntity(rawPtr);
     }
-}
-
-using json = nlohmann::json;
-
-void to_json(json& entityJson, const Entity& entity)
-{
-    entityJson["name"] = entity.m_name;
-    entityJson["active"] = entity.m_isActive;
-    
-    json componentsJson = json::object();
-    
-    {
-        json compData;
-        entity.getTransformPtr()->save(compData);
-        componentsJson[entity.getTransformPtr()->getTypeName()] = compData;
-    }
-    
-    for (const auto& comp : entity.getComponents())
-    {
-        json compData;
-        comp->save(compData);
-        
-        // Ключом будет имя компонента, например "TransformComponent"
-        componentsJson[comp->getTypeName()] = compData;
-    }
-    
-    entityJson["components"] = componentsJson;
 }
 
 static constexpr uint8_t uuid_characters[] = {
@@ -292,20 +268,33 @@ uint64_t FromBase32(const std::string& str) {
     return result;
 }
 
-void SerializeEntity(json& entityJson, const Entity* entity)
+void SerializeEntity(nlohmann::json& entityJson, const Entity* entity)
 {
     entityJson["name"] = entity->m_name;
     entityJson["uid"] = entity->uid;
     entityJson["parent"] = entity->parent ? entity->parent->uid : UID::Invalid();
     
-    json componentsArray = json::array();
+    nlohmann::json componentsArray = nlohmann::json::array();
+    
+    {
+        auto comp = entity->getTransformPtr();
+        
+        nlohmann::json compNode;
+        compNode["type"] = comp->getTypeName();
+        
+        nlohmann::json compData;
+        comp->save(compData);
+        compNode["data"] = compData;
+        
+        componentsArray.push_back(compNode);
+    }
     
     for (const auto& comp : entity->getComponents())
     {
-        json compNode;
+        nlohmann::json compNode;
         compNode["type"] = comp->getTypeName();
         
-        json compData;
+        nlohmann::json compData;
         comp->save(compData);
         compNode["data"] = compData;
         
@@ -317,14 +306,14 @@ void SerializeEntity(json& entityJson, const Entity* entity)
 
 void WorldScene::save()
 {
-    json sceneJson;
+    nlohmann::json sceneJson;
     
     sceneJson["name"] = "test";
-    sceneJson["entities"] = json::array();
+    sceneJson["entities"] = nlohmann::json::array();
     
     for (const auto& entity : m_entities)
     {
-        json entityJson;
+        nlohmann::json entityJson;
         SerializeEntity(entityJson, entity.get());
         sceneJson["entities"].push_back(entityJson);
     }
@@ -333,14 +322,14 @@ void WorldScene::save()
     file << sceneJson.dump(4);
 }
 
-static void DeserializeEntity(const json& entityJson, Entity* entity)
+static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
 {
     auto componentsArray = entityJson.at("components");
     
     for (const auto& compNode : componentsArray)
     {
         std::string compName = compNode.at("type").get<std::string>();
-        const json& compData = compNode.at("data");
+        const nlohmann::json& compData = compNode.at("data");
         
         Component* newComp = nullptr;
         
@@ -391,6 +380,10 @@ static void DeserializeEntity(const json& entityJson, Entity* entity)
         {
             newComp = entity->addComponent<CameraComponent>();
         }
+        else if (compName == "MovementComponent")
+        {
+            newComp = entity->addComponent<MovementComponent>(&g_collision);
+        }
         
         // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
         if (newComp)
@@ -411,10 +404,10 @@ void WorldScene::load()
         return;
     }
     
-    json sceneJson;
+    nlohmann::json sceneJson;
     try {
         file >> sceneJson;
-    } catch (const json::parse_error& e) {
+    } catch (const nlohmann::json::parse_error& e) {
         std::cerr << "Ошибка парсинга JSON: " << e.what() << std::endl;
         return;
     }
@@ -484,6 +477,7 @@ void WorldScene::loadMap(const std::string &filename)
     }
     
     g_mesh.initFromBsp(&bsp);
+    g_collision.initFromBsp(&bsp);
 }
 
 void WorldScene::registerComponent(Component *component)

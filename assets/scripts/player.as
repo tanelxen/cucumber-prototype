@@ -3,8 +3,9 @@ class Player : MonoBehaviour
     float move_speed = 400.0f;
     float mouse_speed = 8.0f;
 
-    float forwardmove = 0;
-    float rightmove = 0;
+    private float forwardmove = 0;
+    private float rightmove = 0;
+    private bool jump = false;
 
     TransformComponent@ headTransform;
 
@@ -20,36 +21,19 @@ class Player : MonoBehaviour
 
         forwardmove = 0;
         rightmove = 0;
+        jump = Input::GetKey(KeyCode::Space); // Добавили прыжок
 
-        if (Input::GetKey(KeyCode::W))
-        {
-            forwardmove += 1;
-        }
-        
-        if (Input::GetKey(KeyCode::S))
-        {
-            forwardmove -= 1;
-        }
-        
-        if (Input::GetKey(KeyCode::D))
-        {
-            rightmove += 1;
-        }
-        
-        if (Input::GetKey(KeyCode::A))
-        {
-            rightmove -= 1;
-        }
+        if (Input::GetKey(KeyCode::W)) forwardmove += 1;
+        if (Input::GetKey(KeyCode::S)) forwardmove -= 1;
+        if (Input::GetKey(KeyCode::D)) rightmove += 1;
+        if (Input::GetKey(KeyCode::A)) rightmove -= 1;
 
+        MovementComponent@ motor = GetOwner().GetMovement();
 
-        Vector3 forward = transform.GetForward();
-        Vector3 right = transform.GetRight();
-
-        Vector3 direction(0, 0, 0);
-        direction += forward * forwardmove * move_speed;
-        direction += right * rightmove * move_speed;
-        Vector3 newPosition = transform.GetPosition() + direction * dt;
-        transform.SetPosition(newPosition);
+        if (motor != null)
+        {
+            motor.SetInput(forwardmove, rightmove, jump);
+        }
 
         if (Input::GetRightMouseButton())
         {
