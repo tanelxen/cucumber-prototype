@@ -10,6 +10,9 @@
 #include "Entity.h"
 #include "q3/Q3BspCollision.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp> // Required for length2
+
 static constexpr float cl_forwardspeed = 400.0;
 static constexpr float cl_sidespeed = 350.0;
 static constexpr float cl_movement_accelerate = 15.0;
@@ -21,7 +24,7 @@ static constexpr float cl_stop_speed = 200.0;
 static constexpr float cpm_air_stop_acceleration = 2.5;
 static constexpr float cpm_air_control_amount = 150.0;
 static constexpr float cpm_strafe_acceleration = 70.0;
-static constexpr float cpm_wish_speed = 30.0;
+static constexpr float cpm_wish_speed = 60.0;
 
 static constexpr int MAX_CLIP_PLANES = 5;
 static constexpr float OVERCLIP = 1.001;
@@ -57,19 +60,40 @@ MovementComponent::MovementComponent(Q3BspCollision *collision) : Component(Flag
     
 }
 
-void MovementComponent::setInput(float forward, float right, bool jump)
+//void MovementComponent::setInput(float forward, float right, bool jump)
+//{
+//
+//}
+
+void MovementComponent::addMovementInput(const glm::vec3& direction, float scale)
 {
-    m_forwardmove = forward;
-    m_rightmove = right;
+//    m_inputVector += OpenGL2Quake(direction) * scale;
     
-    if (jump)
-    {
-        m_movementBits |= MOVEMENT_JUMP;
+    // 1. Защита от NaN и бесконечностей (ввод может прийти из забагованного скрипта)
+    if (glm::any(glm::isnan(direction)) || glm::any(glm::isinf(direction)) ||
+        std::isnan(scale) || std::isinf(scale)) {
+        return;
     }
-    else
-    {
-        m_movementBits &= ~MOVEMENT_JUMP;
+    
+    // 2. Защита от нулевого вектора (нет смысла обрабатывать и нормализовать)
+    float lenSq = glm::length2(direction); // Используем квадрат длины для скорости
+    if (lenSq < 0.00001f) {
+        return;
     }
+    
+    // В Unreal ввод нормализуется, если передан неединичный вектор
+    glm::vec3 normalizedDir = (lenSq > 1.0f) ? glm::normalize(direction) : direction;
+    
+    // 3. Ограничиваем масштаб (в Unreal масштаб обычно зажат между -1.0 и 1.0)
+    scale = glm::clamp(scale, -1.0f, 1.0f);
+    
+    // Накапливаем безопасный вектор ввода
+    m_inputVector += OpenGL2Quake(normalizedDir) * scale;
+}
+
+void MovementComponent::jump()
+{
+    m_movementBits |= MOVEMENT_JUMP;
 }
 
 void MovementComponent::update(float dt)
@@ -80,9 +104,8 @@ void MovementComponent::update(float dt)
     m_forward = OpenGL2Quake(owner->getTransform().getForward());
     m_right = OpenGL2Quake(owner->getTransform().getRight());
     
-    // Логика Quake 3: физика просто берёт уже готовые m_forwardmove и m_rightmove
     trace_ground();
-    apply_inputs(dt); // Внутри используем m_forwardmove и m_rightmove
+    apply_inputs(dt);
     
     bool useGravity = (m_movementBits & MOVEMENT_JUMPING) != 0;
     step_slide(useGravity, dt);
@@ -90,8 +113,8 @@ void MovementComponent::update(float dt)
     m_movementBits &= ~MOVEMENT_JUMP_THIS_FRAME;
     
     // В конце кадра зануляем ввод
-    m_forwardmove = 0.0f;
-    m_rightmove = 0.0f;
+    m_inputVector = { 0.0f, 0.0f, 0.0f };
+    m_movementBits = 0;
     
     owner->getTransform().setPosition(Quake2OpenGL(m_position));
 }
@@ -122,66 +145,56 @@ void MovementComponent::trace_ground()
 
 void MovementComponent::apply_inputs(float dt)
 {
-    glm::vec3 forward = m_forward;
-    glm::vec3 right = m_right;
-    
-    forward.z = 0;
-    right.z = 0;
-    forward = glm::normalize(forward);
-    right = glm::normalize(right);
-    
-    glm::vec3 direction = forward * m_forwardmove * cl_forwardspeed + right * m_rightmove * cl_sidespeed;
-    
-    float wishspeed = glm::length(direction);
-    wishspeed = fmin(wishspeed, sv_max_speed);
-    
-    if (wishspeed >= 0.0001f) {
-        direction /= wishspeed;
-    }
-    
     apply_jump();
     apply_friction(dt);
     
-    float selected_acceleration = cl_movement_accelerate;
-    float base_wishspeed = wishspeed;
-    
-    if ((m_movementBits & MOVEMENT_JUMPING) || (m_movementBits & MOVEMENT_JUMP_THIS_FRAME))
-    {
-        if (glm::dot(m_velocity, direction) < 0) {
-            selected_acceleration = cpm_air_stop_acceleration;
-        } else {
-            selected_acceleration = cl_movement_airaccelerate;
-        }
-        
-        if (m_rightmove != 0 && m_forwardmove == 0)
-        {
-            wishspeed = fmin(wishspeed, cpm_wish_speed);
-            selected_acceleration = cpm_strafe_acceleration;
-        }
+    if (glm::length2(m_inputVector) < 0.0001f) {
+        return; // Игрок никуда не жмет
     }
     
-    apply_acceleration(direction, wishspeed, selected_acceleration, dt);
-    apply_air_control(direction, base_wishspeed, dt);
+    // 1. Разделяем вектор ввода на направление и интенсивность нажатия
+    float inputLength = glm::length(m_inputVector);
+    glm::vec3 wishDir = m_inputVector / inputLength; // Нормализованное мировое направление
+    
+    // 2. Получаем локальные оси взгляда персонажа из Transform
+    glm::vec3 forward = m_forward;
+    glm::vec3 right = m_right;
+    
+    forward.z = 0.0f; right.z = 0.0f; // Проецируем на плоскость земли
+    forward = glm::normalize(forward);
+    right = glm::normalize(right);
+    
+    // 3. Проецируем желаемое направление движения на оси персонажа
+    // dot-product покажет, насколько движение "прямое" или "боковое" (от -1.0 до 1.0)
+    float forwardComponent = std::abs(glm::dot(wishDir, forward));
+    float strafeComponent = std::abs(glm::dot(wishDir, right));
+    
+    // 4. Задаем разные настройки максимальной скорости (вынесите их в структуру настроек)
+    float maxForwardSpeed = cl_forwardspeed; // Скорость бега вперед
+    float maxStrafeSpeed = cl_sidespeed;  // Скорость стрейфа (меньше, чем вперед)
+    
+    // Интерполируем максимальную скорость в зависимости от направления движения.
+    // Если игрок идет строго по диагонали, скорость будет средней между ними.
+    float totalComponent = forwardComponent + strafeComponent;
+    float currentMaxSpeed = maxForwardSpeed;
+    
+    if (totalComponent > 0.0f) {
+        currentMaxSpeed = ((forwardComponent * maxForwardSpeed) + (strafeComponent * maxStrafeSpeed)) / totalComponent;
+    }
+    
+    // 5. Финальная желаемая скорость кадра
+    float wishSpeed = inputLength * currentMaxSpeed;
+    wishSpeed = std::min(wishSpeed, currentMaxSpeed); // Гарантируем ограничение
+    
+    // 6. Передаем рассчитанные wishDir и wishSpeed в стандартный акселейт Quake 3
+    float acceleration = (m_isGrounded) ? cl_movement_accelerate : cl_movement_airaccelerate;
+    apply_acceleration(wishDir, wishSpeed, acceleration, dt);
 }
 
-//void BspCharacterController::apply_jump(bool jumpPressed) {
-//    if (!jumpPressed) {
-//        m_movementBits &= ~MOVEMENT_JUMP;
-//        return;
-//    }
-//    if ((m_movementBits & MOVEMENT_JUMPING)) return;
-//    
-//    m_movementBits |= MOVEMENT_JUMP_THIS_FRAME;
-//    m_velocity.z = 270; // Импульс прыжка Quake 3
-//}
-
-// В методах step_slide и slide замените все m_position на m_pEntity->m_transform.refPosition()
-// Например:
-// m_pEntity->m_transform.setPosition(work.endpos);
 
 void MovementComponent::apply_air_control(const glm::vec3& direction, float wishspeed, float dt)
 {
-    if (m_forwardmove == 0 || wishspeed == 0) return;
+    if (wishspeed == 0) return;
     
     float falling_speed = m_velocity.z;
     m_velocity.z = 0;

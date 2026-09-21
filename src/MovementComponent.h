@@ -33,7 +33,9 @@ public:
     
     void update(float dt) override;
     
-    void setInput(float forward, float right, bool jump);
+    void addMovementInput(const glm::vec3& direction, float scale = 1.0f);
+    void jump();
+    
     const glm::vec3& getVelocity() const { return m_velocity; }
     bool isWalking() const { return m_isGrounded && glm::length(m_velocity) > 0.1f; }
     int getSurfaceFlags() const { return m_surfaceFlags; }
@@ -52,8 +54,7 @@ private:
 private:
     Q3BspCollision* m_pCollision;
     
-    float m_forwardmove = 0.0f;
-    float m_rightmove = 0.0f;
+    glm::vec3 m_inputVector{0.0f};
     
     // Физическое состояние
     glm::vec3 m_position;

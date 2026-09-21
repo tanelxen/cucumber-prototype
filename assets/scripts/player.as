@@ -19,20 +19,16 @@ class Player : MonoBehaviour
         TransformComponent@ transform = GetTransform();
         if (transform == null) return;
 
-        forwardmove = 0;
-        rightmove = 0;
-        jump = Input::GetKey(KeyCode::Space); // Добавили прыжок
-
-        if (Input::GetKey(KeyCode::W)) forwardmove += 1;
-        if (Input::GetKey(KeyCode::S)) forwardmove -= 1;
-        if (Input::GetKey(KeyCode::D)) rightmove += 1;
-        if (Input::GetKey(KeyCode::A)) rightmove -= 1;
-
         MovementComponent@ motor = GetOwner().GetMovement();
 
         if (motor != null)
         {
-            motor.SetInput(forwardmove, rightmove, jump);
+            if (Input::GetKey(KeyCode::W)) motor.AddMovementInput(transform.GetForward(), 1.0f);
+            if (Input::GetKey(KeyCode::S)) motor.AddMovementInput(transform.GetForward(), -1.0f);
+            if (Input::GetKey(KeyCode::D)) motor.AddMovementInput(transform.GetRight(), 1.0f);
+            if (Input::GetKey(KeyCode::A)) motor.AddMovementInput(transform.GetRight(), -1.0f);
+
+            if (Input::GetKey(KeyCode::Space)) motor.Jump();
         }
 
         if (Input::GetRightMouseButton())

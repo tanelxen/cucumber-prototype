@@ -369,12 +369,13 @@ void RegisterAudioComponent(asIScriptEngine* engine)
 
 void RegisterMovementComponent(asIScriptEngine* engine)
 {
-    // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
     engine->RegisterObjectType("MovementComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
     
-    // Регистрируем метод получения TransformComponent у Entity
-    engine->RegisterObjectMethod("MovementComponent", "void SetInput(float, float, bool)",
-                                 asMETHOD(MovementComponent, setInput), asCALL_THISCALL);
+    engine->RegisterObjectMethod("MovementComponent", "void AddMovementInput(const Vector3 &in, float)",
+                                 asMETHOD(MovementComponent, addMovementInput), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("MovementComponent", "void Jump()",
+                                 asMETHOD(MovementComponent, jump), asCALL_THISCALL);
 }
 
 void RegisterEntity(asIScriptEngine* engine)
