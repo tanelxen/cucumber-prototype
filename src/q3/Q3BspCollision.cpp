@@ -8,6 +8,8 @@
 #include "Q3BspCollision.h"
 #include "Q3BSPAsset.h"
 
+#include "PhysicsCommon.h"
+
 struct trace_work
 {
     glm::vec3 start;

@@ -12,18 +12,18 @@
 
 class Q3BSPAsset;
 
-struct HitResult
-{
-    glm::vec3 endpos;
-    glm::vec3 normal;
-    float fraction;
-    
-    bool startsolid;
-    bool allsolid;
-    
-    int textureId;
-    int surfaceFlags;
-};
+//struct HitResult
+//{
+//    glm::vec3 endpos;
+//    glm::vec3 normal;
+//    float fraction;
+//    
+//    bool startsolid;
+//    bool allsolid;
+//    
+//    int textureId;
+//    int surfaceFlags;
+//};
 
 class Q3BspCollision
 {
@@ -33,7 +33,7 @@ public:
     
     void initFromBsp(Q3BSPAsset* bsp);
     
-    void trace(HitResult& result, const glm::vec3 &start, const glm::vec3 &end, const glm::vec3 &mins, const glm::vec3 &maxs) const;
+    void trace(struct HitResult& result, const glm::vec3 &start, const glm::vec3 &end, const glm::vec3 &mins, const glm::vec3 &maxs) const;
     
     void findClusterArea(const glm::vec3 &pos, int &cluster, int &area);
 

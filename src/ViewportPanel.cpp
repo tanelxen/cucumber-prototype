@@ -219,14 +219,10 @@ static bool DrawStopButton()
     return pressed;
 }
 
-
-
-// Глобальные или переданные настройки гизмо в редакторе
-static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
-static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL); // или ImGuizmo::WORLD
-
 static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const ImVec2& contentPos, const ImVec2& contentSize)
 {
+    ImGuizmo::AllowAxisFlip(false);
+    
     if (!selectedNode) return;
     
     // 1. Инициализация ImGuizmo для текущего кадра
@@ -237,8 +233,6 @@ static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const g
     ImVec2 current_avail_size = ImGui::GetContentRegionAvail();
     
     // 2. Задаем область рисования гизмо (должна совпадать с размерами окна вашего вьюпорта)
-//    ImVec2 windowPos = ImGui::GetWindowPos();
-//    ImVec2 windowSize = ImGui::GetWindowSize();
     ImGuizmo::SetRect(contentPos.x, contentPos.y, contentSize.x, contentSize.y);
     
     // 3. Получаем ТЕКУЩУЮ мировую матрицу объекта
@@ -252,9 +246,7 @@ static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const g
     
     // 4. Отрисовка и манипуляция гизмо
     // Эта функция сама проверяет ввод мыши и модифицирует matrixPtr (worldMatrix)
-    ImGuizmo::Manipulate(viewPtr, projPtr,
-                         mCurrentGizmoOperation, mCurrentGizmoMode,
-                         matrixPtr);
+    ImGuizmo::Manipulate(viewPtr, projPtr, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, matrixPtr);
     
     // 5. Если пользователь потянул за стрелочку — применяем изменения
     if (ImGuizmo::IsUsing())

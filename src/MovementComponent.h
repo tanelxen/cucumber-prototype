@@ -12,12 +12,10 @@
 
 #include "../vendor/json.hpp"
 
-class Q3BspCollision;
-
 class MovementComponent : public Component
 {
 public:
-    MovementComponent(Q3BspCollision* collision);
+    MovementComponent();
     
     void save(nlohmann::json& j) const override
     {
@@ -36,6 +34,9 @@ public:
     void addMovementInput(const glm::vec3& direction, float scale = 1.0f);
     void jump();
     
+    // Если надо перезаписать скорость
+    void launch(const glm::vec3& launchVelocity, bool overrideCurrent);
+    
     const glm::vec3& getVelocity() const { return m_velocity; }
     bool isWalking() const { return m_isGrounded && glm::length(m_velocity) > 0.1f; }
     int getSurfaceFlags() const { return m_surfaceFlags; }
@@ -52,8 +53,6 @@ private:
     bool slide(bool gravity, float dt);
     
 private:
-    Q3BspCollision* m_pCollision;
-    
     glm::vec3 m_inputVector{0.0f};
     
     // Физическое состояние

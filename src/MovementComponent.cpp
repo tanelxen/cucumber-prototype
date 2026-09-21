@@ -8,7 +8,9 @@
 #include "MovementComponent.h"
 
 #include "Entity.h"
-#include "q3/Q3BspCollision.h"
+#include "World.h"
+
+#include "PhysicsCommon.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp> // Required for length2
@@ -53,9 +55,9 @@ static glm::vec3 Quake2OpenGL(const glm::vec3& in)
 
 static bool noclip = false;
 
-void clip_velocity(const glm::vec3& in, const glm::vec3& normal, glm::vec3& out, float overbounce);
+static void clip_velocity(const glm::vec3& in, const glm::vec3& normal, glm::vec3& out, float overbounce);
 
-MovementComponent::MovementComponent(Q3BspCollision *collision) : Component(Flags::RequiresUpdate), m_pCollision(collision)
+MovementComponent::MovementComponent() : Component(Flags::RequiresUpdate)
 {
     
 }
@@ -96,6 +98,20 @@ void MovementComponent::jump()
     m_movementBits |= MOVEMENT_JUMP;
 }
 
+void MovementComponent::launch(const glm::vec3 &launchVelocity, bool overrideCurrent)
+{
+    if (overrideCurrent) {
+        m_velocity = launchVelocity; // Жестко перезаписываем (для телепортов/батутов)
+    } else {
+        m_velocity += launchVelocity; // Добавляем импульс (для взрывов/рывков)
+    }
+    
+    // Принудительно отрываем от земли, если импульс направлен вверх
+    if (launchVelocity.z > 0.0f) {
+        m_isGrounded = false;
+    }
+}
+
 void MovementComponent::update(float dt)
 {
     if (owner == nullptr) return;
@@ -125,7 +141,7 @@ void MovementComponent::trace_ground()
     point.z -= 0.25;
     
     HitResult result;
-    m_pCollision->trace(result, m_position, point, player_mins, player_maxs);
+    g_currentScene->trace(result, m_position, point, player_mins, player_maxs);
     
     if (result.fraction == 1.0f || (m_movementBits & MOVEMENT_JUMP_THIS_FRAME))
     {
@@ -281,7 +297,7 @@ void MovementComponent::step_slide(bool gravity, float dt)
     down.z -= STEPSIZE;
     
     HitResult result;
-    m_pCollision->trace(result, start_o, down, player_mins, player_maxs);
+    g_currentScene->trace(result, start_o, down, player_mins, player_maxs);
     
     glm::vec3 up = {0, 0, 1};
     
@@ -295,7 +311,7 @@ void MovementComponent::step_slide(bool gravity, float dt)
     up.z += STEPSIZE;
     
     // test the player position if they were a stepheight higher
-    m_pCollision->trace(result, up, up, player_mins, player_maxs);
+    g_currentScene->trace(result, up, up, player_mins, player_maxs);
     
     if (result.allsolid)
     {
@@ -313,7 +329,7 @@ void MovementComponent::step_slide(bool gravity, float dt)
     down = m_position;
     down.z -= STEPSIZE;
     
-    m_pCollision->trace(result, m_position, down, player_mins, player_maxs);
+    g_currentScene->trace(result, m_position, down, player_mins, player_maxs);
     
     if (!result.allsolid)
     {
@@ -367,7 +383,7 @@ bool MovementComponent::slide(bool gravity, float dt)
         /* calculate future position and attempt the move */
         HitResult work;
         glm::vec3 end = m_position + m_velocity * time_left;
-        m_pCollision->trace(work, m_position, end, player_mins, player_maxs);
+        g_currentScene->trace(work, m_position, end, player_mins, player_maxs);
         
         //        printf("(fraction = %.1f) (allsolid = %i) \n", work.fraction, work.allsolid);
         
@@ -498,7 +514,7 @@ bool MovementComponent::slide(bool gravity, float dt)
 }
 
 
-void clip_velocity(const glm::vec3& in, const glm::vec3& normal, glm::vec3& out, float overbounce)
+static void clip_velocity(const glm::vec3& in, const glm::vec3& normal, glm::vec3& out, float overbounce)
 {
     float backoff = glm::dot(in, normal);
     

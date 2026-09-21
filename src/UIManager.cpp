@@ -223,13 +223,13 @@ void UIManager::drawMenuBar()
         {
             if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
             {
-                Application::currentInstance->m_pScene->save();
+                Application::currentInstance->m_pScene->save("scene.json");
             }
             
             if (ImGui::MenuItem("Load Scene", "Cmd+L"))
             {
-                Application::currentInstance->m_pScene->load();
-            };
+                Application::currentInstance->m_pScene->load("scene.json");
+            }
             
             ImGui::Separator();
             
@@ -237,7 +237,7 @@ void UIManager::drawMenuBar()
             {
                 ScriptEngine::get().HotReloadAllScripts("assets/scripts");
                 
-            };
+            }
             ImGui::EndMenu();
         }
         

@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-
+#include <glm/glm.hpp>
 
 class Viewport;
 
@@ -23,7 +23,7 @@ public:
     WorldScene();
     ~WorldScene();
     
-    void loadMap(const std::string &filename);
+    void loadBSP(const std::string &filename);
     void update(float dt);
     void draw();
     
@@ -32,25 +32,19 @@ public:
     
     void selectEntityAtIndex(int index);
     
-    void save();
-    void load();
+    void save(const std::string& filename);
+    void load(const std::string& filename);
     
     void registerComponent(Component* component);
     
-    void queueComponentDestruction(Component* component) {
-        m_componentsToDestroy.push_back(component);
-    }
+    void queueComponentDestruction(Component* component);
+    void queueEntityDestruction(Entity* entity);
     
-    void queueEntityDestruction(Entity* entity)
-    {
-        // Проверяем, нет ли его уже в очереди
-        if (std::find(m_entitiesToDestroy.begin(), m_entitiesToDestroy.end(), entity) == m_entitiesToDestroy.end()) {
-            m_entitiesToDestroy.push_back(entity);
-        }
-    }
+    void trace(struct HitResult& result, const glm::vec3 &start, const glm::vec3 &end, const glm::vec3 &mins, const glm::vec3 &maxs) const;
     
     Viewport* m_pAttachedViewport;
     
+    // Открыто для удобства редактора
     std::vector<std::unique_ptr<Entity>> m_entities;
     
     Entity* findEntityByName(const std::string& name);

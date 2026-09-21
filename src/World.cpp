@@ -18,6 +18,7 @@
 
 #include "Entity.h"
 #include "TransformComponent.h"
+#include "MovementComponent.h"
 #include "AnimatorComponent.h"
 #include "ScriptComponent.h"
 #include "CameraComponent.h"
@@ -35,7 +36,8 @@
 #include "q3/Q3BSPAsset.h"
 #include "q3/Q3BspMesh.h"
 #include "q3/Q3BspCollision.h"
-#include "MovementComponent.h"
+
+#include "PhysicsCommon.h"
 
 #include "../vendor/json.hpp"
 
@@ -46,7 +48,7 @@ static Grid g_grid;
 static Sky g_sky;
 
 static Q3BspMesh g_mesh;
-Q3BspCollision g_collision;
+static Q3BspCollision g_collision;
 
 WorldScene::WorldScene()
 {
@@ -63,7 +65,7 @@ WorldScene::WorldScene()
         std::cerr << "Failed to init AngelScript!" << std::endl;
     }
     
-    loadMap("assets/wolf/maps/escape2.bsp");
+    loadBSP("assets/wolf/maps/escape2.bsp");
     
     g_currentScene = this;
 }
@@ -76,10 +78,13 @@ void WorldScene::update(float dt)
 {
     processPendingStarts();
     
-    for (auto* component : m_globalUpdatables)
+    if (m_isSimulationMode)
     {
-        if (component->owner->m_isActive && component->enabled) {
-            component->update(dt);
+        for (auto* component : m_globalUpdatables)
+        {
+            if (component->owner->m_isActive && component->enabled) {
+                component->update(dt);
+            }
         }
     }
     
@@ -125,7 +130,7 @@ void WorldScene::draw()
         }
     }
     
-    // FIXME: установка вьюпорта быть в RenderDevice
+    // FIXME: установка вьюпорта должна быть в RenderDevice
     m_pAttachedViewport->bind();
     
     if (m_drawSkybox)
@@ -148,124 +153,6 @@ void WorldScene::selectEntityAtIndex(int index)
         Entity* rawPtr = m_entities[index].get();
         Application::currentInstance->m_pUIManager->setEntity(rawPtr);
     }
-}
-
-static constexpr uint8_t uuid_characters[] = {
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8'
-};
-
-template <typename T, size_t SIZE>
-constexpr size_t std_size(const T (&)[SIZE]) {
-    return SIZE;
-}
-
-static constexpr uint32_t base = std_size(uuid_characters); // Строго 34
-static constexpr uint32_t max_uuid_number_length = 13;
-
-std::string id_to_text(int64_t p_id)
-{
-    if (p_id < 0) {
-        return "uid://<invalid>";
-    }
-    
-    char32_t tmp[max_uuid_number_length];
-    uint32_t tmp_size = 0;
-    
-    uint64_t remaining_id = static_cast<uint64_t>(p_id);
-    
-    do {
-        uint32_t c = remaining_id % base;
-        tmp[tmp_size] = uuid_characters[c];
-        remaining_id /= base;
-        ++tmp_size;
-    } while (remaining_id);
-    
-    std::string txt;
-    // +6 для "uid://" и +1 для '\0' (resize не требует +1 для '\0', но мы заполняем вручную)
-    txt.resize(tmp_size + 6);
-    
-    txt[0] = 'u';
-    txt[1] = 'i';
-    txt[2] = 'd';
-    txt[3] = ':';
-    txt[4] = '/';
-    txt[5] = '/';
-    
-    uint32_t size = 6;
-    for (uint32_t i = 0; i < tmp_size; ++i) {
-        txt[size++] = tmp[tmp_size - i - 1];
-    }
-    
-    return txt;
-}
-
-int64_t text_to_id(const std::string &p_text)
-{
-    // Проверяем префикс и минимальную длину (хотя бы 1 символ после "uid://")
-    if (p_text.length() <= 6 || !p_text.starts_with("uid://") || p_text == "uid://<invalid>") {
-        return -1; // Возвращаем -1 (или 0) для невалидного ID
-    }
-    
-    uint32_t l = p_text.length();
-    uint64_t uid = 0;
-    
-    for (uint32_t i = 6; i < l; i++) {
-        uint32_t c = p_text[i];
-        
-        // Ищем символ в нашем же массиве алфавита
-        const uint8_t* slot = std::find(std::begin(uuid_characters), std::end(uuid_characters), c);
-        
-        if (slot == std::end(uuid_characters)) {
-            return -1; // Найден символ, которого нет в алфавите
-        }
-        
-        uint32_t index = std::distance(std::begin(uuid_characters), slot);
-        
-        uid *= base;
-        uid += index;
-    }
-    
-    // Возвращаем как int64_t, маскируя старший бит для безопасности знака
-    return static_cast<int64_t>(uid & 0x7FFFFFFFFFFFFFFF);
-}
-
-// Алфавит Base32 (32 символа, исключены опасные 0, 1, 8, 9)
-const char BASE32_ALPHABET[] = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
-
-// Кодирование uint64_t в Base32 строку
-std::string ToBase32(uint64_t value) {
-    if (value == 0) return std::string(1, BASE32_ALPHABET[0]);
-    
-    std::string result;
-    result.reserve(13); // Максимум 13 символов для uint64_t
-    
-    while (value > 0) {
-        result.push_back(BASE32_ALPHABET[value & 0x1F]); // Берем последние 5 бит (32 значения)
-        value >>= 5; // Сдвигаем на 5 бит вправо
-    }
-    
-    // Разворачиваем строку, так как мы читали с конца
-    std::reverse(result.begin(), result.end());
-    return result;
-}
-
-// Декодирование обратно в uint64_t
-uint64_t FromBase32(const std::string& str) {
-    uint64_t result = 0;
-    for (char c : str) {
-        // Приводим к верхнему регистру (для регистронезависимости)
-        char up_c = std::toupper(c);
-        
-        // Ищем индекс символа в алфавите
-        const char* slot = std::find(std::begin(BASE32_ALPHABET), std::end(BASE32_ALPHABET), up_c);
-        if (slot == std::end(BASE32_ALPHABET)) continue; // Пропускаем невалидные символы
-        
-        size_t index = std::distance(std::begin(BASE32_ALPHABET), slot);
-        result = (result << 5) | (index & 0x1F);
-    }
-    return result;
 }
 
 void SerializeEntity(nlohmann::json& entityJson, const Entity* entity)
@@ -304,7 +191,7 @@ void SerializeEntity(nlohmann::json& entityJson, const Entity* entity)
     entityJson["components"] = componentsArray;
 }
 
-void WorldScene::save()
+void WorldScene::save(const std::string& filename)
 {
     nlohmann::json sceneJson;
     
@@ -318,7 +205,7 @@ void WorldScene::save()
         sceneJson["entities"].push_back(entityJson);
     }
     
-    std::ofstream file("scene.json");
+    std::ofstream file(filename);
     file << sceneJson.dump(4);
 }
 
@@ -382,7 +269,7 @@ static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
         }
         else if (compName == "MovementComponent")
         {
-            newComp = entity->addComponent<MovementComponent>(&g_collision);
+            newComp = entity->addComponent<MovementComponent>();
         }
         
         // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
@@ -393,10 +280,8 @@ static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
     }
 }
 
-void WorldScene::load()
+void WorldScene::load(const std::string& filename)
 {
-    std::string filename = "scene.json";
-    
     // 1. Открываем и читаем JSON-файл
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -458,7 +343,7 @@ void WorldScene::load()
     }
 }
 
-Entity *WorldScene::findEntityByName(const std::string &name)
+Entity* WorldScene::findEntityByName(const std::string &name)
 {
     auto it = std::find_if(m_entities.begin(), m_entities.end(),
                            [&name](const std::unique_ptr<Entity>& entity) {
@@ -468,7 +353,7 @@ Entity *WorldScene::findEntityByName(const std::string &name)
     return (it != m_entities.end()) ? it->get() : nullptr;
 }
 
-void WorldScene::loadMap(const std::string &filename)
+void WorldScene::loadBSP(const std::string &filename)
 {
     Q3BSPAsset bsp;
     
@@ -478,6 +363,18 @@ void WorldScene::loadMap(const std::string &filename)
     
     g_mesh.initFromBsp(&bsp);
     g_collision.initFromBsp(&bsp);
+}
+
+void WorldScene::queueComponentDestruction(Component* component) {
+    m_componentsToDestroy.push_back(component);
+}
+
+void WorldScene::queueEntityDestruction(Entity* entity)
+{
+    // Проверяем, нет ли его уже в очереди
+    if (std::find(m_entitiesToDestroy.begin(), m_entitiesToDestroy.end(), entity) == m_entitiesToDestroy.end()) {
+        m_entitiesToDestroy.push_back(entity);
+    }
 }
 
 void WorldScene::registerComponent(Component *component)
@@ -556,33 +453,6 @@ void WorldScene::cleanupDeadEntities()
     
     for (Entity* entity : processingList)
     {
-        
-//        // 1. Обработка иерархии Unreal-style (остается прежней)
-//        TransformComponent* transform = entity->getTransform();
-//        if (transform)
-//        {
-//            // Вариант А: Уничтожаем детей вместе с родителем (Каскадное удаление)
-//            // Делаем копию вектора детей, так как их Destroy() изменит оригинальный вектор
-//            auto children = transform->getChildren();
-//            
-//            for (TransformComponent* childTransform : children)
-//            {
-//                childTransform->entity->destroy(); // Вызываем Destroy у дочерней Сущности
-//            }
-//            
-//            // Вариант Б: Если вы НЕ хотите удалять детей, а хотите просто "отвязать" их в мир:
-//            // transform->detachAllChildren();
-//            
-//            // Отвязываем сам удаляемый объект от его родителя
-//            transform->setParent(nullptr);
-//        }
-        
-        // 2. Важный момент: Мы НЕ трогаем списки обновлений здесь!
-        // Потому что на этом же кадре (чуть раньше или чуть позже) сработает метод
-        // CleanupDeadComponents(), который аккуратно вычистит все компоненты
-        // этой сущности из m_globalUpdatables, так как они были туда добавлены в Entity::Destroy().
-        
-        // 3. Физически удаляем только контейнер сущности
         m_entities.erase(std::remove_if(m_entities.begin(), m_entities.end(),
                                         [entity](const std::unique_ptr<Entity>& e) { return e.get() == entity; }),
                          m_entities.end()
@@ -624,4 +494,9 @@ void WorldScene::startSimulation(Viewport* viewport)
 void WorldScene::stopSimulation()
 {
     m_isSimulationMode = false;
+}
+
+void WorldScene::trace(HitResult &result, const glm::vec3 &start, const glm::vec3 &end, const glm::vec3 &mins, const glm::vec3 &maxs) const
+{
+    g_collision.trace(result, start, end, mins, maxs);
 }
