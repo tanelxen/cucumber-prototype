@@ -382,11 +382,11 @@ void RegisterAnimatorComponent(asIScriptEngine* engine)
     engine->RegisterObjectType("AnimatorComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
     
     // Регистрация методов очереди
-    engine->RegisterObjectMethod("AnimatorComponent", "void Play(const string &in, bool)",
-                                 asMETHODPR(AnimatorComponent, play, (const std::string&, bool), void), asCALL_THISCALL);
+    engine->RegisterObjectMethod("AnimatorComponent", "void Play(const string &in, bool, float = 0.0f)",
+                                 asMETHODPR(AnimatorComponent, play, (const std::string&, bool, float), void), asCALL_THISCALL);
     
-    engine->RegisterObjectMethod("AnimatorComponent", "void PlayQueue(const string &in, const string &in, bool)",
-                                 asMETHODPR(AnimatorComponent, playQueue, (const std::string&, const std::string&, bool), void), asCALL_THISCALL);
+    engine->RegisterObjectMethod("AnimatorComponent", "void PlayQueue(const string &in, const string &in, bool, float = 0.2f)",
+                                 asMETHODPR(AnimatorComponent, playQueue, (const std::string&, const std::string&, bool, float), void), asCALL_THISCALL);
     
     
     // Для Варианта А (коллбэки): регистрируем сигнатуру функции-делегата в AngelScript
@@ -433,7 +433,7 @@ void RegisterEntity(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Entity", "MovementComponent@ GetMovement()",
                                  asMETHOD(Entity, getComponent<MovementComponent>), asCALL_THISCALL);
     
-    engine->RegisterObjectMethod("Entity", "string GetName() const",
+    engine->RegisterObjectMethod("Entity", "const string& GetName() const",
                                  asMETHOD(Entity, GetName), asCALL_THISCALL);
 }
 

@@ -84,44 +84,60 @@ int AnimatorComponent::findClipIndex(const std::string& name) const
     return -1;
 }
 
-void AnimatorComponent::play(int clipIndex, bool once)
+void AnimatorComponent::play(int clipIndex, bool once, float blendTime)
 {
-    if (clipIndex >= 0 && clipIndex < m_clips.size())
+    if (clipIndex < 0 || clipIndex >= m_clips.size()) return;
+    
+    // Если мы уже проигрываем этот клип и он зациклен, повторно с блендингом его не запускаем
+    if (m_currentClipIndex == clipIndex && !m_isStopped && !once) return;
+    
+    // ЗАХВАТЫВАЕМ ТЕКУЩУЮ ПОЗУ ДЛЯ СТАРТА БЛЕНДИНГА
+    // Если анимация вообще еще ни разу не играла, sourcePose заполнится дефолтными значениями костей
+    if (m_skeleton)
     {
-        m_currentClipIndex = clipIndex;
-        m_currentTime = 0.0f;
-        m_isStopped = false;
-        m_isOnce = once;
+        m_sourcePose.translations = m_translations;
+        m_sourcePose.rotations = m_rotations;
+        m_sourcePose.scales = m_scales;
         
-        // При принудительном вызове play сбрасываем очередь
-        m_nextClipIndex = -1;
-        
-        // СБРОС ФЛАГОВ СОБЫТИЙ ДЛЯ НОВОГО КЛИПА
-        resetEvents(m_clips[m_currentClipIndex].get());
-        resetNotifies(m_currentClipIndex);
+        m_isBlending = (blendTime > 0.0f);
+        m_blendTimeTotal = blendTime;
+        m_blendTimeCurrent = 0.0f;
     }
+    
+    m_currentClipIndex = clipIndex;
+    m_currentTime = 0.0f;
+    m_isStopped = false;
+    m_isOnce = once;
+    
+    // При принудительном вызове play сбрасываем очередь
+    m_nextClipIndex = -1;
+    
+    // СБРОС ФЛАГОВ СОБЫТИЙ ДЛЯ НОВОГО КЛИПА
+    resetEvents(m_clips[m_currentClipIndex].get());
+    resetNotifies(m_currentClipIndex);
 }
 
-void AnimatorComponent::play(const std::string& clipName, bool once)
+void AnimatorComponent::play(const std::string& clipName, bool once, float blendTime)
 {
     int index = findClipIndex(clipName);
-    play(index, once);
+    play(index, once, blendTime);
 }
 
-void AnimatorComponent::playQueue(int currentClipIndex, int nextClipIndex, bool nextOnce)
+void AnimatorComponent::playQueue(int currentClipIndex, int nextClipIndex, bool nextOnce, float blendTime)
 {
-    if (currentClipIndex >= 0 && currentClipIndex < m_clips.size()) {
-        play(currentClipIndex, true); // Первый клип всегда играет один раз
+    if (currentClipIndex >= 0 && currentClipIndex < m_clips.size())
+    {
+        play(currentClipIndex, true, blendTime); // Первый клип всегда играет один раз
         m_nextClipIndex = nextClipIndex;
         m_nextClipOnce = nextOnce;
     }
 }
 
-void AnimatorComponent::playQueue(const std::string& currentClipName, const std::string& nextClipName, bool nextOnce)
+void AnimatorComponent::playQueue(const std::string& currentClipName, const std::string& nextClipName, bool nextOnce, float blendTime)
 {
     int currentIdx = findClipIndex(currentClipName);
     int nextIdx = findClipIndex(nextClipName);
-    playQueue(currentIdx, nextIdx, nextOnce);
+    playQueue(currentIdx, nextIdx, nextOnce, blendTime);
 }
 
 void AnimatorComponent::update(float dt)
@@ -130,6 +146,15 @@ void AnimatorComponent::update(float dt)
     
     auto clip = m_clips[m_currentClipIndex];
     float prevTime = m_currentTime; // Запоминаем время до обновления
+    
+    // Обновляем время блендинга, если он активен
+    if (m_isBlending)
+    {
+        m_blendTimeCurrent += dt;
+        if (m_blendTimeCurrent >= m_blendTimeTotal) {
+            m_isBlending = false; // Блендинг завершен, теперь идет чистая анимация
+        }
+    }
     
     if (clip->duration > 0.0f)
     {
@@ -144,6 +169,7 @@ void AnimatorComponent::update(float dt)
             {
                 int nextIdx = m_nextClipIndex;
                 bool nextOnce = m_nextClipOnce;
+                float blendT = m_nextClipBlendTime;
                 
                 // Сбрасываем очередь перед запуском, чтобы избежать зацикливания
                 m_nextClipIndex = -1;
@@ -310,7 +336,22 @@ void AnimatorComponent::update(float dt)
         }
     }
     
-    // 3. Расчет глобальных матриц и финальных матриц скиннинга
+    // 2. ЕСЛИ ИДЕТ БЛЕНДИНГ: Смешиваем полученную позу кадра с нашей стартовой sourcePose
+    if (m_isBlending && !m_sourcePose.translations.empty())
+    {
+        float blendFactor = m_blendTimeCurrent / m_blendTimeTotal;
+        blendFactor = glm::clamp(blendFactor, 0.0f, 1.0f); // Защита границ
+        
+        for (size_t i = 0; i < m_skeleton->bones.size(); ++i)
+        {
+            // Плавно интерполируем от сохраненного снимка к данным нового кадра
+            m_translations[i] = glm::mix(m_sourcePose.translations[i], m_translations[i], blendFactor);
+            m_rotations[i]    = glm::slerp(m_sourcePose.rotations[i], m_rotations[i], blendFactor);
+            m_scales[i]       = glm::mix(m_sourcePose.scales[i], m_scales[i], blendFactor);
+        }
+    }
+    
+    // 3. Расчет глобальных и финальных матриц скиннинга (Пункт без изменений)
     for (size_t i = 0; i < m_skeleton->bones.size(); ++i) {
         const auto& bone = m_skeleton->bones[i];
         

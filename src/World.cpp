@@ -78,7 +78,7 @@ WorldScene::~WorldScene() = default;
 
 void WorldScene::update(float dt)
 {
-    processPendingStarts();
+//    processPendingStarts();
     
     if (m_isSimulationMode)
     {
@@ -505,6 +505,12 @@ void WorldScene::startSimulation(Viewport* viewport)
     
     // 3. Запускаем логику симуляции (например, вызов функций Start у скриптов)
     // onSimulationStart();
+    
+    // FIXME: HACK
+    for (auto* component : m_globalWaitingForStart)
+    {
+        component->start();
+    }
 }
 
 void WorldScene::stopSimulation()

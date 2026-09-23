@@ -35,13 +35,13 @@ public:
     
     void setSkeleton(std::shared_ptr<Skeleton> skeleton);
     
-    // Существующий метод (добавим поиск по имени для удобства скриптов)
-    void play(int clipIndex, bool once = false);
-    void play(const std::string& clipName, bool once = false);
+    // Обычное проигрывание
+    void play(const std::string& clipName, bool once = false, float blendTime = 0.0f);
+    void play(int clipIndex, bool once = false, float blendTime = 0.0f);
     
-    // ВАРИАНТ Б: Метод для проигрывания очереди
-    void playQueue(const std::string& currentClipName, const std::string& nextClipName, bool nextOnce = false);
-    void playQueue(int currentClipIndex, int nextClipIndex, bool nextOnce = false);
+    // Метод для проигрывания очереди
+    void playQueue(const std::string& currentClipName, const std::string& nextClipName, bool nextOnce = false, float blendTime = 0.2f);
+    void playQueue(int currentClipIndex, int nextClipIndex, bool nextOnce = false, float blendTime = 0.2f);
     
     // Вспомогательный метод для поиска индекса клипа по имени
     int findClipIndex(const std::string& name) const;
@@ -98,6 +98,13 @@ public:
     std::string path;
 
 private:
+    // СТРУКТУРА ДЛЯ ХРАНЕНИЯ СНИМКА ПОЗЫ (Rest/Source Pose во время блендинга)
+    struct BlendPose {
+        std::vector<glm::vec3> translations;
+        std::vector<glm::quat> rotations;
+        std::vector<glm::vec3> scales;
+    };
+    
     std::shared_ptr<Skeleton> m_skeleton;
     
     float m_currentTime = 0.0f;
@@ -107,6 +114,13 @@ private:
     // Переменные для Очереди (Вариант Б)
     int m_nextClipIndex = -1;
     bool m_nextClipOnce = false;
+    float m_nextClipBlendTime = 0.2f;
+    
+    // ПЕРЕМЕННЫЕ ДЛЯ БЛЕНДИНГА
+    bool m_isBlending = false;
+    float m_blendTimeTotal = 0.0f;
+    float m_blendTimeCurrent = 0.0f;
+    BlendPose m_sourcePose; // Сюда зафиксируем позу костей в момент клика play()
     
     // Твои массивы трансформаций
     std::vector<glm::mat4> m_finalBoneMatrices;

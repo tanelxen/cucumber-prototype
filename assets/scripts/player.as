@@ -11,7 +11,7 @@ class Player : MonoBehaviour
 
     void start()
     {
-        print("Player spawned on entity: " + GetOwner().GetName());
+        print("Player started on entity: " + GetOwner().GetName());
     }
 
     void update(float dt)

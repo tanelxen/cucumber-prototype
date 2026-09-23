@@ -8,9 +8,11 @@ class WeaponMP40 : MonoBehaviour
 
     void start()
     {
+        print("WeaponMP40 started on entity: " + GetOwner().GetName());
+
         @anim = GetOwner().GetAnimator();
 
-        anim.Play("idle", false);
+        anim.Play("idle", false, 0.0f);
     }
 
     void update(float dt)
@@ -42,7 +44,7 @@ class WeaponMP40 : MonoBehaviour
 
         // ВИЗУАЛ: Запускаем анимацию выстрела в ЗАЦИКЛЕННОМ режиме (once = false)
         // Оружие начинает непрерывно воспроизводить цикл отдачи/работы затвора
-        anim.Play("attack", false); 
+        anim.Play("attack", false, 0.1f); 
         
         // Первый выстрел делаем мгновенно, без задержки
         executeLogicShot();
@@ -55,7 +57,7 @@ class WeaponMP40 : MonoBehaviour
         isFiring = false;
 
         // ВИЗУАЛ: Переключаемся обратно на зацикленный idle
-        anim.Play("idle", false);
+        anim.Play("idle", false, 0.2f);
     }
 
     void executeLogicShot()
