@@ -261,6 +261,16 @@ static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
             std::string path = compData.at("source_glb");
             ModelResource model = ModelLoader::LoadModel("assets/" + path);
             
+//            if (model.hasAnimations())
+//            {
+//                AnimationEvent magOut;
+//                magOut.time = 0.4f; // 0.4 секунды от начала
+//                magOut.name = "play_sound";
+//                magOut.paramString = "assets/audio/mag_out.wav";
+//                
+//                model.animations[4]->events.push_back(magOut);
+//            }
+            
             auto animComp = static_cast<AnimatorComponent*>(newComp);
             animComp->setSkeleton(model.skeleton);
             animComp->m_clips = model.animations;

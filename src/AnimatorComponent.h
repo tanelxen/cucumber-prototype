@@ -19,6 +19,14 @@ class Skeleton;
 
 class asIScriptFunction;
 
+// Событие которое мы млжем добавить из скриптов
+struct AnimationNotify
+{
+    float time;                       // Время триггера (например, 0.44f)
+    asIScriptFunction* callback = nullptr; // Какую функцию скрипта вызвать
+    bool hasFired = false;            // Флаг-предохранитель
+};
+
 class AnimatorComponent: public Component
 {
 public:
@@ -39,6 +47,13 @@ public:
     int findClipIndex(const std::string& name) const;
     
     const std::vector<glm::mat4>& getFinalBoneMatrices() const { return m_finalBoneMatrices; }
+    
+    
+    // МЕТОД ДЛЯ СКРИПТА (Аналог Unreal #exec MESH NOTIFY)
+    void addNotify(const std::string& clipName, float time, asIScriptFunction* callback);
+    
+    // Очистить все нотифаи для конкретного клипа (если нужно сбросить в рантайме)
+    void clearNotifies(const std::string& clipName);
     
 public:
     void update(float dt) override;
@@ -68,11 +83,11 @@ public:
             return clip->name == clipName;
         });
         
-        if (it != m_clips.end())
-        {
-            int index = static_cast<int>(it - m_clips.begin());
-            play(index);
-        }
+//        if (it != m_clips.end())
+//        {
+//            int index = static_cast<int>(it - m_clips.begin());
+//            play(index);
+//        }
     }
     
 public:
@@ -103,4 +118,15 @@ private:
 public:
     // Храним указатель на скриптовую функцию-коллбэк
     asIScriptFunction* m_onClipFinishedCallback = nullptr;
+    asIScriptFunction* onAnimEvent = nullptr;
+    
+private:
+    // Будем сбрасывать флаги событий при каждом запуске анимации
+    void resetEvents(AnimationClip* clip);
+    
+    // Чтобы не портить исходный shared_ptr ресурса AnimationClip (который шарится между всеми врагами),
+    // мы будем хранить нотифаи прямо в компоненте, привязав их к индексу клипа.
+    // int -> индекс клипа, vector -> список его кастомных нотифаев
+    std::unordered_map<int, std::vector<AnimationNotify>> m_customNotifies;
+    void resetNotifies(int clipIndex);
 };

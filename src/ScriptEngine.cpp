@@ -360,6 +360,11 @@ void RegisterTransformComponent(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRight()", asMETHOD(TransformComponent, getRight), asCALL_THISCALL); assert(r >= 0);
 }
 
+static void PlaySound(const std::string& path)
+{
+    AudioSystem::Get().PlaySound(path);
+}
+
 void RegisterAudioComponent(asIScriptEngine* engine)
 {
     // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
@@ -367,6 +372,8 @@ void RegisterAudioComponent(asIScriptEngine* engine)
     
     // Регистрируем метод получения AudioComponent у Entity
     engine->RegisterObjectMethod("AudioComponent", "void Play()", asMETHOD(AudioComponent, play), asCALL_THISCALL);
+    
+    engine->RegisterGlobalFunction("void PlaySound(const string &in)", asFUNCTION(PlaySound), asCALL_CDECL);
 }
 
 void RegisterAnimatorComponent(asIScriptEngine* engine)
@@ -385,6 +392,16 @@ void RegisterAnimatorComponent(asIScriptEngine* engine)
     // Для Варианта А (коллбэки): регистрируем сигнатуру функции-делегата в AngelScript
     engine->RegisterFuncdef("void OnClipFinishedCallback(const string &in)");
     engine->RegisterObjectProperty("AnimatorComponent", "OnClipFinishedCallback@ onClipFinished", asOFFSET(AnimatorComponent, m_onClipFinishedCallback));
+    
+    engine->RegisterFuncdef("void OnAnimEventCallback(const string &in eventName, const string &in eventParam)");
+    engine->RegisterObjectProperty("AnimatorComponent", "OnAnimEventCallback@ onAnimEvent", asOFFSET(AnimatorComponent, onAnimEvent));
+    
+    // Сигнатура функции, которая выполнится в момент нотифая
+    engine->RegisterFuncdef("void OnAnimNotify()");
+    
+    // Регистрация метода в компонент
+    engine->RegisterObjectMethod("AnimatorComponent", "void addNotify(const string &in clipName, float time, OnAnimNotify@ callback)",
+                                 asMETHOD(AnimatorComponent, addNotify), asCALL_THISCALL);
 }
 
 void RegisterMovementComponent(asIScriptEngine* engine)

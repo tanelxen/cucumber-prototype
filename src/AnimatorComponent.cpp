@@ -24,6 +24,12 @@ AnimatorComponent::~AnimatorComponent()
     if (m_onClipFinishedCallback) {
         m_onClipFinishedCallback->Release();
     }
+    
+    for (auto& pair : m_customNotifies) {
+        for (auto& notify : pair.second) {
+            if (notify.callback) notify.callback->Release();
+        }
+    }
 }
 
 void AnimatorComponent::setSkeleton(std::shared_ptr<Skeleton> skeleton)
@@ -89,6 +95,10 @@ void AnimatorComponent::play(int clipIndex, bool once)
         
         // При принудительном вызове play сбрасываем очередь
         m_nextClipIndex = -1;
+        
+        // СБРОС ФЛАГОВ СОБЫТИЙ ДЛЯ НОВОГО КЛИПА
+        resetEvents(m_clips[m_currentClipIndex].get());
+        resetNotifies(m_currentClipIndex);
     }
 }
 
@@ -119,6 +129,7 @@ void AnimatorComponent::update(float dt)
     if (m_isStopped || !m_skeleton || m_currentClipIndex < 0 || m_clips.empty()) return;
     
     auto clip = m_clips[m_currentClipIndex];
+    float prevTime = m_currentTime; // Запоминаем время до обновления
     
     if (clip->duration > 0.0f)
     {
@@ -180,6 +191,66 @@ void AnimatorComponent::update(float dt)
         }
     }
 
+    // ПРОВЕРКА ТАЙМЛАЙНА СОБЫТИЙ
+    for (auto& ev : clip->events)
+    {
+        // Условие 1: Если анимация идет обычно вперед
+        // Условие 2: Защита от пропуска кадра (время перешагнуло отметку события)
+        if (!ev.hasFired && m_currentTime >= ev.time && prevTime <= ev.time)
+        {
+            ev.hasFired = true;
+            
+            // Вызываем скриптовый коллбэк
+            if (onAnimEvent)
+            {
+                asIScriptEngine* engine = onAnimEvent->GetEngine();
+                asIScriptContext* ctx = asGetActiveContext();
+                bool isNested = true;
+                if (!ctx) { ctx = engine->RequestContext(); isNested = false; }
+                
+                ctx->Prepare(onAnimEvent);
+                ctx->SetArgObject(0, &ev.name);
+                ctx->SetArgObject(1, &ev.paramString);
+                ctx->Execute();
+                
+                if (!isNested) engine->ReturnContext(ctx);
+            }
+        }
+    }
+    
+    // ПРОВЕРКА ДИНАМИЧЕСКИХ НОТИФАЕВ ИЗ СКРИПТА
+    if (m_customNotifies.count(m_currentClipIndex))
+    {
+        auto& notifies = m_customNotifies[m_currentClipIndex];
+        for (auto& notify : notifies)
+        {
+            if (!notify.hasFired && m_currentTime >= notify.time && prevTime <= notify.time)
+            {
+                notify.hasFired = true;
+                
+                if (notify.callback)
+                {
+                    asIScriptEngine* engine = notify.callback->GetEngine();
+                    asIScriptContext* ctx = asGetActiveContext();
+                    bool isNested = true;
+                    if (!ctx) { ctx = engine->RequestContext(); isNested = false; }
+                    
+                    ctx->Prepare(notify.callback);
+                    // Функция вызывается без аргументов (или можно передать float time, если нужно)
+                    ctx->Execute();
+                    
+                    if (!isNested) engine->ReturnContext(ctx);
+                }
+            }
+        }
+    }
+    
+    // Если анимация зациклена и сбросилась в ноль (fmod), сбрасываем флаги событий для следующего круга
+    if (m_currentTime < prevTime && !m_isOnce)
+    {
+        resetEvents(clip.get());
+        resetNotifies(m_currentClipIndex);
+    }
     
     // Вспомогательная функция для поиска двух соседних кадров и фактора интерполяции
     auto getFramesAndFactor = [](const std::vector<float>& times, float animTime, int& p0, int& p1, float& factor) {
@@ -257,16 +328,40 @@ void AnimatorComponent::update(float dt)
     }
 }
 
-void AnimatorComponent::setClipFinishedCallback(asIScriptFunction* func)
+void AnimatorComponent::resetEvents(AnimationClip* clip)
 {
-    // Если уже был привязан коллбэк — освобождаем его
-    if (m_onClipFinishedCallback) {
-        m_onClipFinishedCallback->Release();
-        m_onClipFinishedCallback = nullptr;
+    if (!clip) return;
+    
+    for (auto& ev : clip->events) {
+        ev.hasFired = false;
+    }
+}
+
+void AnimatorComponent::addNotify(const std::string& clipName, float time, asIScriptFunction* callback)
+{
+    int clipIdx = findClipIndex(clipName);
+    if (clipIdx == -1) {
+        std::cerr << "[Animator] Ошибка addNotify: Анимация " << clipName << " не найдена!" << std::endl;
+        return;
     }
     
-    if (func) {
-        m_onClipFinishedCallback = func;
-        m_onClipFinishedCallback->AddRef(); // Заставляем скрипт держать её в памяти [1]
+    if (callback) {
+        callback->AddRef(); // Защищаем от сборщика мусора AngelScript
+        
+        AnimationNotify notify;
+        notify.time = time;
+        notify.callback = callback;
+        notify.hasFired = false;
+        
+        m_customNotifies[clipIdx].push_back(notify);
+    }
+}
+
+void AnimatorComponent::resetNotifies(int clipIndex)
+{
+    if (m_customNotifies.count(clipIndex)) {
+        for (auto& notify : m_customNotifies[clipIndex]) {
+            notify.hasFired = false;
+        }
     }
 }

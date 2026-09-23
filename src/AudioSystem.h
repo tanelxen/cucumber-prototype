@@ -36,6 +36,11 @@ public:
     
     ma_engine* GetEngine() { return &m_engine; }
     
+    void PlaySound(const std::string& path)
+    {
+        ma_engine_play_sound(&m_engine, path.c_str(), NULL);
+    }
+    
 private:
     AudioSystem() = default;
     ~AudioSystem() { Shutdown(); }

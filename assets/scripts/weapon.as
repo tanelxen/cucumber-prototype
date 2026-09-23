@@ -6,17 +6,49 @@ class Weapon : MonoBehaviour
 
     string effect = "Пыщ-Пыщ";
 
-    void Fire()
+    void start()
     {
-        print(effect);
-        
-        AudioComponent@ sound = GetOwner().GetAudio();
+        //print("Weapon spawned on entity: " + GetOwner().GetName());
 
-        if (sound != null)
+        AnimatorComponent@ animator = GetOwner().GetAnimator();
+
+        if (animator != null)
         {
-            sound.Play();
+            // Подписываемся на завершение анимации
+            @animator.onClipFinished = OnClipFinishedCallback(this.handleAnimationEnd);
+
+            animator.addNotify("reload", 0.0f, OnAnimNotify(this.PlayReloadSound));
+            animator.addNotify("attack", 0.0f, OnAnimNotify(this.PlayShotSound));
+        }
+    }
+
+    void update(float dt)
+    {
+        if (Input::GetLeftMouseButtonClicked())
+        {
+            Fire();
         }
 
+        if (Input::GetKeyDown(KeyCode::R))
+        {
+            Reload();
+        }
+    }
+
+    void PlayReloadSound()
+    {
+        //print("Звук перезарядки");
+        PlaySound("assets/sounds/mp40_reload.wav");
+    }
+
+    void PlayShotSound()
+    {
+        //print("Звук выстрела");
+        PlaySound("assets/sounds/mp40f1.wav");
+    }
+
+    void Fire()
+    {
         AnimatorComponent@ animator = GetOwner().GetAnimator();
 
         if (animator != null)
@@ -36,6 +68,21 @@ class Weapon : MonoBehaviour
             //animator.Play(4, true);
             //animator.PlayQueue("reload", "idle", false);
 
+            // Подписываемся на события таймлайна анимации
+            @animator.onAnimEvent = function(const string &in eventName, const string &in eventParam) {
+                print(eventName);
+
+                if (eventName == "play_sound") {
+                    // Вызываем твою аудио-систему miniaudio
+                    // eventParam содержит путь к файлу: "assets/audio/mag_click.wav"
+                    //AudioSystem::play(eventParam); 
+                }
+                if (eventName == "spawn_fx") {
+                    // Например, выброс гильзы или партикл
+                    //FXSystem::spawn(eventParam, this.getMuzzlePosition());
+                }
+            };
+
             animator.Play("reload", true);
             ammo = 0;
 
@@ -47,9 +94,6 @@ class Weapon : MonoBehaviour
                 }
             };
             */
-
-            // Подписываемся на завершение анимации
-            @animator.onClipFinished = OnClipFinishedCallback(this.handleAnimationEnd);
         }
     }
 
@@ -63,24 +107,6 @@ class Weapon : MonoBehaviour
             animator.Play("idle", false); // Возвращаемся в idle
 
             @animator.onClipFinished = null; // Отписываемся
-        }
-    }
-
-    void start()
-    {
-        print("Weapon spawned on entity: " + GetOwner().GetName());
-    }
-
-    void update(float dt)
-    {
-        if (Input::GetLeftMouseButtonClicked())
-        {
-            Fire();
-        }
-
-        if (Input::GetKeyDown(KeyCode::R))
-        {
-            Reload();
         }
     }
 }
