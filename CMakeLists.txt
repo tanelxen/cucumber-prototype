@@ -80,6 +80,8 @@ set(SRC_COMPONENTS
         src/ScriptComponent.h
         src/CameraComponent.cpp
         src/CameraComponent.h
+        src/MovementComponent.cpp
+        src/MovementComponent.h
 )
 
 set(SRC_RENDERER
@@ -97,6 +99,8 @@ set(SRC_RENDERER
         src/Shader.h
         src/ShaderVariant.cpp
         src/ShaderVariant.h
+        src/GizmoRender.cpp
+        src/GizmoRender.h
 )
 
 set(SRC_PANELS

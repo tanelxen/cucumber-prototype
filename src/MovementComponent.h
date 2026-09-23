@@ -27,6 +27,8 @@ public:
         
     }
     
+    void gizmo() override;
+    
     const std::string getTypeName() const override { return "MovementComponent"; }
     
     void update(float dt) override;

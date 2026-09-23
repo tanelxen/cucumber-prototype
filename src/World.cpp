@@ -14,6 +14,8 @@
 #include "Camera.h"
 
 #include "Grid.h"
+#include "GizmoRender.h"
+
 #include "ModelLoader.h"
 
 #include "Entity.h"
@@ -88,6 +90,11 @@ void WorldScene::update(float dt)
         }
     }
     
+    for (auto* component : m_globalUpdatables)
+    {
+        component->gizmo();
+    }
+    
     // 2. СНАЧАЛА зачищаем указатели «смертников» из систем обновлений Сцены
     cleanupDeadComponents();
     
@@ -139,11 +146,19 @@ void WorldScene::draw()
         g_sky.draw(camera->view, camera->projection);
     }
     
+    {
+        auto camera = m_pAttachedViewport->getCamera();
+        GizmoRender::Get().Flush(camera->view, camera->projection);
+    }
+    
     RenderDevice::commit(m_pAttachedViewport->getCamera());
+    
+
     
     m_pAttachedViewport->unbind();
     
     RenderDevice::endFrame();
+    GizmoRender::Get().Clear();
 }
 
 void WorldScene::selectEntityAtIndex(int index)

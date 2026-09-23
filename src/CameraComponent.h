@@ -32,4 +32,6 @@ struct CameraComponent : public Component
     }
     
     void update(float dt) override;
+    
+    void gizmo() override;
 };

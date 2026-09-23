@@ -29,6 +29,8 @@ public:
     virtual void start() {}
     virtual void update(float dt) {}
     
+    virtual void gizmo() {}
+    
     virtual void save(nlohmann::json& j) const = 0;
     virtual void load(const nlohmann::json& j) = 0;
     virtual const std::string getTypeName() const = 0;

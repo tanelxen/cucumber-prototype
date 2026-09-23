@@ -10,6 +10,8 @@
 #include "Entity.h"
 #include "World.h"
 
+#include "GizmoRender.h"
+
 #include "PhysicsCommon.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -60,6 +62,12 @@ static void clip_velocity(const glm::vec3& in, const glm::vec3& normal, glm::vec
 MovementComponent::MovementComponent() : Component(Flags::RequiresUpdate)
 {
     
+}
+
+void MovementComponent::gizmo()
+{
+    const glm::vec3& pos = owner->getTransform().getPosition();
+    GizmoRender::Get().DrawAABB(pos + Quake2OpenGL(player_mins), pos + Quake2OpenGL(player_maxs), { 1, 0, 0, 1 });
 }
 
 //void MovementComponent::setInput(float forward, float right, bool jump)

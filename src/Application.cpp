@@ -8,6 +8,8 @@
 #include "Application.h"
 
 #include "RenderDevice.h"
+#include "GizmoRender.h"
+
 #include "UIManager.h"
 #include "World.h"
 #include "Input.h"
@@ -63,6 +65,7 @@ Application::Application()
     glfwMakeContextCurrent(m_pWindow);
 
     RenderDevice::init();
+    GizmoRender::Get().Initialize();
     
     m_pScene = new WorldScene();
     
