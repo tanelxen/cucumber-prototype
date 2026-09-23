@@ -477,7 +477,9 @@ void RegisterInputSystem(asIScriptEngine* engine)
     r = engine->RegisterGlobalFunction("float GetMouseOffsetX()", asFUNCTION(Input::getMouseOffsetX), asCALL_CDECL); assert(r >= 0);
     r = engine->RegisterGlobalFunction("float GetMouseOffsetY()", asFUNCTION(Input::getMouseOffsetY), asCALL_CDECL); assert(r >= 0);
     
+    r = engine->RegisterGlobalFunction("bool GetLeftMouseButtonPressed()", asFUNCTION(Input::isLeftMouseButtonPressed), asCALL_CDECL); assert(r >= 0);
     r = engine->RegisterGlobalFunction("bool GetLeftMouseButtonClicked()", asFUNCTION(Input::isLeftMouseButtonClicked), asCALL_CDECL); assert(r >= 0);
+    
     r = engine->RegisterGlobalFunction("bool GetRightMouseButton()", asFUNCTION(Input::isRightMouseButtonPressed), asCALL_CDECL); assert(r >= 0);
     
     r = engine->RegisterGlobalFunction("void SetCursorEnabled(bool state)", asFUNCTION(Input::setCursorEnabled), asCALL_CDECL); assert(r >= 0);
