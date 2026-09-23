@@ -8,6 +8,7 @@
 #include "ScriptEngine.h"
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
+#include "AnimatorComponent.h"
 #include "TransformComponent.h"
 #include "MovementComponent.h"
 
@@ -103,6 +104,7 @@ void ScriptEngine::MessageCallback(const asSMessageInfo* msg, void* param)
 void RegisterMath(asIScriptEngine* engine);
 void RegisterTransformComponent(asIScriptEngine* engine);
 void RegisterAudioComponent(asIScriptEngine* engine);
+void RegisterAnimatorComponent(asIScriptEngine* engine);
 void RegisterMovementComponent(asIScriptEngine* engine);
 void RegisterEntity(asIScriptEngine* engine);
 
@@ -126,6 +128,7 @@ void ScriptEngine::RegisterEngineAPI()
     RegisterMath(m_asEngine);
     RegisterTransformComponent(m_asEngine);
     RegisterAudioComponent(m_asEngine);
+    RegisterAnimatorComponent(m_asEngine);
     RegisterMovementComponent(m_asEngine);
     
     RegisterEntity(m_asEngine);
@@ -362,9 +365,17 @@ void RegisterAudioComponent(asIScriptEngine* engine)
     // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
     engine->RegisterObjectType("AudioComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
     
-    // Регистрируем метод получения TransformComponent у Entity
-    engine->RegisterObjectMethod("AudioComponent", "void Play()",
-                                 asMETHOD(AudioComponent, play), asCALL_THISCALL);
+    // Регистрируем метод получения AudioComponent у Entity
+    engine->RegisterObjectMethod("AudioComponent", "void Play()", asMETHOD(AudioComponent, play), asCALL_THISCALL);
+}
+
+void RegisterAnimatorComponent(asIScriptEngine* engine)
+{
+    // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
+    engine->RegisterObjectType("AnimatorComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
+    
+    // Регистрируем метод получения AnimatorComponent у Entity
+    engine->RegisterObjectMethod("AnimatorComponent", "void Play(int index, bool once)", asMETHOD(AnimatorComponent, play), asCALL_THISCALL);
 }
 
 void RegisterMovementComponent(asIScriptEngine* engine)
@@ -390,6 +401,9 @@ void RegisterEntity(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Entity", "AudioComponent@ GetAudio()",
                                  asMETHOD(Entity, getComponent<AudioComponent>), asCALL_THISCALL);
     
+    engine->RegisterObjectMethod("Entity", "AnimatorComponent@ GetAnimator()",
+                                 asMETHOD(Entity, getComponent<AnimatorComponent>), asCALL_THISCALL);
+    
     engine->RegisterObjectMethod("Entity", "MovementComponent@ GetMovement()",
                                  asMETHOD(Entity, getComponent<MovementComponent>), asCALL_THISCALL);
     
@@ -409,6 +423,8 @@ void RegisterInputEnums(asIScriptEngine* engine)
     r = engine->RegisterEnumValue("KeyCode", "D",        68);  assert(r >= 0);
     r = engine->RegisterEnumValue("KeyCode", "W",        87);  assert(r >= 0);
     r = engine->RegisterEnumValue("KeyCode", "S",        83);  assert(r >= 0);
+    r = engine->RegisterEnumValue("KeyCode", "R",        82);  assert(r >= 0);
+    r = engine->RegisterEnumValue("KeyCode", "C",        67);  assert(r >= 0);
     r = engine->RegisterEnumValue("KeyCode", "Escape",   256); assert(r >= 0);
     
     // Аналогично для мыши
@@ -435,6 +451,7 @@ void RegisterInputSystem(asIScriptEngine* engine)
     r = engine->RegisterGlobalFunction("float GetMouseOffsetX()", asFUNCTION(Input::getMouseOffsetX), asCALL_CDECL); assert(r >= 0);
     r = engine->RegisterGlobalFunction("float GetMouseOffsetY()", asFUNCTION(Input::getMouseOffsetY), asCALL_CDECL); assert(r >= 0);
     
+    r = engine->RegisterGlobalFunction("bool GetLeftMouseButtonClicked()", asFUNCTION(Input::isLeftMouseButtonClicked), asCALL_CDECL); assert(r >= 0);
     r = engine->RegisterGlobalFunction("bool GetRightMouseButton()", asFUNCTION(Input::isRightMouseButtonPressed), asCALL_CDECL); assert(r >= 0);
     
     r = engine->RegisterGlobalFunction("void SetCursorEnabled(bool state)", asFUNCTION(Input::setCursorEnabled), asCALL_CDECL); assert(r >= 0);

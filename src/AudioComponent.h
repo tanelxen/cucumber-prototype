@@ -38,8 +38,7 @@ struct AudioComponent : public Component
         
         ma_uint32 flags = 0;
         
-        ma_result result = ma_sound_init_from_file(
-                                                   AudioSystem::Get().GetEngine(),
+        ma_result result = ma_sound_init_from_file(AudioSystem::Get().GetEngine(),
                                                    filePath.c_str(),
                                                    flags,
                                                    nullptr, // Группа микширования (опционально)
@@ -51,6 +50,9 @@ struct AudioComponent : public Component
             std::cerr << "Failed to load sound: " << filePath << std::endl;
             return;
         }
+        
+        // Временно отключаем пространственность
+        ma_sound_set_spatialization_enabled(&m_sound, false);
         
         m_isInitialized = true;
         

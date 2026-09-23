@@ -34,23 +34,26 @@ void AnimatorComponent::setSkeleton(std::shared_ptr<Skeleton> skeleton)
     }
 }
 
-void AnimatorComponent::play(int clipIndex)
+void AnimatorComponent::play(int clipIndex, bool once)
 {
     if (clipIndex >= 0 && clipIndex < m_clips.size())
     {
         m_currentClipIndex = clipIndex;
         m_currentTime = 0.0f;
+        m_isStopped = false;
+        m_isOnce = once;
     }
 }
 
 void AnimatorComponent::update(float dt)
 {
-    if (!m_skeleton || m_currentClipIndex < 0 || m_clips.empty()) return;
+    if (m_isStopped || !m_skeleton || m_currentClipIndex < 0 || m_clips.empty()) return;
 
     auto clip = m_clips[m_currentClipIndex];
     
     if (clip->duration > 0.0f)
     {
+        m_isStopped = m_isOnce && (m_currentTime + dt) >= clip->duration;
         m_currentTime = fmod(m_currentTime + dt, clip->duration);
     }
     

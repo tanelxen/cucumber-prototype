@@ -26,7 +26,7 @@ public:
     void setSkeleton(std::shared_ptr<Skeleton> skeleton);
 //    void addClip(const AnimationClip& clip) { m_clips.push_back(clip); }
     
-    void play(int clipIndex);
+    void play(int clipIndex, bool once = true);
     
     const std::vector<glm::mat4>& getFinalBoneMatrices() const { return m_finalBoneMatrices; }
     
@@ -76,4 +76,7 @@ private:
     // Финальный массив для отправки в шейдер
     std::vector<glm::mat4> m_finalBoneMatrices;
     std::vector<glm::mat4> m_globalTransforms;
+    
+    bool m_isOnce = true;
+    bool m_isStopped = false;
 };

@@ -15,6 +15,24 @@ class Weapon : MonoBehaviour
         {
             sound.Play();
         }
+
+        AnimatorComponent@ animator = GetOwner().GetAnimator();
+
+        if (animator != null)
+        {
+            animator.Play(1, true);
+        }
+    }
+
+    void Reload()
+    {
+        print("Reload");
+        AnimatorComponent@ animator = GetOwner().GetAnimator();
+
+        if (animator != null)
+        {
+            animator.Play(4, true);
+        }
     }
 
     void start()
@@ -24,5 +42,14 @@ class Weapon : MonoBehaviour
 
     void update(float dt)
     {
+        if (Input::GetLeftMouseButtonClicked())
+        {
+            Fire();
+        }
+
+        if (Input::GetKeyDown(KeyCode::R))
+        {
+            Reload();
+        }
     }
 }
