@@ -264,6 +264,7 @@ static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
             auto animComp = static_cast<AnimatorComponent*>(newComp);
             animComp->setSkeleton(model.skeleton);
             animComp->m_clips = model.animations;
+            animComp->path = path; // FIXME: HACK
         }
         else if (compName == "AudioComponent")
         {

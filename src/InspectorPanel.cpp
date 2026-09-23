@@ -139,6 +139,10 @@ static void RegisterUI()
                 comp->mesh = resource.mesh;
                 comp->materials = resource.embeddedMaterials;
                 
+                std::filesystem::path base_path("./assets");
+                auto rel_path = std::filesystem::relative(path, base_path);
+                comp->path = rel_path;
+                
                 if (resource.hasSkeleton())
                 {
                     auto animator = comp->owner->getComponent<AnimatorComponent>();
@@ -150,12 +154,8 @@ static void RegisterUI()
                     animator->setSkeleton(resource.skeleton);
                     animator->m_clips = resource.animations;
                     animator->m_currentClipIndex = -1;
+                    animator->path = rel_path;
                 }
-                
-                
-                std::filesystem::path base_path("./assets");
-                auto rel_path = std::filesystem::relative(path, base_path);
-                comp->path = rel_path;
             }
         }
         

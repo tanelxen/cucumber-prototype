@@ -374,8 +374,17 @@ void RegisterAnimatorComponent(asIScriptEngine* engine)
     // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
     engine->RegisterObjectType("AnimatorComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
     
-    // Регистрируем метод получения AnimatorComponent у Entity
-    engine->RegisterObjectMethod("AnimatorComponent", "void Play(int index, bool once)", asMETHOD(AnimatorComponent, play), asCALL_THISCALL);
+    // Регистрация методов очереди
+    engine->RegisterObjectMethod("AnimatorComponent", "void Play(const string &in, bool)",
+                                 asMETHODPR(AnimatorComponent, play, (const std::string&, bool), void), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("AnimatorComponent", "void PlayQueue(const string &in, const string &in, bool)",
+                                 asMETHODPR(AnimatorComponent, playQueue, (const std::string&, const std::string&, bool), void), asCALL_THISCALL);
+    
+    
+    // Для Варианта А (коллбэки): регистрируем сигнатуру функции-делегата в AngelScript
+    engine->RegisterFuncdef("void OnClipFinishedCallback(const string &in)");
+    engine->RegisterObjectProperty("AnimatorComponent", "OnClipFinishedCallback@ onClipFinished", asOFFSET(AnimatorComponent, m_onClipFinishedCallback));
 }
 
 void RegisterMovementComponent(asIScriptEngine* engine)
