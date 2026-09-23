@@ -28,9 +28,35 @@ void AnimatorComponent::setSkeleton(std::shared_ptr<Skeleton> skeleton)
         
         m_finalBoneMatrices.resize(count, glm::mat4(1.0f));
         m_globalTransforms.resize(count, glm::mat4(1.0f));
-        m_translations.resize(count, glm::vec3(0.0f));
-        m_rotations.resize(count, glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
-        m_scales.resize(count, glm::vec3(1.0f));
+        
+        m_translations.resize(count);
+        m_rotations.resize(count);
+        m_scales.resize(count);
+        
+        // Заполняем локальные буферы дефолтными трансформациями из glTF
+        for (size_t i = 0; i < count; ++i)
+        {
+            m_translations[i] = m_skeleton->bones[i].defaultTranslation;
+            m_rotations[i]    = m_skeleton->bones[i].defaultRotation;
+            m_scales[i]       = m_skeleton->bones[i].defaultScale;
+        }
+        
+        // Сразу принудительно рассчитываем матрицы скиннинга для T-позы/Rest позы
+        for (size_t i = 0; i < count; ++i) {
+            const auto& bone = m_skeleton->bones[i];
+            
+            glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), m_translations[i]) *
+            glm::mat4_cast(m_rotations[i]) *
+            glm::scale(glm::mat4(1.0f), m_scales[i]);
+            
+            if (bone.parentIndex >= 0) {
+                m_globalTransforms[i] = m_globalTransforms[bone.parentIndex] * localTransform;
+            } else {
+                m_globalTransforms[i] = localTransform;
+            }
+            
+            m_finalBoneMatrices[i] = m_globalTransforms[i] * bone.inverseBindMatrix;
+        }
     }
 }
 

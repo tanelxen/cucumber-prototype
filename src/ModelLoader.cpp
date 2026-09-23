@@ -112,8 +112,23 @@ static ModelResource ParseGLB(const std::string& filepath)
         
         for (cgltf_size i = 0; i < skin.joints_count; ++i) {
             cgltf_node* jointNode = skin.joints[i];
+            auto& bone = skeleton->bones[i];
+            
+            // 1. Родитель
             if (jointNode->parent && nodeToBoneIndex.count(jointNode->parent)) {
-                skeleton->bones[i].parentIndex = nodeToBoneIndex[jointNode->parent];
+                bone.parentIndex = nodeToBoneIndex[jointNode->parent];
+            }
+            
+            // 2. Чтение дефолтной локальной позы (Rest Pose)
+            if (jointNode->has_translation) {
+                bone.defaultTranslation = glm::vec3(jointNode->translation[0], jointNode->translation[1], jointNode->translation[2]);
+            }
+            if (jointNode->has_rotation) {
+                // glTF: [X, Y, Z, W] -> glm::quat: [W, X, Y, Z]
+                bone.defaultRotation = glm::quat(jointNode->rotation[3], jointNode->rotation[0], jointNode->rotation[1], jointNode->rotation[2]);
+            }
+            if (jointNode->has_scale) {
+                bone.defaultScale = glm::vec3(jointNode->scale[0], jointNode->scale[1], jointNode->scale[2]);
             }
         }
         
