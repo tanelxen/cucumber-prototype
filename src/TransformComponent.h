@@ -30,6 +30,8 @@ struct TransformComponent : public Component
     void setPosition(const glm::vec3& pos);
     glm::vec3 getPosition() const;
     
+    glm::vec3 getWorldPosition();
+    
     void setRotation(const glm::vec3& eulerDegrees);
     glm::vec3 getRotation() const;
     

@@ -406,3 +406,42 @@ void AnimatorComponent::resetNotifies(int clipIndex)
         }
     }
 }
+
+//glm::vec3 AnimatorComponent::getBoneWorldPosition(const std::string& boneName) const
+//{
+//    if (!m_skeleton) return glm::vec3(0.0f);
+//    
+//    // 1. Ищем индекс кости по имени в скелете
+//    int boneIndex = -1;
+//    for (size_t i = 0; i < m_skeleton->bones.size(); ++i) {
+//        if (m_skeleton->bones[i].name == boneName) {
+//            boneIndex = static_cast<int>(i);
+//            break;
+//        }
+//    }
+//    
+//    return getBoneWorldPosition(boneIndex);
+//}
+
+glm::vec3 AnimatorComponent::getBoneWorldPosition(int boneIndex) const
+{
+    if (!m_skeleton) return glm::vec3(0.0f);
+    
+    const glm::mat4& entityWorldMatrix = owner->getTransform().getWorldMatrix();
+    
+    // Если кость с таким именем не найдена, возвращаем позицию самого объекта
+    if (boneIndex == -1 || boneIndex >= m_globalTransforms.size()) {
+        std::cerr << "[Animator] Предупреждение getBoneWorldPosition: Кость " << boneIndex << " не найдена!" << std::endl;
+        return glm::vec3(entityWorldMatrix[3]); // 4-я колонка матрицы — это позиция объекта
+    }
+    
+    // 2. Получаем глобальную матрицу кости в пространстве модели
+    glm::mat4 boneMatrixInObjectSpace = m_globalTransforms[boneIndex];
+    
+    // 3. Перемножаем её с мировой матрицей сущности, чтобы получить мировую матрицу кости
+    glm::mat4 boneMatrixInWorldSpace = entityWorldMatrix * boneMatrixInObjectSpace;
+    
+    // Извлекаем позицию (сдвиг) из итоговой матрицы мира.
+    // В матрицах glm 4-я колонка (индекс 3) отвечает за translation: vec3(matrix[3])
+    return glm::vec3(boneMatrixInWorldSpace[3]);
+}

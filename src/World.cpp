@@ -41,6 +41,8 @@
 
 #include "PhysicsCommon.h"
 
+#include "SpriteRenderer.h"
+
 #include "../vendor/json.hpp"
 
 #include <iostream>
@@ -57,6 +59,8 @@ WorldScene::WorldScene()
     g_grid.init();
     g_sky.init();
     AudioSystem::Get().Initialize();
+    
+    SpriteRenderer::Init();
     
     if (ScriptEngine::get().init())
     {
@@ -153,7 +157,10 @@ void WorldScene::draw()
     
     RenderDevice::commit(m_pAttachedViewport->getCamera());
     
-
+    {
+        auto camera = m_pAttachedViewport->getCamera();
+        SpriteRenderer::Flush(camera->view, camera->projection);
+    }
     
     m_pAttachedViewport->unbind();
     

@@ -15,6 +15,8 @@
 #include "Entity.h"
 #include "Input.h"
 
+#include "SpriteRenderer.h"
+
 #include "World.h"
 
 #include <glm/glm.hpp>
@@ -109,6 +111,7 @@ void RegisterMovementComponent(asIScriptEngine* engine);
 void RegisterEntity(asIScriptEngine* engine);
 
 void RegisterInputSystem(asIScriptEngine* engine);
+void RegisterSpriteRenderer(asIScriptEngine* engine);
 
 void ScriptPrintCallback(const std::string& text)
 {
@@ -135,6 +138,7 @@ void ScriptEngine::RegisterEngineAPI()
     m_asEngine->RegisterGlobalFunction("ref@ _GetScript(Entity@, const string &in)", asFUNCTION(GetScriptOnEntity), asCALL_CDECL);
     
     RegisterInputSystem(m_asEngine);
+    RegisterSpriteRenderer(m_asEngine);
 }
 
 bool ScriptEngine::CompileAllScripts(const std::string& scriptsFolder)
@@ -281,6 +285,14 @@ glm::vec3 Vec3MulVec3(const glm::vec3& v1, const glm::vec3& v2) { return v1 * v2
 glm::vec3& Vec3AddAssignVec3(const glm::vec3& v2, glm::vec3& v1) { v1 += v2; return v1; }
 glm::vec3& Vec3SubAssignVec3(const glm::vec3& v2, glm::vec3& v1) { v1 -= v2; return v1; }
 
+#include <random>
+static float RandomFloat(float min, float max)
+{
+    static std::mt19937 gen(std::random_device{}());
+    std::uniform_real_distribution<float> dis(min, max);
+    return dis(gen);
+}
+
 void RegisterMath(asIScriptEngine* engine)
 {
     int r;
@@ -336,6 +348,10 @@ void RegisterMath(asIScriptEngine* engine)
     // v1 -= v2
     r = engine->RegisterObjectMethod("Vector3", "Vector3& opSubAssign(const Vector3 &in)",
                                      asFUNCTION(Vec3SubAssignVec3), asCALL_CDECL_OBJLAST); assert(r >= 0);
+    
+    engine->SetDefaultNamespace("Math");
+    engine->RegisterGlobalFunction("float RandomFloat(float, float)", asFUNCTION(RandomFloat), asCALL_CDECL);
+    engine->SetDefaultNamespace("");
 }
 
 void RegisterTransformComponent(asIScriptEngine* engine)
@@ -349,6 +365,9 @@ void RegisterTransformComponent(asIScriptEngine* engine)
     // Регистрируем позицию как свойство "position"
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetPosition() const", asMETHOD(TransformComponent, getPosition), asCALL_THISCALL); assert(r >= 0);
     r = engine->RegisterObjectMethod("TransformComponent", "void SetPosition(const Vector3 &in)", asMETHOD(TransformComponent, setPosition), asCALL_THISCALL); assert(r >= 0);
+    
+    r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetWorldPosition() const",
+                                     asMETHOD(TransformComponent, getWorldPosition), asCALL_THISCALL); assert(r >= 0);
     
     // Скрываем кватернион! Регистрируем углы Эйлера как свойство "rotation"
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRotation() const", asMETHOD(TransformComponent, getRotation), asCALL_THISCALL); assert(r >= 0);
@@ -402,6 +421,12 @@ void RegisterAnimatorComponent(asIScriptEngine* engine)
     // Регистрация метода в компонент
     engine->RegisterObjectMethod("AnimatorComponent", "void addNotify(const string &in clipName, float time, OnAnimNotify@ callback)",
                                  asMETHOD(AnimatorComponent, addNotify), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("AnimatorComponent",
+                                 "Vector3 getBoneWorldPosition(int boneIndex) const",
+                                 asMETHOD(AnimatorComponent, getBoneWorldPosition),
+                                 asCALL_THISCALL);
+
 }
 
 void RegisterMovementComponent(asIScriptEngine* engine)
@@ -486,6 +511,14 @@ void RegisterInputSystem(asIScriptEngine* engine)
     
     // Сбрасываем пространство имен обратно в глобальное, чтобы не сломать регистрацию других систем
     r = engine->SetDefaultNamespace(""); assert(r >= 0);
+}
+
+void RegisterSpriteRenderer(asIScriptEngine* engine)
+{
+    engine->SetDefaultNamespace("SpriteRenderer");
+    engine->RegisterGlobalFunction("int preloadTexture(const string &in)", asFUNCTION(SpriteRenderer::PreloadTexture), asCALL_CDECL);
+    engine->RegisterGlobalFunction("void addBillboard(int, Vector3, float, float)", asFUNCTION(SpriteRenderer::AddBillboard), asCALL_CDECL);
+    engine->SetDefaultNamespace("");
 }
 
 static CScriptHandle GetScriptOnEntity(Entity* entity, const std::string& className)

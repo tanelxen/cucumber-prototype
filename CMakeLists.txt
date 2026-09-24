@@ -101,6 +101,8 @@ set(SRC_RENDERER
         src/ShaderVariant.h
         src/GizmoRender.cpp
         src/GizmoRender.h
+        src/SpriteRenderer.cpp
+        src/SpriteRenderer.h
 )
 
 set(SRC_PANELS

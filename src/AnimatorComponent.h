@@ -48,6 +48,8 @@ public:
     
     const std::vector<glm::mat4>& getFinalBoneMatrices() const { return m_finalBoneMatrices; }
     
+    glm::vec3 getBoneWorldPosition(int boneIndex) const;
+//    glm::vec3 getBoneWorldPosition(const std::string& boneName) const;
     
     // МЕТОД ДЛЯ СКРИПТА (Аналог Unreal #exec MESH NOTIFY)
     void addNotify(const std::string& clipName, float time, asIScriptFunction* callback);

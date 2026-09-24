@@ -143,6 +143,11 @@ glm::vec3 TransformComponent::getPosition() const
     return m_position;
 }
 
+glm::vec3 TransformComponent::getWorldPosition()
+{
+    return glm::vec3(getWorldMatrix()[3]);
+}
+
 void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
 {
     m_euler = eulerDegrees;
