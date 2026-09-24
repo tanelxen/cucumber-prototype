@@ -33,6 +33,16 @@ struct HitResult
     Entity* hitEntity = nullptr;
 };
 
+inline glm::vec3 OpenGL2Quake(const glm::vec3& in)
+{
+    return { in.x, -in.z, in.y };
+}
+
+inline glm::vec3 Quake2OpenGL(const glm::vec3& in)
+{
+    return { in.x, in.z, -in.y };
+}
+
 /*
 class ICharacterCollider {
 public:

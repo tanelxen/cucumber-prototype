@@ -71,7 +71,7 @@ class WeaponMP40 : MonoBehaviour
 
         // Чисто геймплейные действия: тратим патрон, считаем попадания
         //print("Логический выстрел! Наносим урон.");
-        PlaySound("assets/sounds/mp40f1.wav");
+        //PlaySound("assets/sounds/mp40f1.wav");
 
         //TransformComponent@ transform = GetTransform();
         //Vector3 position = transform.GetWorldPosition();
@@ -84,5 +84,18 @@ class WeaponMP40 : MonoBehaviour
         float randomScale = Math::RandomFloat(12.0f, 16.0f);
 
         SpriteRenderer::addBillboard(flashTextureId, muzzlePos, randomScale, randomRot);
+
+        
+        TransformComponent@ transform = GetTransform();
+        Vector3 position = transform.GetWorldPosition();
+        Vector3 forward = transform.GetRight();
+        RaycastResult hit;
+
+        if (Physics::Raycast(position, forward, 1024.0f, hit)) 
+        {
+            SpawnSparks(hit.point, hit.normal, 5);
+        }
+
+        //SpawnSparks(position + forward * 32.0f, Vector3(0, 1, 0), 30);
     }
 }

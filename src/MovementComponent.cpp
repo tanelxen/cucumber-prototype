@@ -45,16 +45,6 @@ enum movement_bits
     LAST_MOVEMENT_BIT
 };
 
-static glm::vec3 OpenGL2Quake(const glm::vec3& in)
-{
-    return { in.x, -in.z, in.y };
-}
-
-static glm::vec3 Quake2OpenGL(const glm::vec3& in)
-{
-    return { in.x, in.z, -in.y };
-}
-
 static bool noclip = false;
 
 static void clip_velocity(const glm::vec3& in, const glm::vec3& normal, glm::vec3& out, float overbounce);

@@ -42,6 +42,7 @@
 #include "PhysicsCommon.h"
 
 #include "SpriteRenderer.h"
+#include "ParticleSystem.h"
 
 #include "../vendor/json.hpp"
 
@@ -61,6 +62,7 @@ WorldScene::WorldScene()
     AudioSystem::Get().Initialize();
     
     SpriteRenderer::Init();
+    ParticleSystem::Init();
     
     if (ScriptEngine::get().init())
     {
@@ -98,6 +100,8 @@ void WorldScene::update(float dt)
     {
         component->gizmo();
     }
+    
+    ParticleSystem::Update(dt);
     
     // 2. СНАЧАЛА зачищаем указатели «смертников» из систем обновлений Сцены
     cleanupDeadComponents();

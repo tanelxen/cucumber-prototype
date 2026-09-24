@@ -103,6 +103,8 @@ set(SRC_RENDERER
         src/GizmoRender.h
         src/SpriteRenderer.cpp
         src/SpriteRenderer.h
+        src/ParticleSystem.cpp
+        src/ParticleSystem.h
 )
 
 set(SRC_PANELS

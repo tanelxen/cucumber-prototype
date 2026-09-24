@@ -16,6 +16,7 @@
 #include "Input.h"
 
 #include "SpriteRenderer.h"
+#include "ParticleSystem.h"
 
 #include "World.h"
 
@@ -112,6 +113,7 @@ void RegisterEntity(asIScriptEngine* engine);
 
 void RegisterInputSystem(asIScriptEngine* engine);
 void RegisterSpriteRenderer(asIScriptEngine* engine);
+void RegisterPhysics(asIScriptEngine* engine);
 
 void ScriptPrintCallback(const std::string& text)
 {
@@ -139,6 +141,7 @@ void ScriptEngine::RegisterEngineAPI()
     
     RegisterInputSystem(m_asEngine);
     RegisterSpriteRenderer(m_asEngine);
+    RegisterPhysics(m_asEngine);
 }
 
 bool ScriptEngine::CompileAllScripts(const std::string& scriptsFolder)
@@ -518,6 +521,59 @@ void RegisterSpriteRenderer(asIScriptEngine* engine)
     engine->SetDefaultNamespace("SpriteRenderer");
     engine->RegisterGlobalFunction("int preloadTexture(const string &in)", asFUNCTION(SpriteRenderer::PreloadTexture), asCALL_CDECL);
     engine->RegisterGlobalFunction("void addBillboard(int, Vector3, float, float)", asFUNCTION(SpriteRenderer::AddBillboard), asCALL_CDECL);
+    engine->SetDefaultNamespace("");
+    
+    // Регистрируем функцию в глобальном пространстве AngelScript
+    engine->RegisterGlobalFunction("void SpawnSparks(const Vector3 &in position, const Vector3 &in normal, int count)",
+                                   asFUNCTION(ParticleSystem::SpawnSparks),
+                                   asCALL_CDECL);
+}
+
+#include "PhysicsCommon.h"
+
+namespace {
+    struct RaycastResult
+    {
+        glm::vec3 point;
+        glm::vec3 normal;
+    };
+    
+    bool MakeRaycast(const glm::vec3& start, const glm::vec3& dir, float distance, RaycastResult& hit)
+    {
+        HitResult result;
+        result.endpos = { 0, 0, 0 };
+        result.normal = { 0, 1, 0 };
+        
+        g_currentScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0));
+        
+        hit.point = Quake2OpenGL(result.endpos);
+        hit.normal = Quake2OpenGL(result.normal);
+        
+        return result.fraction > 0.0f && result.fraction < 1.0f;
+    }
+}
+
+void RegisterPhysics(asIScriptEngine* engine)
+{
+    int r;
+    
+    // 1. Регистрируем тип RaycastResult
+    r = engine->RegisterObjectType("RaycastResult", sizeof(RaycastResult),
+                                   asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS); assert(r >= 0);
+    
+    // 2. Регистрируем свойства
+    r = engine->RegisterObjectProperty("RaycastResult", "Vector3 point", asOFFSET(RaycastResult, point)); assert(r >= 0);
+    r = engine->RegisterObjectProperty("RaycastResult", "Vector3 normal", asOFFSET(RaycastResult, normal)); assert(r >= 0);
+    
+    /*
+    // 3. Регистрируем конструкторы
+    r = engine->RegisterObjectBehaviour("RaycastResult", asBEHAVE_CONSTRUCT, "void f()",
+                                        asFUNCTION(+[](void* memory) { new(memory) RaycastResult(); }), asCALL_CDECL_OBJLAST); assert(r >= 0);
+     */
+    
+    engine->SetDefaultNamespace("Physics");
+    engine->RegisterGlobalFunction("bool Raycast(const Vector3 &in start, const Vector3 &in dir, float distance, RaycastResult &out hit)",
+                                   asFUNCTION(MakeRaycast), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 }
 
