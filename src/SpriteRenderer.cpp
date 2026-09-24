@@ -217,7 +217,7 @@ namespace SpriteRenderer {
         }
         
         int width, height, channels;
-        stbi_set_flip_vertically_on_load(true);
+//        stbi_set_flip_vertically_on_load(true);
         unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 4);
         
         if (!data) {
@@ -242,54 +242,6 @@ namespace SpriteRenderer {
         s_loadedTextures[filename] = textureId;
         return textureId;
     }
-    
-//    void AddBillboard(int textureId, glm::vec3 position, float scale, float zRot)
-//    {
-//        if (textureId <= 0) return;
-//        s_batches[textureId].textureId = textureId;
-//        s_batches[textureId].instances.push_back({ position, scale, zRot });
-//    }
-    
-//    void Flush(glm::mat4 view, glm::mat4 projection)
-//    {
-//        if (s_batches.empty()) return;
-//        
-//        // Настройка стейта под полупрозрачные эффекты / огонь
-//        glEnable(GL_BLEND);
-//        glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Аддитивное смешивание (черный цвет прозрачный) [3]
-//        glDepthMask(GL_FALSE);             // Вспышки не перекрывают друг друга по буферу глубины [3]
-//        
-//        s_shader->bind();
-//        s_shader->setUniform("view", view);
-//        s_shader->setUniform("projection", projection);
-//        
-//        glBindVertexArray(s_quadVAO);
-//        
-//        for (auto& [texId, batch] : s_batches)
-//        {
-//            if (batch.instances.empty()) continue;
-//            
-//            // Биндим текстуру этого батча
-//            glActiveTexture(GL_TEXTURE0);
-//            glBindTexture(GL_TEXTURE_2D, texId);
-//            
-//            // Загружаем массив данных инстансов в s_instanceVBO [3]
-//            glBindBuffer(GL_ARRAY_BUFFER, s_instanceVBO);
-//            glBufferSubData(GL_ARRAY_BUFFER, 0, batch.instances.size() * sizeof(BillboardInstance), batch.instances.data());
-//            
-//            // Отрисовываем весь батч за 1 Draw Call [3]
-//            glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, static_cast<GLsizei>(batch.instances.size()));
-//            
-//            batch.instances.clear();
-//        }
-//        
-//        // Возвращаем OpenGL стейт к стандарту движка
-//        glDepthMask(GL_TRUE);
-//        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//        glBindVertexArray(0);
-//        
-//        s_batches.clear();
-//    }
     
     void Shutdown()
     {

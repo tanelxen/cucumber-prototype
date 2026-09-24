@@ -43,6 +43,7 @@
 
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
+#include "DecalManager.h"
 
 #include "../vendor/json.hpp"
 
@@ -63,6 +64,7 @@ WorldScene::WorldScene()
     
     SpriteRenderer::Init();
     ParticleSystem::Init();
+    DecalManager::Init();
     
     if (ScriptEngine::get().init())
     {
@@ -102,6 +104,7 @@ void WorldScene::update(float dt)
     }
     
     ParticleSystem::Update(dt);
+    DecalManager::Update(dt);
     
     // 2. СНАЧАЛА зачищаем указатели «смертников» из систем обновлений Сцены
     cleanupDeadComponents();
@@ -165,6 +168,7 @@ void WorldScene::draw()
     {
         auto camera = m_pAttachedViewport->getCamera();
         SpriteRenderer::Flush(camera->view, camera->projection);
+        DecalManager::Flush(camera->view, camera->projection);
     }
     
     m_pAttachedViewport->unbind();

@@ -171,11 +171,11 @@ void ParticleSystem::SpawnDust(const glm::vec3& position, int count)
         
         p.type = ParticleType::Dust;
         p.active = true;
-        p.position = position + glm::vec3(RandomFloat(-0.1f, 0.1f), RandomFloat(-0.1f, 0.1f), RandomFloat(-0.1f, 0.1f));
-        p.maxLife = RandomFloat(0.8f, 2.0f);
+        p.position = position + glm::vec3(RandomFloat(-0.1f, 0.1f), RandomFloat(-0.1f, 0.1f), RandomFloat(-0.1f, 0.1f)) * 38.f;
+        p.maxLife = RandomFloat(2.0f, 3.0f);
         p.life = p.maxLife; // Пыль живет долго
-        p.size = RandomFloat(0.2f, 0.5f) * 80.f;
-        p.velocity = glm::vec3(RandomFloat(-0.2f, 0.2f) * 38.0f, RandomFloat(0.1f, 0.4f) * 38.0f, RandomFloat(-0.2f, 0.2f) * 38.0f);
+        p.size = RandomFloat(0.2f, 0.5f) * 96.f;
+        p.velocity = glm::vec3(RandomFloat(-0.2f, 0.2f), RandomFloat(0.1f, 0.4f), RandomFloat(-0.2f, 0.2f)) * 38.f;
     }
 }
 

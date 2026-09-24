@@ -8,6 +8,7 @@ class WeaponMP40 : MonoBehaviour
     private float fireTimer = 0.0f;
 
     private int flashTextureId = 0;
+    private int bulletHoleTexId = 0;
 
     void start()
     {
@@ -18,6 +19,7 @@ class WeaponMP40 : MonoBehaviour
         anim.Play("idle", false, 0.0f);
 
         flashTextureId = SpriteRenderer::preloadTexture("assets/textures/muzzle_flash.png");
+        bulletHoleTexId = SpriteRenderer::preloadTexture("assets/textures/bullet_hole.png");
     }
 
     void update(float dt)
@@ -69,14 +71,7 @@ class WeaponMP40 : MonoBehaviour
     {
         fireTimer = fireInterval; // Сброс таймера
 
-        // Чисто геймплейные действия: тратим патрон, считаем попадания
-        //print("Логический выстрел! Наносим урон.");
-        //PlaySound("assets/sounds/mp40f1.wav");
-
-        //TransformComponent@ transform = GetTransform();
-        //Vector3 position = transform.GetWorldPosition();
-        //Vector3 forward = transform.GetRight();
-        //Vector3 muzzleWorldPos = position + forward * 32.0f;
+        PlaySound("assets/sounds/mp40f1.wav");
 
         Vector3 muzzlePos = anim.getBoneWorldPosition(boneIndex);
 
@@ -84,7 +79,7 @@ class WeaponMP40 : MonoBehaviour
         float randomScale = Math::RandomFloat(12.0f, 16.0f);
 
         SpriteRenderer::AddBillboard(flashTextureId, muzzlePos, randomScale, randomRot);
-        SpawnSmoke(muzzlePos, 3);
+        SpawnSmoke(muzzlePos, 1);
 
         
         TransformComponent@ transform = GetTransform();
@@ -98,8 +93,9 @@ class WeaponMP40 : MonoBehaviour
 
             SpawnSparks(hit.point, hit.normal, 5);
             SpawnDust(hit.point, 5);
-        }
 
-        //SpawnSparks(position + forward * 32.0f, Vector3(0, 1, 0), 30);
+            float randomScale = Math::RandomFloat(4.0f, 8.0f);
+            DecalManager::AddDecal(bulletHoleTexId, hit.point, hit.normal, randomScale, 60.0f);
+        }
     }
 }
