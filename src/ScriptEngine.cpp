@@ -516,17 +516,56 @@ void RegisterInputSystem(asIScriptEngine* engine)
     r = engine->SetDefaultNamespace(""); assert(r >= 0);
 }
 
+static void AddBillboardShort(int textureId, glm::vec3 position, float scale, float zRot)
+{
+    SpriteRenderer::AddBillboard(textureId, position, scale, zRot);
+}
+
 void RegisterSpriteRenderer(asIScriptEngine* engine)
 {
+    // 1. Регистрируем тип Vector3 (сопоставляем с glm::vec3)
+    engine->RegisterObjectType("Color", sizeof(glm::vec4),
+                                   asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS);
+    
+    // 2. Регистрируем свойства (поля x, y, z)
+    engine->RegisterObjectProperty("Color", "float r", asOFFSET(glm::vec4, x));
+    engine->RegisterObjectProperty("Color", "float g", asOFFSET(glm::vec4, y));
+    engine->RegisterObjectProperty("Color", "float b", asOFFSET(glm::vec4, z));
+    engine->RegisterObjectProperty("Color", "float a", asOFFSET(glm::vec4, w));
+    
+    // 3. Регистрируем конструкторы
+    // Стандартный конструктор Vector3()
+    engine->RegisterObjectBehaviour("Color", asBEHAVE_CONSTRUCT, "void f()",
+                                    asFUNCTION(+[](void* memory) { new(memory) glm::vec4(1.0f); }), asCALL_CDECL_OBJLAST);
+    
+    // Конструктор с параметрами Vector3(x, y, z)
+    engine->RegisterObjectBehaviour("Color", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)",
+                                    asFUNCTION(+[](float r, float g, float b, float a, void* memory) { new(memory) glm::vec4(r, g, b, a); }), asCALL_CDECL_OBJLAST);
+
+    
+    
     engine->SetDefaultNamespace("SpriteRenderer");
     engine->RegisterGlobalFunction("int preloadTexture(const string &in)", asFUNCTION(SpriteRenderer::PreloadTexture), asCALL_CDECL);
-    engine->RegisterGlobalFunction("void addBillboard(int, Vector3, float, float)", asFUNCTION(SpriteRenderer::AddBillboard), asCALL_CDECL);
+    engine->RegisterGlobalFunction("void AddBillboard(int, Vector3, float, float)", asFUNCTION(AddBillboardShort), asCALL_CDECL);
     engine->SetDefaultNamespace("");
     
     // Регистрируем функцию в глобальном пространстве AngelScript
     engine->RegisterGlobalFunction("void SpawnSparks(const Vector3 &in position, const Vector3 &in normal, int count)",
                                    asFUNCTION(ParticleSystem::SpawnSparks),
                                    asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void SpawnBlood(const Vector3 &in position, const Vector3 &in normal, int count)",
+                                   asFUNCTION(ParticleSystem::SpawnBlood), asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void SpawnDust(const Vector3 &in position, int count)",
+                                   asFUNCTION(ParticleSystem::SpawnDust), asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void SpawnSmoke(const Vector3 &in position, int count)",
+                                   asFUNCTION(ParticleSystem::SpawnSmoke), asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void SpawnTracer(const Vector3 &in start, const Vector3 &in end)",
+                                   asFUNCTION(ParticleSystem::SpawnTracer), asCALL_CDECL);
+
 }
 
 #include "PhysicsCommon.h"

@@ -83,7 +83,8 @@ class WeaponMP40 : MonoBehaviour
         float randomRot = Math::RandomFloat(0.0f, 6.28f);
         float randomScale = Math::RandomFloat(12.0f, 16.0f);
 
-        SpriteRenderer::addBillboard(flashTextureId, muzzlePos, randomScale, randomRot);
+        SpriteRenderer::AddBillboard(flashTextureId, muzzlePos, randomScale, randomRot);
+        SpawnSmoke(muzzlePos, 3);
 
         
         TransformComponent@ transform = GetTransform();
@@ -93,7 +94,10 @@ class WeaponMP40 : MonoBehaviour
 
         if (Physics::Raycast(position, forward, 1024.0f, hit)) 
         {
+            SpawnTracer(muzzlePos, hit.point);
+
             SpawnSparks(hit.point, hit.normal, 5);
+            SpawnDust(hit.point, 5);
         }
 
         //SpawnSparks(position + forward * 32.0f, Vector3(0, 1, 0), 30);

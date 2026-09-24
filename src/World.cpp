@@ -154,6 +154,7 @@ void WorldScene::draw()
         g_sky.draw(camera->view, camera->projection);
     }
     
+    if (!m_isSimulationMode)
     {
         auto camera = m_pAttachedViewport->getCamera();
         GizmoRender::Get().Flush(camera->view, camera->projection);

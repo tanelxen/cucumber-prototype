@@ -119,8 +119,11 @@ void ViewportPanel::draw()
         ImGui::SetWindowFocus();
     }
     
-    auto camera = m_viewport->getCamera();
-    DrawGizmo(m_entity, camera->view, camera->projection, contentPos, contentSize);
+    if (g_currentScene->m_isSimulationMode == false)
+    {
+        auto camera = m_viewport->getCamera();
+        DrawGizmo(m_entity, camera->view, camera->projection, contentPos, contentSize);
+    }
     
     ImGui::End();
     ImGui::PopStyleVar();

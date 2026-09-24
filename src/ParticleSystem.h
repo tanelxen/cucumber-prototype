@@ -12,24 +12,17 @@
 
 namespace ParticleSystem {
     
-    struct Particle {
-        glm::vec3 position     = glm::vec3(0.0f);
-        glm::vec3 velocity     = glm::vec3(0.0f);
-        glm::vec4 color          = glm::vec4(1.0f); // Для плавного затухания
-        float size             = 1.0f;
-        float life             = 0.0f;            // Сколько осталось жить (в секундах)
-        float maxLife          = 1.0f;
-        bool active            = false;
-    };
-    
     // Инициализация (загрузка текстур)
     void Init();
     
     // Обновление всех частиц (гравитация, скорость, время жизни)
     void Update(float dt);
     
-    // Главный метод для вызова из AngelScript: спавнит фонтан искр в точке
     void SpawnSparks(const glm::vec3& position, const glm::vec3& normal, int count);
+    void SpawnBlood(const glm::vec3& position, const glm::vec3& normal, int count);
+    void SpawnDust(const glm::vec3& position, int count);
+    void SpawnSmoke(const glm::vec3& position, int count);
+    void SpawnTracer(const glm::vec3& start, const glm::vec3& end);
     
     void Shutdown();
 }
