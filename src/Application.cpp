@@ -17,6 +17,8 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <imgui.h>
+
 #include <stdio.h>
 #include <thread>
 
@@ -176,8 +178,16 @@ void Application::updateInputState()
 
 void Application::setCursorEnabled(bool state)
 {
-    if(currentInstance)
+    if(currentInstance == nullptr) return;
+    
+    if (state)
     {
-        glfwSetInputMode(currentInstance->m_pWindow, GLFW_CURSOR, state ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+        ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+        glfwSetInputMode(currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+    else
+    {
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+        glfwSetInputMode(currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 }
