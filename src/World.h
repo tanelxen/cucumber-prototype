@@ -16,6 +16,7 @@ class Viewport;
 
 class Entity;
 class Component;
+class UID;
 
 class WorldScene
 {
@@ -48,6 +49,7 @@ public:
     std::vector<std::unique_ptr<Entity>> m_entities;
     
     Entity* findEntityByName(const std::string& name);
+    Entity* findEntityByUID(const UID& uid);
     
     bool m_drawGrid = true;
     bool m_drawSkybox = true;

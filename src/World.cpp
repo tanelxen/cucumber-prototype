@@ -373,6 +373,16 @@ void WorldScene::load(const std::string& filename)
             }
         }
     }
+    
+    for (auto& entity : m_entities)
+    {
+        auto scripts = entity->getComponents<ScriptComponent>();
+        
+        for (auto& script : scripts)
+        {
+            script->loadStateSnapshot();
+        }
+    }
 }
 
 Entity* WorldScene::findEntityByName(const std::string &name)
@@ -380,6 +390,16 @@ Entity* WorldScene::findEntityByName(const std::string &name)
     auto it = std::find_if(m_entities.begin(), m_entities.end(),
                            [&name](const std::unique_ptr<Entity>& entity) {
         return entity && entity->m_name == name;
+    });
+    
+    return (it != m_entities.end()) ? it->get() : nullptr;
+}
+
+Entity* WorldScene::findEntityByUID(const UID& uid)
+{
+    auto it = std::find_if(m_entities.begin(), m_entities.end(),
+                           [&uid](const std::unique_ptr<Entity>& entity) {
+        return entity && entity->uid == uid;
     });
     
     return (it != m_entities.end()) ? it->get() : nullptr;

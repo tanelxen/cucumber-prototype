@@ -1,0 +1,211 @@
+{
+    "entities": [
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            -254.7406463623047,
+                            128.19265747070313,
+                            -731.1633911132813
+                        ],
+                        "rotation": [
+                            0.0,
+                            -46.625267028808594,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": null,
+                    "type": "MovementComponent"
+                },
+                {
+                    "data": {
+                        "className": "Player",
+                        "fields": {
+                            "headTransform": {
+                                "owner": "uid://oro2ef1gi7si",
+                                "type": "TransformComponent"
+                            },
+                            "mouse_speed": 8.0,
+                            "move_speed": 400.0
+                        }
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Player",
+            "parent": "uid://<invalid>",
+            "uid": "uid://favu1um0rhq6e"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            64.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            -12.088554382324219,
+                            0.0,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": null,
+                    "type": "CameraComponent"
+                }
+            ],
+            "name": "Head",
+            "parent": "uid://favu1um0rhq6e",
+            "uid": "uid://oro2ef1gi7si"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            0.0,
+                            -1.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            90.0,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/v_mp40.glb"
+                    },
+                    "type": "MeshComponent"
+                },
+                {
+                    "data": {
+                        "clip": "idle",
+                        "source_glb": "meshes/gltf/v_mp40.glb"
+                    },
+                    "type": "AnimatorComponent"
+                },
+                {
+                    "data": {
+                        "className": "WeaponMP40",
+                        "fields": {
+                            "boneIndex": 5,
+                            "fireInterval": 0.10000000149011612
+                        }
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Weapon",
+            "parent": "uid://oro2ef1gi7si",
+            "uid": "uid://eg10jwxm6txt2"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            -133.6999969482422,
+                            128.0,
+                            -800.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            -56.900001525878906,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/hl_zombie.glb"
+                    },
+                    "type": "MeshComponent"
+                },
+                {
+                    "data": {
+                        "clip": "idle1",
+                        "source_glb": "meshes/gltf/hl_zombie.glb"
+                    },
+                    "type": "AnimatorComponent"
+                }
+            ],
+            "name": "Zombie",
+            "parent": "uid://<invalid>",
+            "uid": "uid://htan0lx8hfj1x"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            -141.10000610351563,
+                            153.52244567871094,
+                            -900.0
+                        ],
+                        "rotation": [
+                            180.0,
+                            59.999996185302734,
+                            180.0
+                        ],
+                        "scale": [
+                            1.0,
+                            0.9999999403953552,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/rtcw_zombie.glb"
+                    },
+                    "type": "MeshComponent"
+                },
+                {
+                    "data": {
+                        "clip": "alert_idle",
+                        "source_glb": "meshes/gltf/rtcw_zombie.glb"
+                    },
+                    "type": "AnimatorComponent"
+                }
+            ],
+            "name": "Zombie2",
+            "parent": "uid://<invalid>",
+            "uid": "uid://bxmn1jue3dtsc"
+        }
+    ],
+    "name": "test"
+}

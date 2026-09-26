@@ -9,6 +9,7 @@
 #include "ScriptEngine.h"
 
 #include "TransformComponent.h"
+#include "World.h"
 
 #include <imgui.h>
 #include <iostream>
@@ -226,13 +227,25 @@ void ScriptComponent::drawProperties()
                 void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
                 void* currentActualPtr = *ptrToHandle;
                 
-                // Определяем, пустая ли ссылка (null) или там что-то есть
                 std::string buttonText = "None (" + typeName + ")";
                 
-                if (currentActualPtr != nullptr) {
+                if (currentActualPtr != nullptr)
+                {
                     // Если это C++ компонент, мы можем вытащить имя его Entity
                     // Если это скрипт, через UserData достаем ScriptComponent и его Entity
-                    buttonText = "Linked " + typeName; // Тут можно выводить имя GameObject для красоты
+                    
+                    if (typeName == "TransformComponent")
+                    {
+                        TransformComponent* comp = static_cast<TransformComponent*>(currentActualPtr);
+                        
+                        if (comp && comp->owner) {
+                            buttonText = comp->owner->m_name + "." + typeName;
+                        }
+                    }
+                    else
+                    {
+                        buttonText = "Linked " + typeName;
+                    }
                 }
                 
                 ImGui::Text("%s", propName);
@@ -310,8 +323,6 @@ void ScriptComponent::drawProperties()
         
         ImGui::TreePop();
     }
-    
-    
 }
 
 void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
@@ -323,29 +334,58 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
     for (asUINT i = 0; i < type->GetPropertyCount(); i++)
     {
         const char* propName;
-        int typeId;
+        int propTypeId;
         bool isPrivate;
-        type->GetProperty(i, &propName, &typeId, &isPrivate);
+        type->GetProperty(i, &propName, &propTypeId, &isPrivate);
         
         if (isPrivate) continue; // Пропускаем приватные поля
         
         void* varPtr = m_ScriptObject->GetAddressOfProperty(i);
         
-        if (typeId == asTYPEID_FLOAT) {
+        if (propTypeId == asTYPEID_FLOAT)
+        {
             snapshot[propName] = *static_cast<float*>(varPtr);
         }
-        else if (typeId == asTYPEID_INT32) {
+        else if (propTypeId == asTYPEID_INT32)
+        {
             snapshot[propName] = *static_cast<int*>(varPtr);
         }
-        else if (typeId == asTYPEID_BOOL) {
+        else if (propTypeId == asTYPEID_BOOL)
+        {
             snapshot[propName] = *static_cast<bool*>(varPtr);
         }
-        else if (typeId == ScriptEngine::get().GetRawEngine()->GetTypeIdByDecl("string")) {
+        else if (propTypeId == ScriptEngine::get().GetRawEngine()->GetTypeIdByDecl("string"))
+        {
             snapshot[propName] = *static_cast<std::string*>(varPtr);
         }
+        else if (propTypeId & asTYPEID_OBJHANDLE)
+        {
+            // Получаем тип, на который указывает ссылка (например, TransformComponent или Player)
+            asITypeInfo* propTypeInfo = ScriptEngine::get().GetRawEngine()->GetTypeInfoById(propTypeId);
+            if (propTypeInfo == nullptr) continue;
+            
+            std::string typeName = propTypeInfo->GetName();
+            
+            // Получаем текущее значение указателя, сохраненное в скрипте
+            void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
+            void* currentActualPtr = *ptrToHandle;
+            
+            if (currentActualPtr == nullptr) continue;
+            
+            if (typeName == "TransformComponent")
+            {
+                TransformComponent* comp = static_cast<TransformComponent*>(currentActualPtr);
+                
+                if (comp && comp->owner)
+                {
+                    snapshot[propName] = {
+                        {"type", typeName},
+                        {"owner", comp->owner->uid}
+                    };
+                }
+            }
+        }
     }
-    
-    return snapshot;
 }
 
 void ScriptComponent::saveStateSnapshot()
@@ -367,29 +407,105 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
     if (!m_ScriptObject || snapshot.empty()) return;
     
     asITypeInfo* type = m_ScriptObject->GetObjectType();
+    asIScriptEngine* engine = m_ScriptObject->GetEngine();
     
     for (asUINT i = 0; i < type->GetPropertyCount(); i++)
     {
         const char* propName;
-        int typeId;
+        int propTypeId;
         bool isPrivate;
-        type->GetProperty(i, &propName, &typeId, &isPrivate);
+        type->GetProperty(i, &propName, &propTypeId, &isPrivate);
         
         if (isPrivate || !snapshot.contains(propName)) continue;
         
+        // Получаем адрес, где лежит свойство
         void* varPtr = m_ScriptObject->GetAddressOfProperty(i);
         
-        if (typeId == asTYPEID_FLOAT) {
+        if (propTypeId == asTYPEID_FLOAT)
+        {
             *static_cast<float*>(varPtr) = snapshot[propName].get<float>();
         }
-        else if (typeId == asTYPEID_INT32) {
+        else if (propTypeId == asTYPEID_INT32)
+        {
             *static_cast<int*>(varPtr) = snapshot[propName].get<int>();
         }
-        else if (typeId == asTYPEID_BOOL) {
+        else if (propTypeId == asTYPEID_BOOL)
+        {
             *static_cast<bool*>(varPtr) = snapshot[propName].get<bool>();
         }
-        else if (typeId == ScriptEngine::get().GetRawEngine()->GetTypeIdByDecl("string")) {
+        else if (propTypeId == engine->GetTypeIdByDecl("string"))
+        {
             *static_cast<std::string*>(varPtr) = snapshot[propName].get<std::string>();
+        }
+        else if (propTypeId & asTYPEID_OBJHANDLE)
+        {
+            auto& propData = snapshot[propName];
+            
+            if (!propData.contains("type") || !propData.contains("owner")) continue;
+            
+            UID ownerUID = propData["owner"].get<std::string>();
+            std::string componentTypeName = propData["type"].get<std::string>();
+            
+            Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+            
+            if (entity)
+            {
+                void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
+                
+                if (componentTypeName == "TransformComponent")
+                {
+                    TransformComponent* comp = entity->getComponent<TransformComponent>();
+                    if (comp) {
+                        // Записываем C++ указатель напрямую в память AngelScript
+                        // ВАЖНО: так как тип зарегистрирован как asOBJ_NOCOUNT, мы просто копируем адрес
+                        *ptrToHandle = comp;
+                    }
+                }
+            }
+            
+            
+            // 1. Очищаем бит хэндла, чтобы GetTypeInfoById понял, о каком классе речь
+            int actualTypeId = propTypeId & ~asTYPEID_OBJHANDLE;
+            
+            asITypeInfo* typeInfo = engine->GetTypeInfoById(actualTypeId);
+            if (typeInfo)
+            {
+                asQWORD flags = typeInfo->GetFlags();
+                
+                // 2. Так как это хэндл (@), varPtr хранит указатель на указатель (void**).
+                // Достаем сам фактический адрес объекта:
+                void* actualObjPtr = *static_cast<void**>(varPtr);
+                
+                if (actualObjPtr == nullptr) {
+                    // Хэндл не инициализирован (равен null в скрипте)
+                    continue;
+                }
+                
+                // 3. Проверяем флаги типа
+                if (flags & asOBJ_SCRIPT_OBJECT)
+                {
+                    // Это внутренний скриптовый класс. Работать как с C++ классом нельзя!
+                    asIScriptObject* scriptObj = static_cast<asIScriptObject*>(actualObjPtr);
+                    // ... обработка скриптового объекта ...
+                }
+                else if (flags & asOBJ_APP_CLASS)
+                {
+                    // Это ваш зарегистрированный C++ класс.
+                    // Теперь actualObjPtr можно безопасно приводить к вашему базовому классу C++
+                    // MyBaseClass* myClass = static_cast<MyBaseClass*>(actualObjPtr);
+                }
+            }
+        }
+        else if (propTypeId & asTYPEID_MASK_OBJECT)
+        {
+            // НА ЗАМЕТКУ: Сюда код попадет, если объект хранится ПО ЗНАЧЕНИЮ (например, "MyClass prop;")
+            // В этом случае varPtr — это уже прямой указатель на объект, разыменовывать его не надо.
+            asITypeInfo* typeInfo = engine->GetTypeInfoById(propTypeId);
+            if (typeInfo)
+            {
+                asQWORD flags = typeInfo->GetFlags();
+                if (flags & asOBJ_APP_CLASS) { /* ... */ }
+            }
         }
     }
 }
@@ -412,7 +528,12 @@ void ScriptComponent::load(const nlohmann::json& j)
     
     if (j.contains("fields"))
     {
-        loadScriptStateFromValues(j.at("fields"));
+//        loadScriptStateFromValues(j.at("fields"));
+        
+        // Сохраним в качестве снепшота
+        // Загрузим когда все сущности будут созданы
+        // чтобы восстановить все связи
+        m_StateSnapshot = j.at("fields");
     }
 }
 

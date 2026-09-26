@@ -64,16 +64,16 @@ public:
     
     void save(nlohmann::json& j) const override
     {
-        j = nlohmann::json{ {"source_glb", path} };
+        j["source_glb"] = path;
         
         if (m_currentClipIndex > -1)
         {
             auto clip = m_clips[m_currentClipIndex];
-            j = nlohmann::json{ {"clip", clip->name} };
+            j["clip"] = clip->name;
         }
         else
         {
-            j = nlohmann::json{ {"clip", "<none>"} };
+            j["clip"] = "<none>";
         }
     }
     

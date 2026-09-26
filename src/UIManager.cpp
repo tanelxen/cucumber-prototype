@@ -25,6 +25,8 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include "../vendor/tinyfiledialogs.h"
+
 void DrawScriptConsoleWindow();
 
 UIManager::UIManager()
@@ -221,19 +223,29 @@ void UIManager::drawMenuBar()
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
+            if (ImGui::MenuItem("Save Scene"))
             {
-                Application::currentInstance->m_pScene->save("scene.json");
+                char const * filter[2] = { "*.scene", "*.json" };
+                const char* path = tinyfd_saveFileDialog("Save Scene", "./assets/scenes/", 2, filter, NULL);
+                
+                if (path != nullptr) {
+                    Application::currentInstance->m_pScene->save(path);
+                }
             }
             
-            if (ImGui::MenuItem("Load Scene", "Cmd+L"))
+            if (ImGui::MenuItem("Load Scene"))
             {
-                Application::currentInstance->m_pScene->load("scene.json");
+                char const * filter[2] = { "*.json", "*.scene" };
+                const char* path = tinyfd_openFileDialog("Load Scene", "./assets/scenes/", 2, filter, NULL, 0);
+                
+                if (path != nullptr) {
+                    Application::currentInstance->m_pScene->load(path);
+                }
             }
             
             ImGui::Separator();
             
-            if (ImGui::MenuItem("Reload Scripts", "Ctrl+R"))
+            if (ImGui::MenuItem("Reload Scripts"))
             {
                 ScriptEngine::get().HotReloadAllScripts("assets/scripts");
                 
