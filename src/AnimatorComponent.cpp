@@ -314,6 +314,11 @@ void AnimatorComponent::update(float dt)
             }
         }
         
+        if (bIdx == 0)
+        {
+            translation.z = 0;
+        }
+        
         // --- Интерполяция вращения ---
         if (!track.rotationTimes.empty()) {
             if (track.rotationTimes.size() == 1) {
@@ -396,6 +401,22 @@ void AnimatorComponent::addNotify(const std::string& clipName, float time, asISc
         
         m_customNotifies[clipIdx].push_back(notify);
     }
+}
+
+void AnimatorComponent::clearNotifies(const std::string& clipName)
+{
+    int clipIdx = findClipIndex(clipName);
+    if (clipIdx == -1) {
+        std::cerr << "[Animator] Ошибка clearNotifies: Анимация " << clipName << " не найдена!" << std::endl;
+        return;
+    }
+    
+    m_customNotifies[clipIdx].clear();
+}
+
+void AnimatorComponent::clearAllNotifies()
+{
+    m_customNotifies.clear();
 }
 
 void AnimatorComponent::resetNotifies(int clipIndex)

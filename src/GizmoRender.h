@@ -30,6 +30,7 @@ public:
     void DrawAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color);
     void DrawSphere(const glm::vec3& center, float radius, const glm::vec4& color, int segments = 16);
     void DrawCircle(const glm::vec3& center, float radius, const glm::vec3& normal, const glm::vec4& color, int segments = 32);
+    void DrawCamera(const glm::mat4& modelMatrix, float width, float height, const glm::vec4& color);
     
     // Новое: Отрисовка иконок и текста в 3D пространстве (Биллборды)
     void DrawIcon3D(const glm::vec3& worldPos, const glm::vec2& scale, const glm::vec4& color);

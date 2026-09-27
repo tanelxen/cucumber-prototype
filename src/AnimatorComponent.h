@@ -57,6 +57,8 @@ public:
     // Очистить все нотифаи для конкретного клипа (если нужно сбросить в рантайме)
     void clearNotifies(const std::string& clipName);
     
+    void clearAllNotifies();
+    
 public:
     void update(float dt) override;
     

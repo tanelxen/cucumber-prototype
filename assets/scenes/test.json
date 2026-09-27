@@ -5,13 +5,13 @@
                 {
                     "data": {
                         "position": [
-                            -254.7406463623047,
-                            128.19265747070313,
-                            -731.1633911132813
+                            54.90104293823242,
+                            128.12814331054688,
+                            -934.254638671875
                         ],
                         "rotation": [
                             0.0,
-                            -46.625267028808594,
+                            90.0,
                             0.0
                         ],
                         "scale": [
@@ -23,7 +23,9 @@
                     "type": "TransformComponent"
                 },
                 {
-                    "data": null,
+                    "data": {
+                        "forward_speed": 320.0
+                    },
                     "type": "MovementComponent"
                 },
                 {
@@ -55,7 +57,7 @@
                             0.0
                         ],
                         "rotation": [
-                            -12.088554382324219,
+                            0.0,
                             0.0,
                             0.0
                         ],
@@ -106,7 +108,7 @@
                 },
                 {
                     "data": {
-                        "clip": "idle",
+                        "clip": "<none>",
                         "source_glb": "meshes/gltf/v_mp40.glb"
                     },
                     "type": "AnimatorComponent"
@@ -131,13 +133,62 @@
                 {
                     "data": {
                         "position": [
-                            -133.6999969482422,
-                            128.0,
-                            -800.0
+                            -329.0,
+                            130.0,
+                            -856.0
                         ],
                         "rotation": [
                             0.0,
-                            -56.900001525878906,
+                            -78.0,
+                            0.0
+                        ],
+                        "scale": [
+                            0.9999998807907104,
+                            1.0,
+                            0.9999999403953552
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": {
+                        "className": "Zombie",
+                        "fields": {
+                            "animator": {
+                                "owner": "uid://1wijqfin7cyr",
+                                "type": "AnimatorComponent"
+                            },
+                            "player": {
+                                "type": "Entity",
+                                "uid": "uid://favu1um0rhq6e"
+                            }
+                        }
+                    },
+                    "type": "ScriptComponent"
+                },
+                {
+                    "data": {
+                        "forward_speed": 110.0
+                    },
+                    "type": "MovementComponent"
+                }
+            ],
+            "name": "Zombie",
+            "parent": "uid://<invalid>",
+            "uid": "uid://htan0lx8hfj1x"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            180.0,
                             0.0
                         ],
                         "scale": [
@@ -156,55 +207,15 @@
                 },
                 {
                     "data": {
-                        "clip": "idle1",
+                        "clip": "<none>",
                         "source_glb": "meshes/gltf/hl_zombie.glb"
                     },
                     "type": "AnimatorComponent"
                 }
             ],
-            "name": "Zombie",
-            "parent": "uid://<invalid>",
-            "uid": "uid://htan0lx8hfj1x"
-        },
-        {
-            "components": [
-                {
-                    "data": {
-                        "position": [
-                            -141.10000610351563,
-                            153.52244567871094,
-                            -900.0
-                        ],
-                        "rotation": [
-                            180.0,
-                            59.999996185302734,
-                            180.0
-                        ],
-                        "scale": [
-                            1.0,
-                            0.9999999403953552,
-                            1.0
-                        ]
-                    },
-                    "type": "TransformComponent"
-                },
-                {
-                    "data": {
-                        "source_glb": "meshes/gltf/rtcw_zombie.glb"
-                    },
-                    "type": "MeshComponent"
-                },
-                {
-                    "data": {
-                        "clip": "alert_idle",
-                        "source_glb": "meshes/gltf/rtcw_zombie.glb"
-                    },
-                    "type": "AnimatorComponent"
-                }
-            ],
-            "name": "Zombie2",
-            "parent": "uid://<invalid>",
-            "uid": "uid://bxmn1jue3dtsc"
+            "name": "Mesh",
+            "parent": "uid://htan0lx8hfj1x",
+            "uid": "uid://1wijqfin7cyr"
         }
     ],
     "name": "test"

@@ -27,7 +27,9 @@ void CameraComponent::gizmo()
     const glm::mat4& worldMatrix = owner->getTransform().getWorldMatrix();
     glm::vec3 worldPos = glm::vec3(worldMatrix[3]);
     
-    GizmoRender::Get().DrawSphere(worldPos, 16.0f, {0, 1, 0, 1});
+//    GizmoRender::Get().DrawSphere(worldPos, 16.0f, {0, 1, 0, 1});
+    
+    GizmoRender::Get().DrawCamera(worldMatrix, 32.f, 32.f, {0, 1, 0, 1});
     
 //    GizmoRender::Get().DrawIcon3D(worldPos, {16, 16}, {0, 1, 0, 1});
 //    GizmoRender::Get().DrawText3D(worldPos, "Camera", 16, {0, 1, 0, 1});

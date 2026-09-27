@@ -17,7 +17,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp> // Required for length2
 
-static constexpr float cl_forwardspeed = 400.0;
+//static constexpr float cl_forwardspeed = 400.0;
 static constexpr float cl_sidespeed = 350.0;
 static constexpr float cl_movement_accelerate = 15.0;
 static constexpr float cl_movement_airaccelerate = 7.0;
@@ -35,7 +35,7 @@ static constexpr float OVERCLIP = 1.001;
 static constexpr float STEPSIZE = 18;
 
 static glm::vec3 player_mins = { -15, -15, 0 };
-static glm::vec3 player_maxs = { 15, 15, 56 };
+static glm::vec3 player_maxs = { 15, 15, 72 };
 
 enum movement_bits
 {
@@ -184,7 +184,7 @@ void MovementComponent::apply_inputs(float dt)
     float strafeComponent = std::abs(glm::dot(wishDir, right));
     
     // 4. Задаем разные настройки максимальной скорости (вынесите их в структуру настроек)
-    float maxForwardSpeed = cl_forwardspeed; // Скорость бега вперед
+    float maxForwardSpeed = m_forwardspeed; // Скорость бега вперед
     float maxStrafeSpeed = cl_sidespeed;  // Скорость стрейфа (меньше, чем вперед)
     
     // Интерполируем максимальную скорость в зависимости от направления движения.

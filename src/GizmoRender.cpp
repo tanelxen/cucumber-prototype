@@ -297,13 +297,42 @@ void GizmoRender::Flush(const glm::mat4& viewMatrix, const glm::mat4& projection
 }
 
 // --- ФУНКЦИИ РИСОВАНИЯ ГЕОМЕТРИИ ---
-void GizmoRender::DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color) {if (m_LineVertexCount + 2 > MAX_LINE_VERTICES) return;m_LineBuffer[m_LineVertexCount++] = { start, color };m_LineBuffer[m_LineVertexCount++] = { end, color };}void GizmoRender::DrawAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color) {glm::vec3 c[8] = {{min.x, min.y, min.z}, {max.x, min.y, min.z},{max.x, max.y, min.z}, {min.x, max.y, min.z},{min.x, min.y, max.z}, {max.x, min.y, max.z},{max.x, max.y, max.z}, {min.x, max.y, max.z}};
+void GizmoRender::DrawLine(const glm::vec3& start, const glm::vec3& end, const glm::vec4& color)
+{
+    if (m_LineVertexCount + 2 > MAX_LINE_VERTICES) return;
+    
+    m_LineBuffer[m_LineVertexCount++] = { start, color };
+    m_LineBuffer[m_LineVertexCount++] = { end, color };}
+
+void GizmoRender::DrawAABB(const glm::vec3& min, const glm::vec3& max, const glm::vec4& color)
+{
+    glm::vec3 c[8] = {
+        {min.x, min.y, min.z},
+        {max.x, min.y, min.z},
+        {max.x, max.y, min.z},
+        {min.x, max.y, min.z},
+        {min.x, min.y, max.z},
+        {max.x, min.y, max.z},
+        {max.x, max.y, max.z},
+        {min.x, max.y, max.z}
+    };
     
     // Основания
-    DrawLine(c[0], c[1], color); DrawLine(c[1], c[2], color); DrawLine(c[2], c[3], color); DrawLine(c[3], c[0], color);DrawLine(c[4], c[5], color); DrawLine(c[5], c[6], color); DrawLine(c[6], c[7], color); DrawLine(c[7], c[4], color);
+    DrawLine(c[0], c[1], color);
+    DrawLine(c[1], c[2], color);
+    DrawLine(c[2], c[3], color);
+    DrawLine(c[3], c[0], color);
+    DrawLine(c[4], c[5], color);
+    DrawLine(c[5], c[6], color);
+    DrawLine(c[6], c[7], color);
+    DrawLine(c[7], c[4], color);
     
     // Стойки
-    DrawLine(c[0], c[4], color); DrawLine(c[1], c[5], color); DrawLine(c[2], c[6], color); DrawLine(c[3], c[7], color);}
+    DrawLine(c[0], c[4], color);
+    DrawLine(c[1], c[5], color);
+    DrawLine(c[2], c[6], color);
+    DrawLine(c[3], c[7], color);
+}
 
 void GizmoRender::DrawCircle(const glm::vec3& center, float radius, const glm::vec3& normal, const glm::vec4& color, int segments)
 {
@@ -314,7 +343,8 @@ void GizmoRender::DrawCircle(const glm::vec3& center, float radius, const glm::v
     
     for (int i = 1; i <= segments; ++i) {
         float angle = i * angleStep;glm::vec3 current = center + (tangent * std::cos(angle) + bitangent * std::sin(angle)) * radius;
-        DrawLine(prev, current, color);prev = current;
+        DrawLine(prev, current, color);
+        prev = current;
     }
 }
 
@@ -323,6 +353,83 @@ void GizmoRender::DrawSphere(const glm::vec3& center, float radius, const glm::v
     DrawCircle(center, radius, glm::vec3(1, 0, 0), color, segments);
     DrawCircle(center, radius, glm::vec3(0, 1, 0), color, segments);
     DrawCircle(center, radius, glm::vec3(0, 0, 1), color, segments);
+}
+
+void GizmoRender::DrawCamera(const glm::mat4& modelMatrix, float width, float height, const glm::vec4& color)
+{
+    float halfW = width * 0.5f;
+    float boxSize = height * 0.2f; // Размер корпуса камеры
+    
+    // Цвета
+    glm::vec4 redColor(1.0f, 0.0f, 0.0f, 1.0f); // Красный для стрелки
+    
+    // ==========================================
+    // 1. ЛОКАЛЬНЫЕ КООРДИНАТЫ (Взгляд вдоль -Z)
+    // ==========================================
+    
+    // Пирамида (Вершина в 0, основание смещено на -height)
+    glm::vec4 localTop(0.0f, 0.0f, 0.0f, 1.0f);
+    glm::vec4 localB0(-halfW, -halfW, -height, 1.0f);
+    glm::vec4 localB1( halfW, -halfW, -height, 1.0f);
+    glm::vec4 localB2( halfW,  halfW, -height, 1.0f);
+    glm::vec4 localB3(-halfW,  halfW, -height, 1.0f);
+    
+    // Равносторонний треугольник для метки "Верх кадра"
+    // Делаем сторону треугольника равной 20% от ширины кадра
+    float triSide = width * 0.2f;
+    float triHalfSide = triSide * 0.5f;
+    // Высота равностороннего треугольника: h = a * sqrt(3) / 2 ≈ a * 0.866
+    float triHeight = triSide * 0.866f;
+    
+    glm::vec4 localTriLeft(-triHalfSide, halfW, -height, 1.0f);        // Левый угол у основания
+    glm::vec4 localTriRight(triHalfSide, halfW, -height, 1.0f);       // Правый угол у основания
+    glm::vec4 localTriPeak(0.0f, halfW + triHeight, -height, 1.0f);   // Вершина треугольника
+    
+    // Стрелка направления (Из центра кадра вперед на некоторое расстояние)
+    glm::vec4 localArrowStart(0.0f, 0.0f, -height, 1.0f);
+    glm::vec4 localArrowEnd(0.0f, 0.0f, -height * 1.5f, 1.0f);
+    
+    // Наконечник стрелки
+    glm::vec4 localArrowLeft(-halfW * 0.2f, 0.0f, -height * 1.35f, 1.0f);
+    glm::vec4 localArrowRight(halfW * 0.2f, 0.0f, -height * 1.35f, 1.0f);
+    
+    // ==========================================
+    // 2. ПЕРЕВОД В МИРОВЫЕ КООРДИНАТЫ
+    // ==========================================
+    glm::vec3 top = glm::vec3(modelMatrix * localTop);
+    glm::vec3 b0  = glm::vec3(modelMatrix * localB0);
+    glm::vec3 b1  = glm::vec3(modelMatrix * localB1);
+    glm::vec3 b2  = glm::vec3(modelMatrix * localB2);
+    glm::vec3 b3  = glm::vec3(modelMatrix * localB3);
+    
+    glm::vec3 triLeft  = glm::vec3(modelMatrix * localTriLeft);
+    glm::vec3 triRight = glm::vec3(modelMatrix * localTriRight);
+    glm::vec3 triPeak  = glm::vec3(modelMatrix * localTriPeak);
+    
+    glm::vec3 arrowStart = glm::vec3(modelMatrix * localArrowStart);
+    glm::vec3 arrowEnd   = glm::vec3(modelMatrix * localArrowEnd);
+    glm::vec3 arrowLeft  = glm::vec3(modelMatrix * localArrowLeft);
+    glm::vec3 arrowRight = glm::vec3(modelMatrix * localArrowRight);
+    
+    // ==========================================
+    // 3. ОТРИСОВКА ВСЕХ ЛИНИЙ
+    // ==========================================
+    
+    // --- Пирамида ---
+    DrawLine(b0, b1, color); DrawLine(b1, b2, color);
+    DrawLine(b2, b3, color); DrawLine(b3, b0, color); // Рамка кадра
+    DrawLine(b0, top, color); DrawLine(b1, top, color);
+    DrawLine(b2, top, color); DrawLine(b3, top, color); // Боковые лучи
+    
+    // --- Метка верха (Равносторонний треугольник) ---
+    DrawLine(triLeft, triRight, color); // Основание треугольника на рамке
+    DrawLine(triLeft, triPeak, color);  // Левая грань
+    DrawLine(triRight, triPeak, color); // Правая грань
+    
+    // --- Стрелка направления взгляда (Красная) ---
+    DrawLine(arrowStart, arrowEnd, redColor);    // Стержень стрелки
+    DrawLine(arrowEnd, arrowLeft, redColor);     // Левый наконечник
+    DrawLine(arrowEnd, arrowRight, redColor);    // Правый наконечник
 }
 
 // --- ФУНКЦИИ РИСОВАНИЯ БИЛЛБОРДОВ (ИКОНКИ И ТЕКСТ) ---

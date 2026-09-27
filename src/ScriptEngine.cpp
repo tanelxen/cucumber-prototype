@@ -297,6 +297,21 @@ static float RandomFloat(float min, float max)
     return dis(gen);
 }
 
+static float dot(const glm::vec3& v1, const glm::vec3& v2)
+{
+    return glm::dot(v1, v2);
+}
+
+static float distance(const glm::vec3& v1, const glm::vec3& v2)
+{
+    return glm::distance(v1, v2);
+}
+
+static float length(const glm::vec3& v)
+{
+    return glm::length(v);
+}
+
 void RegisterMath(asIScriptEngine* engine)
 {
     int r;
@@ -353,8 +368,13 @@ void RegisterMath(asIScriptEngine* engine)
     r = engine->RegisterObjectMethod("Vector3", "Vector3& opSubAssign(const Vector3 &in)",
                                      asFUNCTION(Vec3SubAssignVec3), asCALL_CDECL_OBJLAST); assert(r >= 0);
     
+    engine->RegisterGlobalFunction("float dot(const Vector3 &in, const Vector3 &in)", asFUNCTION(dot), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float distance(const Vector3 &in, const Vector3 &in)", asFUNCTION(distance), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float length(const Vector3 &in)", asFUNCTION(length), asCALL_CDECL);
+    
     engine->SetDefaultNamespace("Math");
     engine->RegisterGlobalFunction("float RandomFloat(float, float)", asFUNCTION(RandomFloat), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float atan2(float, float)", asFUNCTION(atan2f), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 }
 
@@ -425,6 +445,12 @@ void RegisterAnimatorComponent(asIScriptEngine* engine)
     // Регистрация метода в компонент
     engine->RegisterObjectMethod("AnimatorComponent", "void addNotify(const string &in clipName, float time, OnAnimNotify@ callback)",
                                  asMETHOD(AnimatorComponent, addNotify), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("AnimatorComponent", "void clearNotifies(const string &in clipName)",
+                                 asMETHOD(AnimatorComponent, clearNotifies), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("AnimatorComponent", "void clearAllNotifies()",
+                                 asMETHOD(AnimatorComponent, clearAllNotifies), asCALL_THISCALL);
     
     engine->RegisterObjectMethod("AnimatorComponent",
                                  "Vector3 getBoneWorldPosition(int boneIndex) const",

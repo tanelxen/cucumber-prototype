@@ -19,12 +19,12 @@ public:
     
     void save(nlohmann::json& j) const override
     {
-        
+        j["forward_speed"] = m_forwardspeed;
     }
     
     void load(const nlohmann::json& j) override
     {
-        
+        m_forwardspeed = j.value("forward_speed", 400.f);
     }
     
     void gizmo() override;
@@ -42,6 +42,8 @@ public:
     const glm::vec3& getVelocity() const { return m_velocity; }
     bool isWalking() const { return m_isGrounded && glm::length(m_velocity) > 0.1f; }
     int getSurfaceFlags() const { return m_surfaceFlags; }
+    
+    float m_forwardspeed = 400.f;
     
 private:
     void apply_inputs(float dt);

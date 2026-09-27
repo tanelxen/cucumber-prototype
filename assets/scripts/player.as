@@ -9,17 +9,19 @@ class Player : MonoBehaviour
 
     TransformComponent@ headTransform;
 
+    private MovementComponent@ motor;
+
     void start()
     {
         print("Player started on entity: " + GetOwner().GetName());
+
+        @motor = GetOwner().GetMovement();
     }
 
     void update(float dt)
     {
         TransformComponent@ transform = GetTransform();
         if (transform == null) return;
-
-        MovementComponent@ motor = GetOwner().GetMovement();
 
         if (motor != null)
         {

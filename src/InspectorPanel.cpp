@@ -272,6 +272,11 @@ static void RegisterUI()
             comp->drawProperties();
         }
     });
+    
+    inspector.Register<MovementComponent>("Movement", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<MovementComponent*>(c);
+        ImGui::DragFloat("Walk Speed##Movement", &comp->m_forwardspeed, 10.f, 0.0f, 1000.0f, "%.0f");
+    });
 }
 
 void InspectorPanel::draw()

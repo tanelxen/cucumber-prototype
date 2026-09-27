@@ -9,6 +9,7 @@
 #include "ScriptEngine.h"
 
 #include "TransformComponent.h"
+#include "AnimatorComponent.h"
 #include "World.h"
 
 #include <imgui.h>
@@ -242,6 +243,21 @@ void ScriptComponent::drawProperties()
                             buttonText = comp->owner->m_name + "." + typeName;
                         }
                     }
+                    if (typeName == "AnimatorComponent")
+                    {
+                        AnimatorComponent* comp = static_cast<AnimatorComponent*>(currentActualPtr);
+                        
+                        if (comp && comp->owner) {
+                            buttonText = comp->owner->m_name + "." + typeName;
+                        }
+                    }
+                    else if (typeName == "Entity")
+                    {
+                        if (Entity* entity = static_cast<Entity*>(currentActualPtr))
+                        {
+                            buttonText = entity->m_name;
+                        }
+                    }
                     else
                     {
                         buttonText = "Linked " + typeName;
@@ -276,6 +292,19 @@ void ScriptComponent::drawProperties()
                                     // ВАЖНО: так как тип зарегистрирован как asOBJ_NOCOUNT, мы просто копируем адрес
                                     *ptrToHandle = comp;
                                 }
+                            }
+                            if (typeName == "AnimatorComponent")
+                            {
+                                AnimatorComponent* comp = draggedEntity->getComponent<AnimatorComponent>();
+                                if (comp) {
+                                    // Записываем C++ указатель напрямую в память AngelScript
+                                    // ВАЖНО: так как тип зарегистрирован как asOBJ_NOCOUNT, мы просто копируем адрес
+                                    *ptrToHandle = comp;
+                                }
+                            }
+                            else if (typeName == "Entity")
+                            {
+                                *ptrToHandle = draggedEntity;
                             }
                             // Ситуация Б: Свойство требует кастомный скрипт (например, Player)
                             else
@@ -372,9 +401,35 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
             
             if (currentActualPtr == nullptr) continue;
             
+            if (typeName == "Entity")
+            {
+                Entity* entity = static_cast<Entity*>(currentActualPtr);
+                
+                if (entity)
+                {
+                    snapshot[propName] = {
+                        {"type", typeName},
+                        {"uid", entity->uid}
+                    };
+                }
+            }
+            
             if (typeName == "TransformComponent")
             {
                 TransformComponent* comp = static_cast<TransformComponent*>(currentActualPtr);
+                
+                if (comp && comp->owner)
+                {
+                    snapshot[propName] = {
+                        {"type", typeName},
+                        {"owner", comp->owner->uid}
+                    };
+                }
+            }
+            
+            if (typeName == "AnimatorComponent")
+            {
+                AnimatorComponent* comp = static_cast<AnimatorComponent*>(currentActualPtr);
                 
                 if (comp && comp->owner)
                 {
@@ -441,28 +496,45 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
         {
             auto& propData = snapshot[propName];
             
-            if (!propData.contains("type") || !propData.contains("owner")) continue;
+            if (!propData.contains("type")) continue;
+            std::string type = propData["type"].get<std::string>();
             
-            UID ownerUID = propData["owner"].get<std::string>();
-            std::string componentTypeName = propData["type"].get<std::string>();
-            
-            Entity* entity = g_currentScene->findEntityByUID(ownerUID);
-            
-            if (entity)
+            if (type == "Entity")
             {
-                void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
+                UID uid = propData["uid"].get<std::string>();
                 
-                if (componentTypeName == "TransformComponent")
-                {
-                    TransformComponent* comp = entity->getComponent<TransformComponent>();
-                    if (comp) {
-                        // Записываем C++ указатель напрямую в память AngelScript
-                        // ВАЖНО: так как тип зарегистрирован как asOBJ_NOCOUNT, мы просто копируем адрес
-                        *ptrToHandle = comp;
-                    }
-                }
+                Entity* entity = g_currentScene->findEntityByUID(uid);
+                if (entity == nullptr) continue;
+                
+                void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
+                *ptrToHandle = entity;
             }
-            
+            else if (type == "TransformComponent")
+            {
+                UID ownerUID = propData["owner"].get<std::string>();
+                
+                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+                if (entity == nullptr) continue;
+                
+                TransformComponent* comp = entity->getComponent<TransformComponent>();
+                if (comp == nullptr) continue;
+                
+                void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
+                *ptrToHandle = comp;
+            }
+            else if (type == "AnimatorComponent")
+            {
+                UID ownerUID = propData["owner"].get<std::string>();
+                
+                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+                if (entity == nullptr) continue;
+                
+                AnimatorComponent* comp = entity->getComponent<AnimatorComponent>();
+                if (comp == nullptr) continue;
+                
+                void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
+                *ptrToHandle = comp;
+            }
             
             // 1. Очищаем бит хэндла, чтобы GetTypeInfoById понял, о каком классе речь
             int actualTypeId = propTypeId & ~asTYPEID_OBJHANDLE;
