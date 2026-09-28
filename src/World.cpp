@@ -45,6 +45,7 @@
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
 #include "DecalManager.h"
+#include "HUD.h"
 
 #include "../vendor/json.hpp"
 
@@ -66,6 +67,7 @@ WorldScene::WorldScene()
     SpriteRenderer::Init();
     ParticleSystem::Init();
     DecalManager::Init();
+    HUD::Init();
     
     if (ScriptEngine::get().init())
     {
@@ -170,6 +172,13 @@ void WorldScene::draw()
         auto camera = m_pAttachedViewport->getCamera();
         SpriteRenderer::Flush(camera->view, camera->projection);
         DecalManager::Flush(camera->view, camera->projection);
+    }
+    
+    {
+        int width = m_pAttachedViewport->getWidth();
+        int height = m_pAttachedViewport->getHeight();
+        HUD::Resize(width, height);
+        HUD::Flush();
     }
     
     m_pAttachedViewport->unbind();

@@ -1,7 +1,7 @@
 class Player : MonoBehaviour
 {
-    float move_speed = 400.0f;
     float mouse_speed = 8.0f;
+    int health = 100;
 
     private float forwardmove = 0;
     private float rightmove = 0;
@@ -50,5 +50,56 @@ class Player : MonoBehaviour
         {
             Input::SetCursorEnabled(true);
         }
+
+        drawCrosshair();
+        drawHealth();
+    }
+
+    void takeDamage(int damage)
+    {
+        health -= damage;
+        drawPain();
+    }
+
+    private void drawCrosshair()
+    {
+        int width = UI::GetScreenWidth();
+        int height = UI::GetScreenHeight();
+
+        Color color(1.0f, 1.0f, 1.0f, 1.0f);
+
+        Vector2 size = Vector2(4.0f, 4.0f);
+        Vector2 pos = Vector2(
+            width * 0.5f - size.x * 0.5f,
+            height * 0.5f - size.y * 0.5f
+        );
+        
+        UI::DrawRect(pos, size, color);
+    }
+
+    private void drawHealth()
+    {
+        //int width = UI::GetScreenWidth();
+        int height = UI::GetScreenHeight();
+
+        Color color(0.9f, 0.9f, 0.9f, 1.0f);
+
+        Vector2 pos = Vector2(16.0f, height - 16.0f);
+        
+        string str = format('{}', health);
+        UI::DrawText(str, pos, 1.0f, color);
+    }
+
+    private void drawPain()
+    {
+        int width = UI::GetScreenWidth();
+        int height = UI::GetScreenHeight();
+
+        Color color(1.0f, 0.0f, 0.0f, 0.3f);
+
+        Vector2 size = Vector2(width, height);
+        Vector2 pos(0, 0);
+        
+        UI::DrawRect(pos, size, color);
     }
 }

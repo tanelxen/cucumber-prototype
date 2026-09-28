@@ -19,6 +19,7 @@
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
 #include "DecalManager.h"
+#include "HUD.h"
 
 #include "World.h"
 
@@ -505,6 +506,8 @@ void RegisterEntity(asIScriptEngine* engine)
     // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
     engine->RegisterObjectType("Entity", 0, asOBJ_REF | asOBJ_NOCOUNT);
     
+    engine->RegisterObjectProperty("Entity", "bool active", asOFFSET(Entity, m_isActive));
+    
     // Регистрируем метод получения TransformComponent у Entity
     engine->RegisterObjectMethod("Entity", "TransformComponent@ GetTransform()",
                                  asMETHOD(Entity, getComponent<TransformComponent>), asCALL_THISCALL);
@@ -594,7 +597,6 @@ static void AddBillboardShort(int textureId, glm::vec3 position, float scale, fl
 
 void RegisterSpriteRenderer(asIScriptEngine* engine)
 {
-    /*
     // 1. Регистрируем тип Vector3 (сопоставляем с glm::vec3)
     engine->RegisterObjectType("Color", sizeof(glm::vec4),
                                    asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS);
@@ -612,7 +614,22 @@ void RegisterSpriteRenderer(asIScriptEngine* engine)
     engine->RegisterObjectBehaviour("Color", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)",
                                     asFUNCTION(+[](float r, float g, float b, float a, void* memory) { new(memory) glm::vec4(r, g, b, a); }), asCALL_CDECL_OBJLAST);
 
-    */
+    
+    
+    engine->RegisterObjectType("Vector2", sizeof(glm::vec2),
+                               asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS);
+    
+    engine->RegisterObjectProperty("Vector2", "float x", asOFFSET(glm::vec2, x));
+    engine->RegisterObjectProperty("Vector2", "float y", asOFFSET(glm::vec2, y));
+    
+    // 3. Регистрируем конструкторы
+    engine->RegisterObjectBehaviour("Vector2", asBEHAVE_CONSTRUCT, "void f()",
+                                    asFUNCTION(+[](void* memory) { new(memory) glm::vec2(0.0f); }), asCALL_CDECL_OBJLAST);
+    
+    engine->RegisterObjectBehaviour("Vector2", asBEHAVE_CONSTRUCT, "void f(float, float)",
+                                    asFUNCTION(+[](float x, float y, void* memory) { new(memory) glm::vec2(x, y); }), asCALL_CDECL_OBJLAST);
+    
+    
     
     engine->SetDefaultNamespace("SpriteRenderer");
     engine->RegisterGlobalFunction("int preloadTexture(const string &in)", asFUNCTION(SpriteRenderer::PreloadTexture), asCALL_CDECL);
@@ -642,7 +659,16 @@ void RegisterSpriteRenderer(asIScriptEngine* engine)
                                    asFUNCTION(DecalManager::AddDecal), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 
-
+    engine->SetDefaultNamespace("UI");
+    engine->RegisterGlobalFunction("int GetScreenWidth()", asFUNCTION(HUD::GetScreenWidth), asCALL_CDECL);
+    engine->RegisterGlobalFunction("int GetScreenHeight()", asFUNCTION(HUD::GetScreenHeight), asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void DrawRect(const Vector2 &in position, const Vector2 &in size, const Color &in color)",
+                                   asFUNCTION(HUD::DrawRect), asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void DrawText(const string &in text, const Vector2 &in pos, float scale, const Color &in color)",
+                                   asFUNCTION(HUD::DrawText), asCALL_CDECL);
+    engine->SetDefaultNamespace("");
 }
 
 #include "PhysicsCommon.h"

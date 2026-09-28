@@ -109,6 +109,8 @@ set(SRC_RENDERER
         src/ParticleSystem.h
         src/DecalManager.cpp
         src/DecalManager.h
+        src/HUD.cpp
+        src/HUD.h
 )
 
 set(SRC_PANELS

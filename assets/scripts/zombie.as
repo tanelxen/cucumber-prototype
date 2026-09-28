@@ -84,7 +84,33 @@ class Zombie : MonoBehaviour
 
     private void doAttack()
     {
-    	PlaySound("assets/sounds/claw_strike1.wav");
+        TransformComponent@ transform = GetTransform();
+
+        Vector3 position = transform.GetWorldPosition();
+        position.y += 48.0f;
+
+        Vector3 forward = transform.GetForward();
+        RaycastResult hit;
+
+        if (Physics::Raycast(position, forward, 128.0f, hit, GetOwner()))
+        {
+            if (hit.entity != null)
+            {
+                PlaySound("assets/sounds/claw_strike1.wav");
+
+                ref@ pl = _GetScript(hit.entity, "Player");
+                Player@ player = cast<Player>(pl);
+
+                if (player != null)
+                {
+                    player.takeDamage(5);
+                }
+            }
+        }
+        else
+        {
+            PlaySound("assets/sounds/claw_miss1.wav");
+        }
     }
 
     void handleAnimationEnd(const string &in clipName)

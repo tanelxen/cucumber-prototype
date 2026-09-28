@@ -11,6 +11,9 @@ class WeaponMP40 : MonoBehaviour
     private int bulletHoleTexId = 0;
     int damage = 10;
 
+    int ammo = 300;
+    int clip = 32;
+
     void start()
     {
         print("WeaponMP40 started on entity: " + GetOwner().GetName());
@@ -42,6 +45,8 @@ class WeaponMP40 : MonoBehaviour
         if (isFiring && fireTimer <= 0.0f) {
             executeLogicShot();
         }
+
+        drawAmmo();
     }
 
     // Игрок нажал ЛКМ
@@ -70,6 +75,10 @@ class WeaponMP40 : MonoBehaviour
 
     void executeLogicShot()
     {
+        clip -= 1;
+
+        if (clip <= 0) return;
+
         fireTimer = fireInterval; // Сброс таймера
 
         PlaySound("assets/sounds/mp40f1.wav");
@@ -115,5 +124,18 @@ class WeaponMP40 : MonoBehaviour
                 DecalManager::AddDecal(bulletHoleTexId, hit.point, hit.normal, randomScale, 60.0f);
             }
         }
+    }
+
+    private void drawAmmo()
+    {
+        int width = UI::GetScreenWidth();
+        int height = UI::GetScreenHeight();
+
+        Color color(0.9f, 0.9f, 0.9f, 1.0f);
+
+        Vector2 pos = Vector2(width - 16.0f - 128, height - 16.0f);
+        
+        string str = format('{}/{}', clip, ammo);
+        UI::DrawText(str, pos, 1.0f, color);
     }
 }
