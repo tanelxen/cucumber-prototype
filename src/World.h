@@ -47,7 +47,7 @@ public:
                const glm::vec3 &end,
                const glm::vec3 &mins,
                const glm::vec3 &maxs,
-               const Entity* ignore,
+               Entity* ignore,
                uint32_t mask = 0xFFFFFFFF) const;
     
     Viewport* m_pAttachedViewport;

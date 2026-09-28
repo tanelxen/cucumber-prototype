@@ -569,12 +569,46 @@ void WorldScene::stopSimulation()
     m_isSimulationMode = false;
 }
 
+
+// Хелпер для вызова AngelScript коллбэка
+void NotifyScriptCallback(Entity* entityToNotify, const std::string& callbackName, Entity* otherEntity)
+{
+    if (!entityToNotify || callbackName.empty() || !otherEntity) return;
+    
+    // Ищем скрипт на объекте, который должен получить уведомление
+    auto scriptComp = entityToNotify->getComponent<ScriptComponent>();
+    if (!scriptComp) return;
+    
+    // В AngelScript вызов метода объекта выглядит примерно так через asIScriptContext:
+    asIScriptEngine* engine = ScriptEngine::get().GetRawEngine();
+    
+    // Ищем метод в объекте скрипта (у вас в ScriptComponent скорее всего хранится asIScriptObject)
+    asIScriptObject* scriptObject = scriptComp->m_ScriptObject;
+    if (!scriptObject) return;
+    
+    asIScriptFunction* func = scriptObject->GetObjectType()->GetMethodByName(callbackName.c_str());
+    if (!func) return; // Метод не объявлен в скрипте (например, у объекта просто нет функции OnTriggerEnter)
+    
+    asIScriptContext* ctx = engine->CreateContext();
+    ctx->Prepare(func);
+    ctx->SetObject(scriptObject);
+    
+    // Передаем @otherEntity в качестве первого аргумента (индекс 0)
+    ctx->SetArgAddress(0, otherEntity);
+    
+    int r = ctx->Execute();
+    if (r != asEXECUTION_FINISHED) {
+        // Обработка ошибок выполнения скрипта
+    }
+    ctx->Release();
+}
+
 void WorldScene::trace(HitResult &result,
                        const glm::vec3 &q_start,
                        const glm::vec3 &q_end,
                        const glm::vec3 &q_mins,
                        const glm::vec3 &q_maxs,
-                       const Entity* ignore,
+                       Entity* ignore,
                        uint32_t mask) const
 {
     // Инициализируем новые поля дефолтными значениями
@@ -613,6 +647,19 @@ void WorldScene::trace(HitResult &result,
         // Тестируем отрезок от start до текущего найденного максимума (currentEnd)
         if (collider->sweepTest(gl_start, gl_end, gl_mins, gl_maxs, entityFrac, localNormal))
         {
+            // Это зона-триггер
+            if (collider->isTrigger)
+            {
+                // Триггеры НЕ прерывают полет луча/ракеты, они просто регистрируют пересечение.
+                // Вызываем коллбэк на триггере (например, OnTriggerEnter), передавая туда того, кто в него вошел.
+                if (ignore)
+                {
+                    collider->CallTriggerEnter(ignore);
+                }
+
+                continue; // Летим дальше, не уменьшая closestFraction!
+            }
+            
             // Берем только если этот объект БЛИЖЕ, чем всё, что мы нашли ранее (включая стены BSP)
             if (entityFrac < closestFraction)
             {
@@ -638,5 +685,20 @@ void WorldScene::trace(HitResult &result,
         result.surfaceFlags = 0;
         result.startsolid = (closestFraction == 0.0f);
         result.allsolid = false; // Для динамических объектов рассчитывается индивидуально
+        
+        /*
+        // --- КОЛЛБЭК ДЛЯ РАКЕТЫ ИЛИ СНАРЯДА ---
+        // Если тот, кто пускал луч (ignoreCollider), имеет специальный скрипт для взрыва
+        if (ignore)
+        {
+            // Например, если ракета врезалась во врага, вызываем у нее "OnProjectileHit"
+            NotifyScriptCallback(ignore, "OnProjectileHit", closestCollider->owner);
+        }
+         */
     }
+//    else if (result.fraction < 1.0f && ignore)
+//    {
+//        // Ракеты также должны взрываться при ударе о статичную BSP-карту (стены уровня)
+//        NotifyScriptCallback(ignore, "OnProjectileHit", nullptr);
+//    }
 }

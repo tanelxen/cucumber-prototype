@@ -30,7 +30,7 @@
                 },
                 {
                     "data": {
-                        "collisionMask": 4294967295,
+                        "collisionMask": 4294901763,
                         "layer": 1,
                         "maxs": [
                             15.0,
@@ -41,7 +41,8 @@
                             -15.0,
                             0.0,
                             15.0
-                        ]
+                        ],
+                        "trigger": false
                     },
                     "type": "CollisionComponent"
                 },
@@ -170,8 +171,8 @@
                 },
                 {
                     "data": {
-                        "collisionMask": 4294967295,
-                        "layer": 1,
+                        "collisionMask": 4294901763,
+                        "layer": 2,
                         "maxs": [
                             15.0,
                             72.0,
@@ -181,7 +182,8 @@
                             -15.0,
                             0.0,
                             15.0
-                        ]
+                        ],
+                        "trigger": false
                     },
                     "type": "CollisionComponent"
                 },
@@ -252,6 +254,64 @@
             "name": "Mesh",
             "parent": "uid://htan0lx8hfj1x",
             "uid": "uid://1wijqfin7cyr"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            128.0,
+                            -700.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "scale": [
+                            0.5,
+                            0.25,
+                            0.5
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/oil_drum.glb"
+                    },
+                    "type": "MeshComponent"
+                },
+                {
+                    "data": {
+                        "collisionMask": 4294901762,
+                        "layer": 8,
+                        "maxs": [
+                            15.0,
+                            32.0,
+                            -15.0
+                        ],
+                        "mins": [
+                            -15.0,
+                            0.0,
+                            15.0
+                        ],
+                        "trigger": true
+                    },
+                    "type": "CollisionComponent"
+                },
+                {
+                    "data": {
+                        "className": "Medkit",
+                        "fields": {}
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Medkit",
+            "parent": "uid://<invalid>",
+            "uid": "uid://cjybsb6j18skk"
         }
     ],
     "name": "test"

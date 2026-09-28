@@ -11,13 +11,23 @@
 class Entity;
 class CollisionComponent;
 
-//struct PhysicsHitResult {
-//    bool hasHit = false;
-//    float fraction = 1.0f;
-//    glm::vec3 endPosition{0.0f};
-//    glm::vec3 normal{0.0f};
-//    Entity* hitEntity = nullptr; // Ссылка на игровой объект (платформу/дверь)
-//};
+enum CollisionLayer
+{
+    LAYER_PLAYER        = 1 << 0, // Игрок
+    LAYER_ENEMY         = 1 << 1, // Все NPC
+    LAYER_PROJECTILE    = 1 << 2, // Летящие ракеты, плазма, гранаты
+    LAYER_TRIGGER       = 1 << 3, // Интерактивные зоны (аптечки, триггерные двери, зоны урона)
+    LAYER_INTERACTIVE   = 1 << 4, // Двигающиеся платформы, разрушаемые ящики, двери-сущности
+};
+
+namespace PhysicsMask
+{
+    const uint32_t PlayerMovement = LAYER_ENEMY | LAYER_INTERACTIVE;
+    const uint32_t NPCMovement    = LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE;
+    const uint32_t Shooting       = LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE;
+    const uint32_t NPCSight       = LAYER_PLAYER | LAYER_INTERACTIVE;
+    const uint32_t PlayerRocket   = LAYER_ENEMY | LAYER_INTERACTIVE;
+}
 
 struct HitResult
 {

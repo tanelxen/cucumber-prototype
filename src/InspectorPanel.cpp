@@ -309,7 +309,7 @@ void InspectorPanel::draw()
         name = buffer;
     }
     
-    ImGui::TextDisabled("uuid: %s", m_entity->uid.toText().c_str());
+    ImGui::TextDisabled("%s", m_entity->uid.toText().c_str());
     
     ImGui::Separator();
     
@@ -573,8 +573,91 @@ std::vector<std::string> GetAvailableScriptClasses()
     return scriptClasses;
 }
 
+
+static void DrawCollisionBits(const char* label, uint32_t& bitmask)
+{
+    ImGui::Text("%s", label);
+    ImGui::PushID(label);
+    
+    // Сетка 4х4 для 16 слоев (если нужно 32, сделайте 8х4 или 4х8)
+    const int numRows = 2;
+    const int numCols = 8;
+    
+    // Делаем кнопки маленькими и квадратными
+    ImVec2 buttonSize = ImVec2(25, 25);
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
+    
+    for (int row = 0; row < numRows; ++row)
+    {
+        for (int col = 0; col < numCols; ++col)
+        {
+            int bitIndex = row * numCols + col;
+            uint32_t bitValue = (1 << bitIndex);
+            bool isSet = (bitmask & bitValue) != 0;
+            
+            // Если бит активен — подсвечиваем кнопку
+            if (isSet)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.08f, 0.25f, 0.14f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.33f, 0.18f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.18f, 0.10f, 1.0f));
+            }
+            else
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+            }
+            
+            // Название кнопки — просто индекс бита (от 1 до 16 для удобства человека)
+            char buf[4];
+            snprintf(buf, sizeof(buf), "%d", bitIndex);
+            
+            ImGui::PushID(bitIndex);
+            if (ImGui::Button(buf, buttonSize))
+            {
+                if (isSet) {
+                    bitmask &= ~bitValue; // Выключаем бит
+                } else {
+                    bitmask |= bitValue;  // Включаем бит
+                }
+            }
+            
+            // Всплывающая подсказка при наведении на бит
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Bit %d (Value: %u)", bitIndex, bitValue);
+            }
+            ImGui::PopID();
+            
+            ImGui::PopStyleColor(3);
+            
+            // Если это не последняя колонка — рисуем на той же строке
+            if (col < numCols - 1) {
+                ImGui::SameLine();
+            }
+        }
+    }
+    
+    ImGui::PopStyleVar();
+    ImGui::PopID();
+    ImGui::Spacing();
+}
+
 static void DrawCollisionComponent(CollisionComponent* comp)
 {
-    DrawVec3Control("Min Bounds", comp->m_mins, -64.0f, 100.0f);
-    DrawVec3Control("Max Bounds", comp->m_maxs,  64.0f, 100.0f);
+//    ImGui::DragFloat3("Mins", &comp->m_mins.x, 1.f);
+//    ImGui::DragFloat3("Maxs", &comp->m_maxs.x, 1.f);
+    
+    DrawVec3Control("Min Bounds", comp->m_mins, -16.0f, 100.0f);
+    DrawVec3Control("Max Bounds", comp->m_maxs,  16.0f, 100.0f);
+    
+    ImGui::Separator();
+    
+    DrawCollisionBits("Layer", comp->layer);
+//    DrawCollisionBits("Mask (С чем сталкивается)", comp->collisionMask);
+    
+    ImGui::Separator();
+    
+    ImGui::Checkbox("Trigger", &comp->isTrigger);
 }

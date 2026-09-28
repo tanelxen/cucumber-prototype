@@ -9,6 +9,31 @@
 #include "GizmoRender.h"
 #include "Entity.h"
 
+void CollisionComponent::save(nlohmann::json& j) const
+{
+    j = nlohmann::json {
+        {"mins", {m_mins.x, m_mins.y, m_mins.z}},
+        {"maxs", {m_maxs.x, m_maxs.y, m_maxs.z}},
+        {"trigger", isTrigger},
+        {"collisionMask", collisionMask},
+        {"layer", layer}
+    };
+}
+
+void CollisionComponent::load(const nlohmann::json& j)
+{
+    auto mins = j.at("mins").get<std::vector<float>>();
+    m_mins = glm::vec3(mins[0], mins[1], mins[2]);
+    
+    auto maxs = j.at("maxs").get<std::vector<float>>();
+    m_maxs = glm::vec3(maxs[0], maxs[1], maxs[2]);
+    
+    isTrigger = j.at("trigger").get<bool>();
+    
+    collisionMask = j.at("collisionMask").get<uint32_t>();
+    layer = j.at("layer").get<uint32_t>();
+}
+
 void CollisionComponent::getWorldAABB(glm::vec3& outMins, glm::vec3& outMaxs)
 {
     glm::vec3 worldPos = owner->getTransform().getWorldPosition();

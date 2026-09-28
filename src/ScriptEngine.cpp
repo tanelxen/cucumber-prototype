@@ -473,6 +473,27 @@ void RegisterMovementComponent(asIScriptEngine* engine)
                                  asMETHOD(MovementComponent, jump), asCALL_THISCALL);
 }
 
+// Посредник для установки коллбэка из скрипта
+static void SetOnTriggerEnter(CollisionComponent* collider, asIScriptFunction* asFunc)
+{
+    if (!collider) return;
+    
+    if (asFunc == nullptr) {
+        collider->onTriggerEnter = nullptr;
+        return;
+    }
+    
+    // Заворачиваем вызов AngelScript в std::function
+    collider->onTriggerEnter = [asFunc](Entity* other) {
+        asIScriptEngine* engine = asFunc->GetEngine();
+        asIScriptContext* ctx = engine->CreateContext();
+        ctx->Prepare(asFunc);
+        ctx->SetArgAddress(0, other);
+        ctx->Execute();
+        ctx->Release();
+    };
+}
+
 void RegisterCollisionComponent(asIScriptEngine* engine)
 {
     engine->RegisterObjectType("CollisionComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
@@ -502,6 +523,17 @@ void RegisterEntity(asIScriptEngine* engine)
     
     engine->RegisterObjectMethod("Entity", "const string& GetName() const",
                                  asMETHOD(Entity, GetName), asCALL_THISCALL);
+    
+    
+    
+    engine->RegisterFuncdef("void OnTriggerEnterCallback(Entity@ other)");
+    //engine->RegisterFuncdef("void OnCollisionEnter(Entity@ other)");
+    
+//    engine->RegisterObjectMethod("CollisionComponent", "void SetOnTriggerEnter(OnTriggerEnterCallback@)", asFUNCTION(SetOnTriggerEnter), asCALL_THISCALL);
+    engine->RegisterGlobalFunction("float SetOnTriggerEnter(CollisionComponent@, OnTriggerEnterCallback@)", asFUNCTION(SetOnTriggerEnter), asCALL_CDECL);
+    
+//    engine->RegisterObjectProperty("CollisionComponent", "OnTriggerEnterCallback@ onTriggerEnter", asOFFSET(CollisionComponent, onTriggerEnterScript));
+    //engine->RegisterObjectProperty("CollisionComponent", "OnCollisionEnterCallback@ onCollisionEnter", asOFFSET(CollisionComponent, onCollisionEnterScript));
 }
 
 void RegisterInputEnums(asIScriptEngine* engine)
@@ -629,7 +661,9 @@ namespace {
         result.endpos = { 0, 0, 0 };
         result.normal = { 0, 1, 0 };
         
-        g_currentScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0), ignore);
+        uint32_t mask = LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE;
+        
+        g_currentScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0), ignore, mask);
         
         hit.point = Quake2OpenGL(result.endpos);
         hit.normal = Quake2OpenGL(result.normal);
