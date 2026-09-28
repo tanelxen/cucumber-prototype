@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 class Entity;
+class CollisionComponent;
 
 //struct PhysicsHitResult {
 //    bool hasHit = false;
@@ -31,6 +32,7 @@ struct HitResult
     int surfaceFlags;
     
     Entity* hitEntity = nullptr;
+    CollisionComponent* hitCollider = nullptr;
 };
 
 inline glm::vec3 OpenGL2Quake(const glm::vec3& in)

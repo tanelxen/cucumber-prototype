@@ -161,7 +161,8 @@ void AnimatorComponent::update(float dt)
         // Проверяем, завершится ли анимация на этом кадре
         if (m_isOnce && (m_currentTime + dt) >= clip->duration)
         {
-            m_currentTime = clip->duration; // Выставляем финальный кадр
+            // FIXME: HACK! приходится выставлять зазор чтобы не получить в конце bind-позу
+            m_currentTime = clip->duration - 0.01f; // Выставляем финальный кадр
             std::string finishedClipName = clip->name; // Запоминаем имя до переключения
             
             // Проверяем, есть ли что-то в очереди (Вариант Б)

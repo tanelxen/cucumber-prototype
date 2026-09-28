@@ -13,6 +13,7 @@
 
 #include "Entity.h"
 #include "TransformComponent.h"
+#include "CollisionComponent.h"
 #include "MovementComponent.h"
 #include "AnimatorComponent.h"
 #include "CameraComponent.h"
@@ -109,6 +110,7 @@ void InspectorPanel::setEntity(Entity *entity)
 void DrawTransformComponent(TransformComponent* transform);
 void DrawAudioComponentInspector(AudioComponent* component);
 void DrawScriptProperties(asITypeInfo* type);
+static void DrawCollisionComponent(CollisionComponent* comp);
 
 static void RegisterUI()
 {
@@ -277,6 +279,11 @@ static void RegisterUI()
         auto* comp = static_cast<MovementComponent*>(c);
         ImGui::DragFloat("Walk Speed##Movement", &comp->m_forwardspeed, 10.f, 0.0f, 1000.0f, "%.0f");
     });
+    
+    inspector.Register<CollisionComponent>("Collision", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<CollisionComponent*>(c);
+        DrawCollisionComponent(comp);
+    });
 }
 
 void InspectorPanel::draw()
@@ -329,6 +336,7 @@ void InspectorPanel::draw()
         if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
         if (ImGui::MenuItem("Camera"))      { m_entity->addComponent<CameraComponent>(); }
         if (ImGui::MenuItem("Movement"))    { m_entity->addComponent<MovementComponent>(); }
+        if (ImGui::MenuItem("Collision"))    { m_entity->addComponent<CollisionComponent>(); }
         
         if (ImGui::BeginMenu("Scripts")) {
             // Получаем актуальный список классов из AngelScript
@@ -563,4 +571,10 @@ std::vector<std::string> GetAvailableScriptClasses()
     }
     
     return scriptClasses;
+}
+
+static void DrawCollisionComponent(CollisionComponent* comp)
+{
+    DrawVec3Control("Min Bounds", comp->m_mins, -64.0f, 100.0f);
+    DrawVec3Control("Max Bounds", comp->m_maxs,  64.0f, 100.0f);
 }

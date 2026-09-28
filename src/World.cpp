@@ -20,6 +20,7 @@
 
 #include "Entity.h"
 #include "TransformComponent.h"
+#include "CollisionComponent.h"
 #include "MovementComponent.h"
 #include "AnimatorComponent.h"
 #include "ScriptComponent.h"
@@ -98,7 +99,7 @@ void WorldScene::update(float dt)
         }
     }
     
-    for (auto* component : m_globalUpdatables)
+    for (auto* component : m_globalWaitingForStart)
     {
         component->gizmo();
     }
@@ -303,6 +304,10 @@ static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
         {
             newComp = entity->addComponent<MovementComponent>();
         }
+        else if (compName == "CollisionComponent")
+        {
+            newComp = entity->addComponent<CollisionComponent>();
+        }
         
         // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
         if (newComp)
@@ -441,6 +446,11 @@ void WorldScene::registerComponent(Component *component)
         m_globalFixedUpdatables.push_back(component);
     }
     
+    // Регистрируем коллайдеры в выделенный список
+    if (auto* collider = dynamic_cast<CollisionComponent*>(component)) {
+        m_globalColliders.push_back(collider);
+    }
+    
     m_globalWaitingForStart.push_back(component);
 }
 
@@ -458,6 +468,11 @@ void WorldScene::unregisterComponent(Component *component)
     m_globalFixedUpdatables.erase(std::remove(m_globalFixedUpdatables.begin(), m_globalFixedUpdatables.end(), component),
                                   m_globalFixedUpdatables.end()
                                   );
+    
+    // Удаляем из списка коллайдеров
+    if (auto* collider = dynamic_cast<CollisionComponent*>(component)) {
+        m_globalColliders.erase(std::remove(m_globalColliders.begin(), m_globalColliders.end(), collider), m_globalColliders.end());
+    }
 }
 
 void WorldScene::processPendingStarts()
@@ -554,7 +569,74 @@ void WorldScene::stopSimulation()
     m_isSimulationMode = false;
 }
 
-void WorldScene::trace(HitResult &result, const glm::vec3 &start, const glm::vec3 &end, const glm::vec3 &mins, const glm::vec3 &maxs) const
+void WorldScene::trace(HitResult &result,
+                       const glm::vec3 &q_start,
+                       const glm::vec3 &q_end,
+                       const glm::vec3 &q_mins,
+                       const glm::vec3 &q_maxs,
+                       const Entity* ignore,
+                       uint32_t mask) const
 {
-    g_collision.trace(result, start, end, mins, maxs);
+    // Инициализируем новые поля дефолтными значениями
+    result.hitEntity = nullptr;
+    result.hitCollider = nullptr;
+    
+    // 1. Сначала считаем коллизию со статичной BSP геометрией Quake 3
+    g_collision.trace(result, q_start, q_end, q_mins, q_maxs);
+    
+    const glm::vec3 gl_start = Quake2OpenGL(q_start);
+    const glm::vec3 gl_end = Quake2OpenGL(q_end);
+    const glm::vec3 gl_mins = Quake2OpenGL(q_mins);
+    const glm::vec3 gl_maxs = Quake2OpenGL(q_maxs);
+    
+    float closestFraction = result.fraction;
+    glm::vec3 entityNormal = Quake2OpenGL(result.normal);
+    CollisionComponent* closestCollider = nullptr;
+    bool hitDynamicEntity = false;
+    
+    // 2. Итерируемся по динамическим сущностям сцены
+    for (const auto& collider : m_globalColliders)
+    {
+        // Пропускаем неактивные сущности или те, что ожидают удаления
+        if (!collider || !collider->enabled || collider->isPendingKill) continue;
+        if (!collider->owner->m_isActive || collider->owner->isPendingKill()) continue;
+        
+        // ИГНОРИРОВАНИЕ СЕБЯ: Пропускаем, если это наш собственный коллайдер
+        if (collider->owner == ignore) continue;
+        
+        // ПРОВЕРКА МАСКИ: Объект должен подходить под маску трассировки
+        if ((collider->layer & mask) == 0) continue;
+        
+        float entityFrac = 1.0f;
+        glm::vec3 localNormal = glm::vec3(0.0f);
+        
+        // Тестируем отрезок от start до текущего найденного максимума (currentEnd)
+        if (collider->sweepTest(gl_start, gl_end, gl_mins, gl_maxs, entityFrac, localNormal))
+        {
+            // Берем только если этот объект БЛИЖЕ, чем всё, что мы нашли ранее (включая стены BSP)
+            if (entityFrac < closestFraction)
+            {
+                closestFraction = entityFrac;
+                closestCollider = collider;
+                entityNormal = localNormal;
+                hitDynamicEntity = true;
+            }
+        }
+    }
+    
+    // 3. Если мы перезаписали точку коллизии динамическим объектом, обновляем результирующий HitResult
+    if (hitDynamicEntity)
+    {
+        result.fraction = closestFraction;
+        result.endpos = OpenGL2Quake(gl_start + closestFraction * (gl_end - gl_start));
+        result.normal = OpenGL2Quake(entityNormal);
+        result.hitEntity = closestCollider->owner;
+        result.hitCollider = closestCollider;
+        
+        // Обнуляем Quake-специфичные флаги текстур брашей, так как попали в динамический объект
+        result.textureId = -1;
+        result.surfaceFlags = 0;
+        result.startsolid = (closestFraction == 0.0f);
+        result.allsolid = false; // Для динамических объектов рассчитывается индивидуально
+    }
 }

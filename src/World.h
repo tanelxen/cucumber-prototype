@@ -16,6 +16,7 @@ class Viewport;
 
 class Entity;
 class Component;
+class CollisionComponent;
 class UID;
 
 class WorldScene
@@ -41,7 +42,13 @@ public:
     void queueComponentDestruction(Component* component);
     void queueEntityDestruction(Entity* entity);
     
-    void trace(struct HitResult& result, const glm::vec3 &start, const glm::vec3 &end, const glm::vec3 &mins, const glm::vec3 &maxs) const;
+    void trace(struct HitResult& result,
+               const glm::vec3 &start,
+               const glm::vec3 &end,
+               const glm::vec3 &mins,
+               const glm::vec3 &maxs,
+               const Entity* ignore,
+               uint32_t mask = 0xFFFFFFFF) const;
     
     Viewport* m_pAttachedViewport;
     
@@ -60,6 +67,7 @@ private:
     std::vector<Component*> m_globalUpdatables;
     std::vector<Component*> m_globalFixedUpdatables;
     std::vector<Component*> m_globalWaitingForStart;
+    std::vector<CollisionComponent*> m_globalColliders;
     
     void processPendingStarts();
     void cleanupDeadComponents();

@@ -11,6 +11,7 @@
 #include "AnimatorComponent.h"
 #include "TransformComponent.h"
 #include "MovementComponent.h"
+#include "CollisionComponent.h"
 
 #include "Entity.h"
 #include "Input.h"
@@ -110,6 +111,7 @@ void RegisterTransformComponent(asIScriptEngine* engine);
 void RegisterAudioComponent(asIScriptEngine* engine);
 void RegisterAnimatorComponent(asIScriptEngine* engine);
 void RegisterMovementComponent(asIScriptEngine* engine);
+void RegisterCollisionComponent(asIScriptEngine* engine);
 void RegisterEntity(asIScriptEngine* engine);
 
 void RegisterInputSystem(asIScriptEngine* engine);
@@ -136,9 +138,10 @@ void ScriptEngine::RegisterEngineAPI()
     RegisterAudioComponent(m_asEngine);
     RegisterAnimatorComponent(m_asEngine);
     RegisterMovementComponent(m_asEngine);
+    RegisterCollisionComponent(m_asEngine);
     
     RegisterEntity(m_asEngine);
-    m_asEngine->RegisterGlobalFunction("ref@ _GetScript(Entity@, const string &in)", asFUNCTION(GetScriptOnEntity), asCALL_CDECL);
+    m_asEngine->RegisterGlobalFunction("ref@ _GetScript(Entity@ entity, const string &in name)", asFUNCTION(GetScriptOnEntity), asCALL_CDECL);
     
     RegisterInputSystem(m_asEngine);
     RegisterSpriteRenderer(m_asEngine);
@@ -470,6 +473,12 @@ void RegisterMovementComponent(asIScriptEngine* engine)
                                  asMETHOD(MovementComponent, jump), asCALL_THISCALL);
 }
 
+void RegisterCollisionComponent(asIScriptEngine* engine)
+{
+    engine->RegisterObjectType("CollisionComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
+    engine->RegisterObjectProperty("CollisionComponent", "bool enabled", asOFFSET(CollisionComponent, enabled));
+}
+
 void RegisterEntity(asIScriptEngine* engine)
 {
     // Регистрируем Entity как тип-ссылку (без подсчета ссылок)
@@ -487,6 +496,9 @@ void RegisterEntity(asIScriptEngine* engine)
     
     engine->RegisterObjectMethod("Entity", "MovementComponent@ GetMovement()",
                                  asMETHOD(Entity, getComponent<MovementComponent>), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("Entity", "CollisionComponent@ GetCollider()",
+                                 asMETHOD(Entity, getComponent<CollisionComponent>), asCALL_THISCALL);
     
     engine->RegisterObjectMethod("Entity", "const string& GetName() const",
                                  asMETHOD(Entity, GetName), asCALL_THISCALL);
@@ -608,18 +620,20 @@ namespace {
     {
         glm::vec3 point;
         glm::vec3 normal;
+        Entity* entity;
     };
     
-    bool MakeRaycast(const glm::vec3& start, const glm::vec3& dir, float distance, RaycastResult& hit)
+    bool MakeRaycast(const glm::vec3& start, const glm::vec3& dir, float distance, RaycastResult& hit, Entity* ignore)
     {
         HitResult result;
         result.endpos = { 0, 0, 0 };
         result.normal = { 0, 1, 0 };
         
-        g_currentScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0));
+        g_currentScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0), ignore);
         
         hit.point = Quake2OpenGL(result.endpos);
         hit.normal = Quake2OpenGL(result.normal);
+        hit.entity = result.hitEntity;
         
         return result.fraction > 0.0f && result.fraction < 1.0f;
     }
@@ -636,15 +650,10 @@ void RegisterPhysics(asIScriptEngine* engine)
     // 2. Регистрируем свойства
     r = engine->RegisterObjectProperty("RaycastResult", "Vector3 point", asOFFSET(RaycastResult, point)); assert(r >= 0);
     r = engine->RegisterObjectProperty("RaycastResult", "Vector3 normal", asOFFSET(RaycastResult, normal)); assert(r >= 0);
-    
-    /*
-    // 3. Регистрируем конструкторы
-    r = engine->RegisterObjectBehaviour("RaycastResult", asBEHAVE_CONSTRUCT, "void f()",
-                                        asFUNCTION(+[](void* memory) { new(memory) RaycastResult(); }), asCALL_CDECL_OBJLAST); assert(r >= 0);
-     */
+    r = engine->RegisterObjectProperty("RaycastResult", "Entity@ entity", asOFFSET(RaycastResult, entity)); assert(r >= 0);
     
     engine->SetDefaultNamespace("Physics");
-    engine->RegisterGlobalFunction("bool Raycast(const Vector3 &in start, const Vector3 &in dir, float distance, RaycastResult &out hit)",
+    engine->RegisterGlobalFunction("bool Raycast(const Vector3 &in start, const Vector3 &in dir, float distance, RaycastResult &out hit, Entity &in ignore)",
                                    asFUNCTION(MakeRaycast), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 }

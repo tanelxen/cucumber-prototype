@@ -9,6 +9,7 @@ class WeaponMP40 : MonoBehaviour
 
     private int flashTextureId = 0;
     private int bulletHoleTexId = 0;
+    int damage = 10;
 
     void start()
     {
@@ -87,15 +88,32 @@ class WeaponMP40 : MonoBehaviour
         Vector3 forward = transform.GetRight();
         RaycastResult hit;
 
-        if (Physics::Raycast(position, forward, 1024.0f, hit)) 
+        if (Physics::Raycast(position, forward, 1024.0f, hit, GetOwner())) 
         {
             SpawnTracer(muzzlePos, hit.point);
 
-            SpawnSparks(hit.point, hit.normal, 5);
-            SpawnDust(hit.point, 5);
+            if (hit.entity != null)
+            {
+                print("Hit " + hit.entity.GetName());
 
-            float randomScale = Math::RandomFloat(4.0f, 8.0f);
-            DecalManager::AddDecal(bulletHoleTexId, hit.point, hit.normal, randomScale, 60.0f);
+                ref@ zom = _GetScript(hit.entity, "Zombie");
+                Zombie@ zombie = cast<Zombie>(zom);
+
+                if (zombie != null)
+                {
+                    zombie.takeDamage(damage);
+                }
+
+                SpawnBlood(hit.point, hit.normal, 5);
+            }
+            else
+            {
+                SpawnSparks(hit.point, hit.normal, 5);
+                SpawnDust(hit.point, 5);
+
+                float randomScale = Math::RandomFloat(4.0f, 8.0f);
+                DecalManager::AddDecal(bulletHoleTexId, hit.point, hit.normal, randomScale, 60.0f);
+            }
         }
     }
 }

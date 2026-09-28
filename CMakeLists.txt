@@ -82,6 +82,8 @@ set(SRC_COMPONENTS
         src/CameraComponent.h
         src/MovementComponent.cpp
         src/MovementComponent.h
+        src/CollisionComponent.cpp
+        src/CollisionComponent.h
 )
 
 set(SRC_RENDERER

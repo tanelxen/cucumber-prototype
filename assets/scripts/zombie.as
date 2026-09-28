@@ -6,6 +6,10 @@ class Zombie : MonoBehaviour
 	private TransformComponent@ transform;
 	private MovementComponent@ motor;
 
+	private bool isHurt = false;
+	private bool isDead = false;
+	int health = 40;
+
 	void start()
     {
         print("Zombie started on entity: " + GetOwner().GetName());
@@ -28,12 +32,16 @@ class Zombie : MonoBehaviour
         	animator.addNotify("attack1", 10.0f/24.0f, OnAnimNotify(this.doAttack));
         	animator.addNotify("attack1", 19.0f/24.0f, OnAnimNotify(this.doAttack));
 
+        	@animator.onClipFinished = OnClipFinishedCallback(this.handleAnimationEnd);
+
         	animator.Play("idle1", false);
         }
     }
 
     void update(float dt)
     {
+    	if (isDead || isHurt) return;
+
     	if (player != null)
     	{
     		Vector3 playerPos = player.GetTransform().GetWorldPosition();
@@ -62,6 +70,11 @@ class Zombie : MonoBehaviour
     			animator.Play("attack1", false);
     		}
     	}
+
+    	if (Input::GetKey(KeyCode::C))
+    	{
+    		takeDamage(0);
+    	}
     }
 
     private void doStep()
@@ -72,5 +85,41 @@ class Zombie : MonoBehaviour
     private void doAttack()
     {
     	PlaySound("assets/sounds/claw_strike1.wav");
+    }
+
+    void handleAnimationEnd(const string &in clipName)
+    {
+        if (clipName == "flinch")
+        {
+            isHurt = false;
+            animator.Play("idle1", false); // Возвращаемся в idle
+        }
+    }
+
+    void takeDamage(int damage)
+    {
+    	if (isDead) return;
+
+    	health -= damage;
+
+    	if (health <= 0)
+    	{
+    		PlaySound("assets/sounds/zo_pain2.wav");
+    		animator.Play("diesimple", true);
+    		isDead = true;
+
+    		CollisionComponent@ collider = GetOwner().GetCollider();
+
+    		if (collider != null)
+    		{
+    			collider.enabled = false;
+    		}
+    	}
+    	else if (!isHurt)
+    	{
+    		PlaySound("assets/sounds/zo_pain1.wav");
+    		animator.Play("flinch", true);
+    		isHurt = true;
+    	}
     }
 }

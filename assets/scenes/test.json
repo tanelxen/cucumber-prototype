@@ -30,6 +30,23 @@
                 },
                 {
                     "data": {
+                        "collisionMask": 4294967295,
+                        "layer": 1,
+                        "maxs": [
+                            15.0,
+                            72.0,
+                            -15.0
+                        ],
+                        "mins": [
+                            -15.0,
+                            0.0,
+                            15.0
+                        ]
+                    },
+                    "type": "CollisionComponent"
+                },
+                {
+                    "data": {
                         "className": "Player",
                         "fields": {
                             "headTransform": {
@@ -118,6 +135,7 @@
                         "className": "WeaponMP40",
                         "fields": {
                             "boneIndex": 5,
+                            "damage": 10,
                             "fireInterval": 0.10000000149011612
                         }
                     },
@@ -152,12 +170,36 @@
                 },
                 {
                     "data": {
+                        "collisionMask": 4294967295,
+                        "layer": 1,
+                        "maxs": [
+                            15.0,
+                            72.0,
+                            -15.0
+                        ],
+                        "mins": [
+                            -15.0,
+                            0.0,
+                            15.0
+                        ]
+                    },
+                    "type": "CollisionComponent"
+                },
+                {
+                    "data": {
+                        "forward_speed": 110.0
+                    },
+                    "type": "MovementComponent"
+                },
+                {
+                    "data": {
                         "className": "Zombie",
                         "fields": {
                             "animator": {
                                 "owner": "uid://1wijqfin7cyr",
                                 "type": "AnimatorComponent"
                             },
+                            "health": 40,
                             "player": {
                                 "type": "Entity",
                                 "uid": "uid://favu1um0rhq6e"
@@ -165,12 +207,6 @@
                         }
                     },
                     "type": "ScriptComponent"
-                },
-                {
-                    "data": {
-                        "forward_speed": 110.0
-                    },
-                    "type": "MovementComponent"
                 }
             ],
             "name": "Zombie",
