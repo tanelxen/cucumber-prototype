@@ -54,8 +54,8 @@
                                 "owner": "uid://oro2ef1gi7si",
                                 "type": "TransformComponent"
                             },
-                            "mouse_speed": 8.0,
-                            "move_speed": 400.0
+                            "health": 100,
+                            "mouse_speed": 8.0
                         }
                     },
                     "type": "ScriptComponent"
@@ -135,7 +135,9 @@
                     "data": {
                         "className": "WeaponMP40",
                         "fields": {
+                            "ammo": 0,
                             "boneIndex": 5,
+                            "clip": 32,
                             "damage": 10,
                             "fireInterval": 0.10000000149011612
                         }
@@ -260,26 +262,26 @@
                 {
                     "data": {
                         "position": [
-                            0.0,
-                            128.0,
-                            -700.0
+                            -32.0,
+                            176.0,
+                            -629.0
                         ],
                         "rotation": [
                             0.0,
-                            0.0,
+                            -0.0,
                             0.0
                         ],
                         "scale": [
-                            0.5,
-                            0.25,
-                            0.5
+                            1.0,
+                            1.0,
+                            1.0
                         ]
                     },
                     "type": "TransformComponent"
                 },
                 {
                     "data": {
-                        "source_glb": "meshes/gltf/oil_drum.glb"
+                        "source_glb": "meshes/gltf/health_l.glb"
                     },
                     "type": "MeshComponent"
                 },
@@ -288,14 +290,14 @@
                         "collisionMask": 4294901762,
                         "layer": 8,
                         "maxs": [
-                            15.0,
-                            32.0,
-                            -15.0
+                            16.0,
+                            16.0,
+                            -16.0
                         ],
                         "mins": [
-                            -15.0,
+                            -16.0,
                             0.0,
-                            15.0
+                            16.0
                         ],
                         "trigger": true
                     },
@@ -304,7 +306,9 @@
                 {
                     "data": {
                         "className": "Medkit",
-                        "fields": {}
+                        "fields": {
+                            "heal": 30
+                        }
                     },
                     "type": "ScriptComponent"
                 }
@@ -312,6 +316,66 @@
             "name": "Medkit",
             "parent": "uid://<invalid>",
             "uid": "uid://cjybsb6j18skk"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            -68.0,
+                            176.0,
+                            -634.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            45.0,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
+                },
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/am_9mm_m.glb"
+                    },
+                    "type": "MeshComponent"
+                },
+                {
+                    "data": {
+                        "collisionMask": 4294967295,
+                        "layer": 8,
+                        "maxs": [
+                            16.0,
+                            16.0,
+                            -16.0
+                        ],
+                        "mins": [
+                            -16.0,
+                            0.0,
+                            16.0
+                        ],
+                        "trigger": true
+                    },
+                    "type": "CollisionComponent"
+                },
+                {
+                    "data": {
+                        "className": "AmmoClip",
+                        "fields": {
+                            "clipSize": 64
+                        }
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Ammo",
+            "parent": "uid://<invalid>",
+            "uid": "uid://flg44ugrswn01"
         }
     ],
     "name": "test"

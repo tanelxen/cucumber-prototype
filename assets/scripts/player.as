@@ -11,6 +11,21 @@ class Player : MonoBehaviour
 
     private MovementComponent@ motor;
 
+    private float footstepTimer = 0.0f;
+    private float footstepIntervalWalking = 0.45f;
+
+    private array<string> footstepSounds = {
+        "assets/sounds/step1.wav",
+        "assets/sounds/step2.wav",
+        "assets/sounds/step3.wav",
+        "assets/sounds/step4.wav"
+    };
+
+    // Переменная, чтобы не играть один и тот же звук два раза подряд
+    private int lastSoundIndex = -1;
+
+    private float damageAlpha = 0;
+
     void start()
     {
         print("Player started on entity: " + GetOwner().GetName());
@@ -23,14 +38,31 @@ class Player : MonoBehaviour
         TransformComponent@ transform = GetTransform();
         if (transform == null) return;
 
+        bool isMoving = false; // Флаг, идет ли игрок прямо сейчас
+
         if (motor != null)
         {
-            if (Input::GetKey(KeyCode::W)) motor.AddMovementInput(transform.GetForward(), 1.0f);
-            if (Input::GetKey(KeyCode::S)) motor.AddMovementInput(transform.GetForward(), -1.0f);
-            if (Input::GetKey(KeyCode::D)) motor.AddMovementInput(transform.GetRight(), 1.0f);
-            if (Input::GetKey(KeyCode::A)) motor.AddMovementInput(transform.GetRight(), -1.0f);
+            if (Input::GetKey(KeyCode::W)) { motor.AddMovementInput(transform.GetForward(), 1.0f); isMoving = true; }
+            if (Input::GetKey(KeyCode::S)) { motor.AddMovementInput(transform.GetForward(), -1.0f); isMoving = true; }
+            if (Input::GetKey(KeyCode::D)) { motor.AddMovementInput(transform.GetRight(), 1.0f); isMoving = true; }
+            if (Input::GetKey(KeyCode::A)) { motor.AddMovementInput(transform.GetRight(), -1.0f); isMoving = true; }
 
             if (Input::GetKey(KeyCode::Space)) motor.Jump();
+        }
+
+        // Логика таймера шагов
+        if (isMoving && motor.IsGrounded()) 
+        {
+            footstepTimer += dt;
+            if (footstepTimer >= footstepIntervalWalking)
+            {
+                playFootstepSound();
+                footstepTimer = 0.0f;
+            }
+        }
+        else
+        {
+            footstepTimer = footstepIntervalWalking; 
         }
 
         if (Input::GetRightMouseButton())
@@ -53,12 +85,41 @@ class Player : MonoBehaviour
 
         drawCrosshair();
         drawHealth();
+
+        if (damageAlpha > 0)
+        {
+            drawPain();
+            damageAlpha = Math::max(0, damageAlpha - dt);
+        }
+    }
+
+    private void playFootstepSound()
+    {
+        // Защита от пустого массива
+        if (footstepSounds.length() == 0) return;
+
+        int index = 0;
+
+        // Если в пуле больше одного звука, выбираем так, чтобы он не повторял предыдущий
+        if (footstepSounds.length() > 1)
+        {
+            do {
+                // Предполагается, что у тебя есть зарегистрированная функция рандома.
+                // Если нет, ниже я покажу, как использовать встроенный в C++ rand()
+                index = Math::RandomInt(0, footstepSounds.length() - 1);
+            } while (index == lastSoundIndex);
+            
+            lastSoundIndex = index;
+        }
+
+        // Вызываем твою глобальную функцию miniaudio
+        PlaySound(footstepSounds[index]);
     }
 
     void takeDamage(int damage)
     {
         health -= damage;
-        drawPain();
+        damageAlpha = 0.3f;
     }
 
     private void drawCrosshair()
@@ -95,7 +156,7 @@ class Player : MonoBehaviour
         int width = UI::GetScreenWidth();
         int height = UI::GetScreenHeight();
 
-        Color color(1.0f, 0.0f, 0.0f, 0.3f);
+        Color color(1.0f, 0.0f, 0.0f, damageAlpha);
 
         Vector2 size = Vector2(width, height);
         Vector2 pos(0, 0);

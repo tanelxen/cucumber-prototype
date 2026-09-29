@@ -41,6 +41,7 @@ public:
     
     const glm::vec3& getVelocity() const { return m_velocity; }
     bool isWalking() const { return m_isGrounded && glm::length(m_velocity) > 0.1f; }
+    bool isGrounded() const { return m_isGrounded; }
     int getSurfaceFlags() const { return m_surfaceFlags; }
     
     float m_forwardspeed = 400.f;

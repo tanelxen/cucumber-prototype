@@ -22,7 +22,10 @@ class Medkit : MonoBehaviour
 
         if (player != null)
         {
-            player.health += heal;
+            PlaySound("assets/sounds/health_pickup.wav");
+
+            player.health = Math::min(100, player.health + heal);
+
             GetOwner().active = false;
         }
     }

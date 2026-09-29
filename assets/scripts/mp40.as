@@ -7,46 +7,78 @@ class WeaponMP40 : MonoBehaviour
     private bool isFiring = false;
     private float fireTimer = 0.0f;
 
+    private bool isReloading = false;
+
     private int flashTextureId = 0;
     private int bulletHoleTexId = 0;
     int damage = 10;
 
-    int ammo = 300;
+    int ammo = 0;
     int clip = 32;
+    private int kMaxClip = 32;
+
+    private int iconTextureId = 0;
 
     void start()
     {
         print("WeaponMP40 started on entity: " + GetOwner().GetName());
 
         @anim = GetOwner().GetAnimator();
+        @anim.onClipFinished = OnClipFinishedCallback(this.handleAnimationEnd);
 
         anim.Play("idle", false, 0.0f);
 
         flashTextureId = SpriteRenderer::preloadTexture("assets/textures/muzzle_flash.png");
         bulletHoleTexId = SpriteRenderer::preloadTexture("assets/textures/bullet_hole.png");
+
+        iconTextureId = SpriteRenderer::preloadTexture("assets/textures/iconw_MP40_1.png");
     }
 
     void update(float dt)
     {
-        if (Input::GetLeftMouseButtonPressed())
+        if (canFire())
         {
-            startFiring();
-        }
-        else
-        {
-            stopFiring();
+            if (Input::GetLeftMouseButtonPressed())
+            {
+                startFiring();
+            }
+            else
+            {
+                stopFiring();
+            }
+
+            if (fireTimer > 0.0f) {
+                fireTimer -= dt;
+            }
+
+            // Логика стрельбы работает строго по таймеру, пока зажата кнопка
+            if (isFiring && fireTimer <= 0.0f) {
+                executeLogicShot();
+            }
         }
 
-        if (fireTimer > 0.0f) {
-            fireTimer -= dt;
-        }
-
-        // Логика стрельбы работает строго по таймеру, пока зажата кнопка
-        if (isFiring && fireTimer <= 0.0f) {
-            executeLogicShot();
+        if (Input::GetKeyDown(KeyCode::R))
+        {
+            reload();
         }
 
         drawAmmo();
+    }
+
+    void handleAnimationEnd(const string &in clipName)
+    {
+        if (clipName == "reload")
+        {
+            int needed = kMaxClip - clip;
+            int remain = Math::max(0, ammo - needed);
+            int added = ammo - remain;
+
+            clip += added;
+            ammo = remain;
+
+            anim.Play("idle", false); // Возвращаемся в idle
+            isReloading = false;
+        }
     }
 
     // Игрок нажал ЛКМ
@@ -77,8 +109,6 @@ class WeaponMP40 : MonoBehaviour
     {
         clip -= 1;
 
-        if (clip <= 0) return;
-
         fireTimer = fireInterval; // Сброс таймера
 
         PlaySound("assets/sounds/mp40f1.wav");
@@ -103,8 +133,6 @@ class WeaponMP40 : MonoBehaviour
 
             if (hit.entity != null)
             {
-                print("Hit " + hit.entity.GetName());
-
                 ref@ zom = _GetScript(hit.entity, "Zombie");
                 Zombie@ zombie = cast<Zombie>(zom);
 
@@ -126,16 +154,37 @@ class WeaponMP40 : MonoBehaviour
         }
     }
 
+    private void reload()
+    {
+        if (ammo > 0 && clip < kMaxClip)
+        {
+            PlaySound("assets/sounds/mp40_reload.wav");
+            anim.Play("reload", true);
+            isReloading = true;
+        }
+    }
+
+    private bool canFire()
+    {
+        return clip > 0 && !isReloading;
+    }
+
     private void drawAmmo()
     {
         int width = UI::GetScreenWidth();
         int height = UI::GetScreenHeight();
 
-        Color color(0.9f, 0.9f, 0.9f, 1.0f);
+        Color color(1.0f, 1.0f, 1.0f, 1.0f);
 
-        Vector2 pos = Vector2(width - 16.0f - 128, height - 16.0f);
-        
-        string str = format('{}/{}', clip, ammo);
-        UI::DrawText(str, pos, 1.0f, color);
+        Vector2 pos = Vector2(width - 16.0f - 154, height - 16.0f);
+        UI::DrawText("" + clip, pos, 1.0f, color);
+
+        Vector2 size(128, 64);
+        pos = Vector2(width - size.x - 8, height - size.y - 16);
+
+        UI::DrawImage(pos, size, iconTextureId, color);
+
+        pos = Vector2(width - 54, height - 64 - 32);
+        UI::DrawText("" + ammo, pos, 1.0f, color);
     }
 }

@@ -29,6 +29,7 @@
 #include <scriptbuilder/scriptbuilder.h>
 #include <scripthandle/scripthandle.h>
 #include <scripthelper/scripthelper.h>
+#include <scriptarray/scriptarray.h>
 
 #include <filesystem>
 #include <iostream>
@@ -59,6 +60,8 @@ bool ScriptEngine::init()
     // 2. Регистрируем стандартные строки из аддонов
     RegisterStdString(m_asEngine);
     RegisterScriptHandle(m_asEngine);
+    
+    RegisterScriptArray(m_asEngine, true);
     
     // 3. Создаем один контекст для выполнения (переиспользуемый)
     m_Context = m_asEngine->CreateContext();
@@ -128,6 +131,11 @@ void ScriptPrintCallback(const std::string& text)
     ScriptEngine::get().AddLogMessage(msg);
 }
 
+static Entity* FindEntityByName(const std::string& name)
+{
+    return g_currentScene->findEntityByName(name);
+}
+
 // Сюда мы будем добавлять функции движка, доступные в скриптах
 void ScriptEngine::RegisterEngineAPI()
 {
@@ -143,6 +151,7 @@ void ScriptEngine::RegisterEngineAPI()
     
     RegisterEntity(m_asEngine);
     m_asEngine->RegisterGlobalFunction("ref@ _GetScript(Entity@ entity, const string &in name)", asFUNCTION(GetScriptOnEntity), asCALL_CDECL);
+    m_asEngine->RegisterGlobalFunction("Entity@ FindEntityByName(const string &in name)", asFUNCTION(FindEntityByName), asCALL_CDECL);
     
     RegisterInputSystem(m_asEngine);
     RegisterSpriteRenderer(m_asEngine);
@@ -301,6 +310,31 @@ static float RandomFloat(float min, float max)
     return dis(gen);
 }
 
+static float RandomInt(int min, int max)
+{
+    return min + rand() % (max - min + 1);
+}
+
+static int min_int(int a, int b)
+{
+    return std::min(a, b);
+}
+
+static float min_float(float a, float b)
+{
+    return std::min(a, b);
+}
+
+static int max_int(int a, int b)
+{
+    return std::max(a, b);
+}
+
+static float max_float(float a, float b)
+{
+    return std::max(a, b);
+}
+
 static float dot(const glm::vec3& v1, const glm::vec3& v2)
 {
     return glm::dot(v1, v2);
@@ -337,6 +371,12 @@ void RegisterMath(asIScriptEngine* engine)
     // Конструктор с параметрами Vector3(x, y, z)
     r = engine->RegisterObjectBehaviour("Vector3", asBEHAVE_CONSTRUCT, "void f(float, float, float)",
                                         asFUNCTION(+[](float x, float y, float z, void* memory) { new(memory) glm::vec3(x, y, z); }), asCALL_CDECL_OBJLAST); assert(r >= 0);
+    
+    
+    // Регистрируем поведение списка инициализации с паттерном "{float, float, float}"
+    engine->RegisterObjectBehaviour("Vector3", asBEHAVE_LIST_CONSTRUCT, "void f(const int &in list) {float, float, float}",
+                                    asFUNCTION(+[](const glm::vec3* listBuffer, void* memory) { new(memory) glm::vec3(*listBuffer); }), asCALL_CDECL_OBJLAST);
+    
     
     // Vec3 * float (Объект Vec3 слева, значит OBJFIRST. В C++ функции: Vec3, затем float)
     engine->RegisterObjectMethod("Vector3", "Vector3 opMul(float) const",
@@ -378,7 +418,12 @@ void RegisterMath(asIScriptEngine* engine)
     
     engine->SetDefaultNamespace("Math");
     engine->RegisterGlobalFunction("float RandomFloat(float, float)", asFUNCTION(RandomFloat), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float RandomInt(int, int)", asFUNCTION(RandomInt), asCALL_CDECL);
     engine->RegisterGlobalFunction("float atan2(float, float)", asFUNCTION(atan2f), asCALL_CDECL);
+    engine->RegisterGlobalFunction("int min(int, int)", asFUNCTION(min_int), asCALL_CDECL);
+    engine->RegisterGlobalFunction("int max(int, int)", asFUNCTION(max_int), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float min(float, float)", asFUNCTION(min_float), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float max(float, float)", asFUNCTION(max_float), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 }
 
@@ -472,6 +517,12 @@ void RegisterMovementComponent(asIScriptEngine* engine)
     
     engine->RegisterObjectMethod("MovementComponent", "void Jump()",
                                  asMETHOD(MovementComponent, jump), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("MovementComponent", "bool IsGrounded()",
+                                 asMETHOD(MovementComponent, isGrounded), asCALL_THISCALL);
+    
+//    engine->RegisterObjectMethod("MovementComponent", "bool IsWalking()",
+//                                 asMETHOD(MovementComponent, isWalking), asCALL_THISCALL);
 }
 
 // Посредник для установки коллбэка из скрипта
@@ -668,6 +719,9 @@ void RegisterSpriteRenderer(asIScriptEngine* engine)
     
     engine->RegisterGlobalFunction("void DrawText(const string &in text, const Vector2 &in pos, float scale, const Color &in color)",
                                    asFUNCTION(HUD::DrawText), asCALL_CDECL);
+    
+    engine->RegisterGlobalFunction("void DrawImage(const Vector2 &in position, const Vector2 &in size, int id, const Color &in color)",
+                                   asFUNCTION(HUD::DrawTexture), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 }
 

@@ -120,7 +120,7 @@ namespace HUD {
     
     void Init()
     {
-        fontPixelHeight = 48.f;
+        fontPixelHeight = 32.f;
         
         // 1. Компиляция шейдеров
         GLuint vs = glCreateShader(GL_VERTEX_SHADER);
@@ -286,6 +286,9 @@ namespace HUD {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
+        glDepthMask(GL_FALSE);      // Отключаем запись в буфер глубины
+        glDisable(GL_DEPTH_TEST);   // Отключаем чтение буфера глубины
+        
         // 1. Загружаем ОДИН РАЗ все вершины кадра на GPU
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(Vertex), vertices.data());
@@ -317,6 +320,9 @@ namespace HUD {
         
         glBindVertexArray(0);
         glBindTexture(GL_TEXTURE_2D, 0);
+        
+        glDepthMask(GL_TRUE);
+        glEnable(GL_DEPTH_TEST);
         
         // Очищаем буферы для следующего кадра
         
