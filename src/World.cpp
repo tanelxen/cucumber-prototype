@@ -45,7 +45,7 @@
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
 #include "DecalManager.h"
-#include "HUD.h"
+#include "GameUI.h"
 
 #include "../vendor/json.hpp"
 
@@ -67,7 +67,7 @@ WorldScene::WorldScene()
     SpriteRenderer::Init();
     ParticleSystem::Init();
     DecalManager::Init();
-    HUD::Init();
+    GameUI::Init();
     
     if (ScriptEngine::get().init())
     {
@@ -177,8 +177,8 @@ void WorldScene::draw()
     {
         int width = m_pAttachedViewport->getWidth();
         int height = m_pAttachedViewport->getHeight();
-        HUD::Resize(width, height);
-        HUD::Flush();
+        GameUI::Resize(width, height);
+        GameUI::Flush();
     }
     
     m_pAttachedViewport->unbind();

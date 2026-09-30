@@ -19,9 +19,11 @@
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
 #include "DecalManager.h"
-#include "HUD.h"
+#include "GameUI.h"
 
 #include "World.h"
+
+#include "GameUI_AS.h"
 
 #include <glm/glm.hpp>
 
@@ -120,7 +122,6 @@ void RegisterEntity(asIScriptEngine* engine);
 
 void RegisterInputSystem(asIScriptEngine* engine);
 void RegisterSpriteRenderer(asIScriptEngine* engine);
-void RegisterUI(asIScriptEngine* engine);
 void RegisterPhysics(asIScriptEngine* engine);
 
 void ScriptPrintCallback(const std::string& text)
@@ -156,7 +157,7 @@ void ScriptEngine::RegisterEngineAPI()
     
     RegisterInputSystem(m_asEngine);
     RegisterSpriteRenderer(m_asEngine);
-    RegisterUI(m_asEngine);
+    RegisterGameUI(m_asEngine);
     RegisterPhysics(m_asEngine);
 }
 
@@ -680,82 +681,15 @@ void RegisterSpriteRenderer(asIScriptEngine* engine)
 }
 
 static void ConstructLayout(void* memory) {
-    new(memory) HUD::Layout();
+    new(memory) GameUI::Layout();
 }
 
-static void CopyConstructLayout(const HUD::Layout& other, void* memory) {
-    new(memory) HUD::Layout(other);
+static void CopyConstructLayout(const GameUI::Layout& other, void* memory) {
+    new(memory) GameUI::Layout(other);
 }
 
 static void DestructLayout(void* memory) {
-    reinterpret_cast<HUD::Layout*>(memory)->~Layout();
-}
-
-void RegisterUI(asIScriptEngine* engine)
-{
-    engine->RegisterObjectType("Color", sizeof(glm::vec4),
-                               asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS);
-    
-    engine->RegisterObjectProperty("Color", "float r", asOFFSET(glm::vec4, x));
-    engine->RegisterObjectProperty("Color", "float g", asOFFSET(glm::vec4, y));
-    engine->RegisterObjectProperty("Color", "float b", asOFFSET(glm::vec4, z));
-    engine->RegisterObjectProperty("Color", "float a", asOFFSET(glm::vec4, w));
-    
-    engine->RegisterObjectBehaviour("Color", asBEHAVE_CONSTRUCT, "void f()",
-                                    asFUNCTION(+[](void* memory) { new(memory) glm::vec4(1.0f); }), asCALL_CDECL_OBJLAST);
-    
-    engine->RegisterObjectBehaviour("Color", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)",
-                                    asFUNCTION(+[](float r, float g, float b, float a, void* memory) { new(memory) glm::vec4(r, g, b, a); }), asCALL_CDECL_OBJLAST);
-    
-    
-    
-    engine->RegisterObjectType("Vector2", sizeof(glm::vec2),
-                               asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS);
-    
-    engine->RegisterObjectProperty("Vector2", "float x", asOFFSET(glm::vec2, x));
-    engine->RegisterObjectProperty("Vector2", "float y", asOFFSET(glm::vec2, y));
-    
-    engine->RegisterObjectBehaviour("Vector2", asBEHAVE_CONSTRUCT, "void f()",
-                                    asFUNCTION(+[](void* memory) { new(memory) glm::vec2(0.0f); }), asCALL_CDECL_OBJLAST);
-    
-    engine->RegisterObjectBehaviour("Vector2", asBEHAVE_CONSTRUCT, "void f(float, float)",
-                                    asFUNCTION(+[](float x, float y, void* memory) { new(memory) glm::vec2(x, y); }), asCALL_CDECL_OBJLAST);
-    
-    engine->SetDefaultNamespace("UI");
-    
-    engine->RegisterObjectType("Layout", sizeof(HUD::Layout), asOBJ_VALUE | asOBJ_APP_CLASS_C | asOBJ_APP_CLASS_ALLFLOATS);
-    
-    engine->RegisterObjectBehaviour("Layout", asBEHAVE_CONSTRUCT, "void f()",
-                                    asFUNCTION(ConstructLayout), asCALL_CDECL_OBJLAST);
-    
-    // Регистрируем конструктор копирования (критически важен для возврата из функций по значению!)
-    engine->RegisterObjectBehaviour("Layout", asBEHAVE_CONSTRUCT, "void f(const Layout &in)",
-                                    asFUNCTION(CopyConstructLayout), asCALL_CDECL_OBJLAST);
-    
-    // Регистрируем деструктор
-    engine->RegisterObjectBehaviour("Layout", asBEHAVE_DESTRUCT, "void f()",
-                                    asFUNCTION(DestructLayout), asCALL_CDECL_OBJLAST);
-    
-//    engine->RegisterObjectBehaviour("Layout", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(+[](void* memory) { new(memory) HUD::Layout(); }), asCALL_CDECL_OBJLAST);
-    
-    engine->RegisterGlobalFunction("Layout LayoutTopLeft(float x, float y, float width, float height)", asFUNCTION(HUD::Layout::TopLeft), asCALL_CDECL);
-    engine->RegisterGlobalFunction("Layout LayoutTopRight(float x, float y, float width, float height)", asFUNCTION(HUD::Layout::TopRight), asCALL_CDECL);
-    engine->RegisterGlobalFunction("Layout LayoutBottomLeft(float x, float y, float width, float height)", asFUNCTION(HUD::Layout::BottomLeft), asCALL_CDECL);
-    engine->RegisterGlobalFunction("Layout LayoutBottomRight(float x, float y, float width, float height)", asFUNCTION(HUD::Layout::BottomRight), asCALL_CDECL);
-    engine->RegisterGlobalFunction("Layout LayoutCenter(float width, float height, Vector2 offset = Vector2())", asFUNCTION(HUD::Layout::Center), asCALL_CDECL);
-    engine->RegisterGlobalFunction("Layout LayoutFullscreen(float margin = 0)", asFUNCTION(HUD::Layout::FullScreen), asCALL_CDECL);
-    
-
-    engine->RegisterGlobalFunction("void DrawRect(const Layout &in layout, const Color &in color)",
-                                   asFUNCTIONPR(HUD::DrawRect, (const HUD::Layout&, const glm::vec4&), void), asCALL_CDECL);
-    
-    engine->RegisterGlobalFunction("void DrawText(const Layout &in layout, const string &in text, const Color &in color)",
-                                   asFUNCTIONPR(HUD::DrawText, (const HUD::Layout&, const std::string&, const glm::vec4&), void), asCALL_CDECL);
-    
-    engine->RegisterGlobalFunction("void DrawImage(const Layout &in layout, int id, const Color &in color)",
-                                   asFUNCTIONPR(HUD::DrawTexture, (const HUD::Layout&, unsigned int, const glm::vec4&), void), asCALL_CDECL);
-    
-    engine->SetDefaultNamespace("");
+    reinterpret_cast<GameUI::Layout*>(memory)->~Layout();
 }
 
 #include "PhysicsCommon.h"

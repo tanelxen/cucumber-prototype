@@ -10,6 +10,7 @@
 #include <angelscript.h>
 #include <vector>
 #include <string>
+#include <iostream>
 
 enum class ScriptLogType {
     Info,
@@ -55,7 +56,10 @@ public:
     void ClearLogs() { m_LogMessages.clear(); }
     
     // Сделаем метод добавления лога публичным, чтобы статический callback мог его вызвать
-    void AddLogMessage(const ScriptLogMessage& msg) { m_LogMessages.push_back(msg); }
+    void AddLogMessage(const ScriptLogMessage& msg) {
+        m_LogMessages.push_back(msg);
+        std::cout << msg.text << std::endl;
+    }
     
 private:
     ScriptEngine() = default;

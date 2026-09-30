@@ -121,26 +121,22 @@ class Player : MonoBehaviour
 
     private void drawCrosshair()
     {
-        UI::DrawRect(
-            UI::LayoutCenter(4, 4),
-            Color(1.0f, 1.0f, 1.0f, 1.0f)
-        );
+        UI::Rect(Color(1.0f, 1.0f, 1.0f, 1.0f))
+                .Center(4, 4)
+                .Draw();
     }
 
     private void drawHealth()
     {
-        UI::DrawText(
-            UI::LayoutBottomLeft(16, 16, 0, 0),
-            format('{}', health),
-            Color(0.63f, 0.47f, 0.25f, 1.0f)
-        );
+        UI::Text("" + health, Color(0.63f, 0.47f, 0.25f, 1.0f))
+                .BottomLeft(16, 16, 0, 0) // Текст рассчитывает размер сам, ширину/высоту ставим 0
+                .Draw();
     }
 
     private void drawPain()
     {
-        UI::DrawRect(
-            UI::LayoutFullscreen(),
-            Color(1.0f, 0.0f, 0.0f, damageAlpha)
-        );
+        UI::Rect(Color(1.0f, 0.0f, 0.0f, damageAlpha))
+                .FullScreen()
+                .Draw();
     }
 }

@@ -5,7 +5,7 @@
 //  Created by Fedor Artemenkov on 28.09.26.
 //
 
-#include "HUD.h"
+#include "GameUI.h"
 
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -59,7 +59,7 @@ const char* fragmentSource = R"(
     }
 )";
 
-namespace HUD {
+namespace GameUI {
     
     // Внутренняя структура для очереди команд отрисовки
     struct DrawCommand {
@@ -503,7 +503,7 @@ namespace HUD {
     }
 }
 
-namespace HUD {
+namespace GameUI {
     
     // 1. Фиксированный элемент в левом верхнем углу
     Layout Layout::TopLeft(float x, float y, float width, float height)

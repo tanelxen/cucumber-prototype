@@ -171,6 +171,7 @@ class WeaponMP40 : MonoBehaviour
 
     private void drawAmmo()
     {
+        /*
         UI::DrawText(
             UI::LayoutBottomRight(144, 16, 0, 0),
             "" + clip,
@@ -188,5 +189,6 @@ class WeaponMP40 : MonoBehaviour
             "" + ammo,
             Color(0.63f, 0.59f, 0.57f, 1.0f)
         );
+        */
     }
 }

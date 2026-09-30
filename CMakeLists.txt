@@ -109,8 +109,13 @@ set(SRC_RENDERER
         src/ParticleSystem.h
         src/DecalManager.cpp
         src/DecalManager.h
-        src/HUD.cpp
-        src/HUD.h
+)
+
+set(SRC_GameUI
+        src/GameUI.cpp
+        src/GameUI.h
+        src/GameUI_AS.cpp
+        src/GameUI_AS.h
 )
 
 set(SRC_PANELS
@@ -161,6 +166,7 @@ add_executable( ${PROJECT_NAME}
         ${SRC_COMPONENTS}
         ${SRC_RENDERER}
         ${SRC_PANELS}
+        ${SRC_GameUI}
         ${SRC_IMGUI}
 )
 
@@ -169,6 +175,7 @@ source_group("Quake 3" FILES ${SRC_Q3})
 source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
+source_group("Game UI" FILES ${SRC_GameUI})
 source_group("imgui" FILES ${SRC_IMGUI})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)
