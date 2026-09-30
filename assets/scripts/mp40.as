@@ -171,24 +171,16 @@ class WeaponMP40 : MonoBehaviour
 
     private void drawAmmo()
     {
-        /*
-        UI::DrawText(
-            UI::LayoutBottomRight(144, 16, 0, 0),
-            "" + clip,
-            Color(0.63f, 0.59f, 0.57f, 1.0f)
-        );
+        UI::Text("" + clip, Color(0.63f, 0.59f, 0.57f, 1.0f))
+                .BottomRight(144, 16, 0, 0)
+                .Draw();
 
-        UI::DrawImage(
-            UI::LayoutBottomRight(16, 0, 128, 64),
-            iconTextureId,
-            Color(1.0f, 1.0f, 1.0f, 1.0f)
-        );
+        UI::Image(iconTextureId)
+                .BottomRight(16, 0, 128, 64)
+                .Draw();
 
-        UI::DrawText(
-            UI::LayoutBottomRight(16, 64, 0, 0),
-            "" + ammo,
-            Color(0.63f, 0.59f, 0.57f, 1.0f)
-        );
-        */
+        UI::Text("" + ammo, Color(0.63f, 0.59f, 0.57f, 1.0f))
+                .BottomRight(16, 64, 0, 0)
+                .Draw();
     }
 }

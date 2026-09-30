@@ -1,0 +1,37 @@
+{
+  "widgets": [
+    {
+      "name": "BloodOverlay",
+      "type": "rect",
+      "color": [1.0, 0.0, 0.0, 0.0],
+      "layout": {
+        "anchorMinX": 0.0, "anchorMinY": 0.0,
+        "anchorMaxX": 1.0, "anchorMaxY": 1.0,
+        "left": 0.0, "top": 0.0, "right": 0.0, "bottom": 0.0
+      }
+    },
+    {
+      "name": "Crosshair",
+      "type": "rect",
+      "color": [1.0, 1.0, 1.0, 1.0],
+      "layout": {
+        "anchorMinX": 0.5, "anchorMinY": 0.5,
+        "anchorMaxX": 0.5, "anchorMaxY": 0.5,
+        "pivotX": 0.5, "pivotY": 0.5,
+        "left": 0.0, "top": 0.0, "right": 4.0, "bottom": 4.0
+      }
+    },
+    {
+      "name": "HealthText",
+      "type": "text",
+      "text": "HP: 100",
+      "color": [0.63, 0.47, 0.25, 1.0],
+      "layout": {
+        "anchorMinX": 0.0, "anchorMinY": 1.0,
+        "anchorMaxX": 0.0, "anchorMaxY": 1.0,
+        "pivotX": 0.0, "pivotY": 1.0,
+        "left": 16.0, "top": -16.0, "right": 100.0, "bottom": 100.0
+      }
+    }
+  ]
+}

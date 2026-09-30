@@ -24,11 +24,20 @@ class Player : MonoBehaviour
     // Переменная, чтобы не играть один и тот же звук два раза подряд
     private int lastSoundIndex = -1;
 
+    private UI::Screen@ gameHud;
+    private int hpTextId = -1;
+    private int bloodOverlayId = -1;
+
     private float damageAlpha = 0;
 
     void start()
     {
         print("Player started on entity: " + GetOwner().GetName());
+
+        @gameHud = UI::Screen();
+        gameHud.Init("assets/ui/main_hud.json");
+        hpTextId = gameHud.GetWidgetId("HealthText");
+        bloodOverlayId = gameHud.GetWidgetId("BloodOverlay");
 
         @motor = GetOwner().GetMovement();
     }
@@ -83,14 +92,16 @@ class Player : MonoBehaviour
             Input::SetCursorEnabled(true);
         }
 
-        drawCrosshair();
-        drawHealth();
+
+        gameHud.SetText(hpTextId, "" + health);
 
         if (damageAlpha > 0)
         {
-            drawPain();
             damageAlpha = Math::max(0, damageAlpha - dt);
+            gameHud.SetColor(bloodOverlayId, Color(1, 0, 0, damageAlpha));
         }
+
+        gameHud.Draw();
     }
 
     private void playFootstepSound()

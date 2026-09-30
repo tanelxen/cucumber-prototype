@@ -7,9 +7,23 @@
 
 #include "GameUI_AS.h"
 #include "GameUI.h"
+#include "GameUIScreen.h"
 
 #include <angelscript.h>
 #include <iostream>
+
+static void RegisterColor(asIScriptEngine* engine);
+static void RegisterVector2(asIScriptEngine* engine);
+static void RegisterWidget(asIScriptEngine* engine);
+static void RegisterScreen(asIScriptEngine* engine);
+
+void RegisterGameUI(asIScriptEngine* engine)
+{
+    RegisterColor(engine);
+    RegisterVector2(engine);
+    RegisterWidget(engine);
+    RegisterScreen(engine);
+}
 
 static void RegisterColor(asIScriptEngine* engine)
 {
@@ -55,11 +69,8 @@ static void DestructWidgetDef(void* memory) {
     reinterpret_cast<GameUI::WidgetDefinition*>(memory)->~WidgetDefinition();
 }
 
-void RegisterGameUI(asIScriptEngine* engine)
+static void RegisterWidget(asIScriptEngine* engine)
 {
-    RegisterColor(engine);
-    RegisterVector2(engine);
-    
     // Устанавливаем дефолтное пространство имен "UI"
     engine->SetDefaultNamespace("UI");
     
@@ -127,5 +138,47 @@ void RegisterGameUI(asIScriptEngine* engine)
                                    asFUNCTION(GameUI::Text), asCALL_CDECL);
     
     // Сбрасываем namespace, чтобы не загрязнять глобальное окружение скриптов
+    engine->SetDefaultNamespace("");
+}
+
+// Фабрика для создания объекта Screen из скрипта
+static GameUI::Screen* ScreenFactory() {
+    return new GameUI::Screen();
+}
+
+static void RegisterScreen(asIScriptEngine* engine)
+{
+    engine->SetDefaultNamespace("UI");
+    
+    // Регистрируем тип Screen как ссылочный объект с подсчетом ссылок
+    engine->RegisterObjectType("Screen", 0, asOBJ_REF);
+    
+    // Регистрируем поведение подсчета ссылок и фабрику создания
+    engine->RegisterObjectBehaviour("Screen", asBEHAVE_FACTORY, "Screen@ f()",
+                                    asFUNCTION(ScreenFactory), asCALL_CDECL);
+    engine->RegisterObjectBehaviour("Screen", asBEHAVE_ADDREF, "void f()",
+                                    asMETHOD(GameUI::Screen, AddRef), asCALL_THISCALL);
+    engine->RegisterObjectBehaviour("Screen", asBEHAVE_RELEASE, "void f()",
+                                    asMETHOD(GameUI::Screen, Release), asCALL_THISCALL);
+    
+    // Регистрируем методы класса Screen
+    engine->RegisterObjectMethod("Screen", "void Init(const string &in path)",
+                                 asMETHOD(GameUI::Screen, Init), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Screen", "void Draw()",
+                                 asMETHOD(GameUI::Screen, Draw), asCALL_THISCALL);
+    
+    // Метод получения ID
+    engine->RegisterObjectMethod("Screen", "int GetWidgetId(const string &in name) const",
+                                 asMETHOD(GameUI::Screen, GetWidgetId), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("Screen", "void SetTexture(int id, uint textureId)",
+                                 asMETHODPR(GameUI::Screen, SetTexture, (int, unsigned int), void), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("Screen", "void SetText(int id, const string &in text)",
+                                 asMETHODPR(GameUI::Screen, SetText, (int, const std::string&), void), asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("Screen", "void SetColor(int id, const Color &in color)",
+                                 asMETHODPR(GameUI::Screen, SetColor, (int, const glm::vec4&), void), asCALL_THISCALL);
+    
     engine->SetDefaultNamespace("");
 }

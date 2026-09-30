@@ -114,6 +114,8 @@ set(SRC_RENDERER
 set(SRC_GameUI
         src/GameUI.cpp
         src/GameUI.h
+        src/GameUIScreen.cpp
+        src/GameUIScreen.h
         src/GameUI_AS.cpp
         src/GameUI_AS.h
 )
