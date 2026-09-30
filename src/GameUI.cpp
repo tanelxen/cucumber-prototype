@@ -229,8 +229,6 @@ namespace GameUI {
     
     void Init()
     {
-        fontPixelHeight = 32.f;
-        
         // 1. Компиляция шейдеров
         GLuint vs = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vs, 1, &vertexSource, NULL);
@@ -379,7 +377,43 @@ namespace GameUI {
         vertices.push_back({ glm::vec2(rect.position.x, rect.position.y + rect.size.y), glm::vec2(0.0f, 1.0f), color });
     }
     
-    void DrawText(const Layout& layout, const std::string& text, const glm::vec4& color)
+    void GenerateTextQuads(const std::string& text, const glm::vec2& pos, const glm::vec4& color)
+    {
+        // 3. Генерация геометрии символов с помощью stb_truetype
+        float x = pos.x;
+        
+        // ВАЖНО: stb_truetype считает координату Y от базовой линии шрифта (baseline).
+        // Наша rect.position.y указывает на левый ВЕРХНИЙ угол текстового блока.
+        // Чтобы текст не улетал вверх за границы блока, мы смещаем стартовую Y вниз на высоту шрифта.
+        float y = pos.y + fontPixelHeight;
+        
+        for (char c : text) {
+            // Ограничиваем рендеринг поддерживаемым диапазоном ASCII
+            if (c >= 32 && c < 128) {
+                if (vertices.size() >= MAX_VERTICES) {
+                    // Если буфер переполнен, мы вынуждены прерваться.
+                    // (Поскольку Flush() посреди кадра вызывать нельзя, мы просто прекращаем отрисовку оставшихся символов)
+                    break;
+                }
+                
+                stbtt_aligned_quad q;
+                // Запрашиваем у stb_truetype расчет текстурных (UV) и экранных координат для символа.
+                // Переменные x и y передаются по указателю, функция автоматически сдвинет x вправо для следующего символа.
+                stbtt_GetBakedQuad(bakedChars, atlasWidth, atlasHeight, c - 32, &x, &y, &q, 1);
+                
+                // Добавляем команду отрисовки шрифта в очередь (система сама объединит буквы в один батч)
+                AddQuadCommand(2, fontTexture);
+                
+                // Заполняем вершины квада
+                vertices.push_back({ glm::vec2(q.x0, q.y0), glm::vec2(q.s0, q.t0), color });
+                vertices.push_back({ glm::vec2(q.x1, q.y0), glm::vec2(q.s1, q.t0), color });
+                vertices.push_back({ glm::vec2(q.x1, q.y1), glm::vec2(q.s1, q.t1), color });
+                vertices.push_back({ glm::vec2(q.x0, q.y1), glm::vec2(q.s0, q.t1), color });
+            }
+        }
+    }
+    
+    void DrawText(const Layout& layout, const std::string& text, const glm::vec4& color, bool drawShadow, const glm::vec4& shadowColor)
     {
         if (text.empty()) return;
         
@@ -408,38 +442,14 @@ namespace GameUI {
 //            }
 //        }
         
-        // 3. Генерация геометрии символов с помощью stb_truetype
-        float x = rect.position.x;
-        
-        // ВАЖНО: stb_truetype считает координату Y от базовой линии шрифта (baseline).
-        // Наша rect.position.y указывает на левый ВЕРХНИЙ угол текстового блока.
-        // Чтобы текст не улетал вверх за границы блока, мы смещаем стартовую Y вниз на высоту шрифта.
-        float y = rect.position.y + fontPixelHeight;
-        
-        for (char c : text) {
-            // Ограничиваем рендеринг поддерживаемым диапазоном ASCII
-            if (c >= 32 && c < 128) {
-                if (vertices.size() >= MAX_VERTICES) {
-                    // Если буфер переполнен, мы вынуждены прерваться.
-                    // (Поскольку Flush() посреди кадра вызывать нельзя, мы просто прекращаем отрисовку оставшихся символов)
-                    break;
-                }
-                
-                stbtt_aligned_quad q;
-                // Запрашиваем у stb_truetype расчет текстурных (UV) и экранных координат для символа.
-                // Переменные x и y передаются по указателю, функция автоматически сдвинет x вправо для следующего символа.
-                stbtt_GetBakedQuad(bakedChars, atlasWidth, atlasHeight, c - 32, &x, &y, &q, 1);
-                
-                // Добавляем команду отрисовки шрифта в очередь (система сама объединит буквы в один батч)
-                AddQuadCommand(2, fontTexture);
-                
-                // Заполняем вершины квада
-                vertices.push_back({ glm::vec2(q.x0, q.y0), glm::vec2(q.s0, q.t0), color });
-                vertices.push_back({ glm::vec2(q.x1, q.y0), glm::vec2(q.s1, q.t0), color });
-                vertices.push_back({ glm::vec2(q.x1, q.y1), glm::vec2(q.s1, q.t1), color });
-                vertices.push_back({ glm::vec2(q.x0, q.y1), glm::vec2(q.s0, q.t1), color });
-            }
+        if (drawShadow)
+        {
+            glm::vec2 shadowOffset = {2.0f, 2.0f};
+            GenerateTextQuads(text, rect.position + shadowOffset, shadowColor);
         }
+        
+        // 2. ЗАТЕМ генерируем квады для ОСНОВНОГО ТЕКСТА поверх
+        GenerateTextQuads(text, rect.position, color);
     }
     
     void Flush()

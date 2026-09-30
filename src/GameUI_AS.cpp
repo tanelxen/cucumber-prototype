@@ -117,6 +117,9 @@ static void RegisterWidget(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Widget", "Widget& SetColor(const Color &in c)",
                                  asMETHOD(GameUI::WidgetDefinition, SetColor), asCALL_THISCALL);
     
+    engine->RegisterObjectMethod("Widget", "Widget& SetShadow(bool enable, const Color &in shadowColor = Color(0,0,0,0.75))",
+                                 asMETHOD(GameUI::WidgetDefinition, SetShadow), asCALL_THISCALL);
+    
     // Метод установки Pivot вручную
     engine->RegisterObjectMethod("Widget", "Widget& SetPivot(const Vector2 &in p)",
                                  asMETHOD(GameUI::WidgetDefinition, SetPivot), asCALL_THISCALL);

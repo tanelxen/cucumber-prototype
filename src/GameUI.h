@@ -49,7 +49,13 @@ namespace GameUI {
     
     void DrawRect(const Layout& layout, const glm::vec4& color);
     void DrawTexture(const Layout& layout, unsigned int texture, const glm::vec4& color = glm::vec4(1.0f));
-    void DrawText(const Layout& layout, const std::string& text, const glm::vec4& color = glm::vec4(1.0f));
+    
+    void DrawText(const Layout& layout,
+                  const std::string& text,
+                  const glm::vec4& color = glm::vec4(1),
+                  bool drawShadow = false,
+                  const glm::vec4& shadowColor = glm::vec4(0)
+                  );
     
     // Отрисовка всего накопленного и очистка буферов (вызывать в конце кадра)
     void Flush();
@@ -62,6 +68,9 @@ namespace GameUI {
         WidgetType type;
         Layout layout;
         glm::vec4 color = glm::vec4(1.0f);
+        
+        bool hasShadow = true;
+        glm::vec4 shadowColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
         
         // Специфичные данные для типов
         unsigned int textureId = 0;
@@ -102,6 +111,12 @@ namespace GameUI {
             return *this;
         }
         
+        WidgetDefinition& SetShadow(bool enable, const glm::vec4& sColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.75f)) {
+            hasShadow = enable;
+            shadowColor = sColor;
+            return *this;
+        }
+        
         WidgetDefinition& SetPivot(const glm::vec2& p) {
             layout.pivot = p;
             return *this;
@@ -114,7 +129,7 @@ namespace GameUI {
             } else if (type == WidgetType::Image) {
                 GameUI::DrawTexture(layout, textureId, color);
             } else if (type == WidgetType::Text) {
-                GameUI::DrawText(layout, text, color);
+                GameUI::DrawText(layout, text, color, hasShadow, shadowColor);
             }
         }
     };
