@@ -29,6 +29,9 @@ const char* vertexSource = R"(
     void main() {
         TexCoords = aTexCoords;
         Color = aColor;
+        Color.r = pow(Color.r, 2.2);
+        Color.g = pow(Color.g, 2.2);
+        Color.b = pow(Color.b, 2.2);
         gl_Position = uProjection * vec4(aPos, 0.0, 1.0);
     }
 )";
@@ -73,7 +76,7 @@ namespace HUD {
         glm::vec4 color;
     };
     
-    int m_width = 1, m_height = 1;
+    int currentWidth = 1, currentHeight = 1;
     
     namespace {
         // Лимиты буфера (при необходимости можно автоматически расширять вектор)
@@ -116,6 +119,112 @@ namespace HUD {
             cmd.firstIndex = static_cast<unsigned int>((vertices.size() / 4) * 6);
             commands.push_back(cmd);
         }
+    }
+    
+    namespace {
+        bool inLayoutGroup = false;
+        glm::vec2 layoutCursor(0.0f);
+        float layoutSpacing = 0.0f;
+    }
+    
+    // Вспомогательная структура для возврата результата расчета
+    struct CalculatedRect {
+        glm::vec2 position;
+        glm::vec2 size;
+    };
+    
+    CalculatedRect CalculateRect(const Layout& layout)
+    {
+        float screenW = static_cast<float>(currentWidth);
+        float screenH = static_cast<float>(currentHeight);
+        
+        // 1. Вычисляем абсолютные координаты опорных точек якорей на экране
+        float anchorLeft   = layout.anchorMin.x * screenW;
+        float anchorTop    = layout.anchorMin.y * screenH;
+        float anchorRight  = layout.anchorMax.x * screenW;
+        float anchorBottom = layout.anchorMax.y * screenH;
+        
+        CalculatedRect rect;
+        
+        if (layout.anchorMin == layout.anchorMax) {
+            // РЕЖИМ FIXED: Якоря в одной точке.
+            // Margin Left/Top — это смещение. Right/Bottom — это Ширина/Высота.
+            rect.size.x = layout.marginRight;
+            rect.size.y = layout.marginBottom;
+            
+            // Базовая позиция до учета Pivot
+            rect.position.x = anchorLeft + layout.marginLeft;
+            rect.position.y = anchorTop + layout.marginTop;
+        }
+        else {
+            // РЕЖИМ STRETCH: Якоря разнесены.
+            // Margins — это чистые отступы со всех сторон.
+            rect.position.x = anchorLeft + layout.marginLeft;
+            rect.position.y = anchorTop + layout.marginTop;
+            
+            rect.size.x = (anchorRight - layout.marginRight) - rect.position.x;
+            rect.size.y = (anchorBottom - layout.marginBottom) - rect.position.y;
+        }
+        
+        // 2. Применяем Pivot (сдвиг origin самого элемента)
+        rect.position.x -= layout.pivot.x * rect.size.x;
+        rect.position.y -= layout.pivot.y * rect.size.y;
+        
+        // Защита от "мыла": округляем до целых пикселей
+        rect.position.x = std::round(rect.position.x);
+        rect.position.y = std::round(rect.position.y);
+        rect.size.x = std::round(rect.size.x);
+        rect.size.y = std::round(rect.size.y);
+        
+        return rect;
+    }
+    
+    // Вспомогательная функция для безопасного сравнения float-векторов (защита от погрешностей)
+    bool IsEpsilonEqual(const glm::vec2& a, const glm::vec2& b) {
+        return std::abs(a.x - b.x) < 0.0001f && std::abs(a.y - b.y) < 0.0001f;
+    }
+    
+    CalculatedRect CalculateRect(const Layout& layout, const glm::vec2& fixedSize) {
+        float screenW = static_cast<float>(currentWidth);
+        float screenH = static_cast<float>(currentHeight);
+        
+        CalculatedRect rect;
+        
+        // Если min и max якоря совпадают — это фиксированный размер (Fixed)
+        if (IsEpsilonEqual(layout.anchorMin, layout.anchorMax)) {
+            rect.size = fixedSize;
+            
+            // Базовое положение от точки якоря + смещение (marginLeft/marginTop работают как offsetX/Y)
+            float anchorX = layout.anchorMin.x * screenW;
+            float anchorY = layout.anchorMin.y * screenH;
+            rect.position.x = anchorX + layout.marginLeft;
+            rect.position.y = anchorY + layout.marginTop;
+        }
+        // Если разнесены — это режим растягивания (Stretch)
+        else {
+            float anchorLeft   = layout.anchorMin.x * screenW;
+            float anchorTop    = layout.anchorMin.y * screenH;
+            float anchorRight  = layout.anchorMax.x * screenW;
+            float anchorBottom = layout.anchorMax.y * screenH;
+            
+            rect.position.x = anchorLeft + layout.marginLeft;
+            rect.position.y = anchorTop + layout.marginTop;
+            
+            rect.size.x = (anchorRight - layout.marginRight) - rect.position.x;
+            rect.size.y = (anchorBottom - layout.marginBottom) - rect.position.y;
+        }
+        
+        // Применяем Pivot (смещение относительно опорной точки самого элемента)
+        rect.position.x -= layout.pivot.x * rect.size.x;
+        rect.position.y -= layout.pivot.y * rect.size.y;
+        
+        // Округляем до целых пикселей, чтобы избежать "мыла" при субпиксельном рендеринге
+        rect.position.x = std::round(rect.position.x);
+        rect.position.y = std::round(rect.position.y);
+        rect.size.x = std::round(rect.size.x);
+        rect.size.y = std::round(rect.size.y);
+        
+        return rect;
     }
     
     void Init()
@@ -178,7 +287,7 @@ namespace HUD {
         
         
         // 4. Загрузка и запекание шрифта через stb_truetype
-        const std::string& fontPath = "assets/fonts/Ruda/Ruda-Medium.ttf";
+        const std::string& fontPath = "assets/fonts/Georgia/SdGeorgiaLight.ttf";
         std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             std::cerr << "[HUD] Не удалось открыть файл шрифта: " << fontPath << std::endl;
@@ -203,7 +312,6 @@ namespace HUD {
         // Создаем OpenGL текстуру для шрифта
         glGenTextures(1, &fontTexture);
         glBindTexture(GL_TEXTURE_2D, fontTexture);
-        // Используем GL_RED, так как это OpenGL Core Profile (GL_ALPHA/GL_LUMINANCE устарели)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, atlasWidth, atlasHeight, 0, GL_RED, GL_UNSIGNED_BYTE, bitmap.data());
         
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -215,62 +323,117 @@ namespace HUD {
     
     void Resize(int width, int height)
     {
-        m_width = width;
-        m_height = height;
+        currentWidth = width;
+        currentHeight = height;
         
         glUseProgram(shaderProgram);
         // Создаем ортографическую проекцию (0,0 в левом верхнем углу экрана)
-        glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, -1.0f, 1.0f);
+        glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(currentWidth), static_cast<float>(currentHeight), 0.0f, -1.0f, 1.0f);
         glUniformMatrix4fv(uProjectionLoc, 1, GL_FALSE, &projection[0][0]);
     }
     
-    int GetScreenWidth() { return m_width; }
-    int GetScreenHeight() { return m_height; }
+    int GetScreenWidth() { return currentWidth; }
+    int GetScreenHeight() { return currentHeight; }
     
-    void DrawRect(const glm::vec2& pos, const glm::vec2& size, const glm::vec4& color)
+    // Вычисление ширины строки в пикселях без генерации геометрии
+    float GetTextWidth(const std::string& text) {
+        float width = 0.0f;
+        float dummyY = 0.0f;
+        
+        for (char c : text) {
+            if (c >= 32 && c < 128) {
+                stbtt_aligned_quad q;
+                // Передаем dummyY, а вместо x передаем нашу переменную width.
+                // Функция сама сдвинет width на нужное расстояние (advance width) для следующего символа.
+                stbtt_GetBakedQuad(bakedChars, atlasWidth, atlasHeight, c - 32, &width, &dummyY, &q, 1);
+            }
+        }
+        return width;
+    }
+    
+    void DrawRect(const Layout& layout, const glm::vec4& color)
     {
         if (vertices.size() >= MAX_VERTICES) return;
+        
+        // Вычисляем финальные экранные координаты и размеры
+        CalculatedRect rect = CalculateRect(layout);
         
         AddQuadCommand(0, 0);
-        
-        vertices.push_back({ pos,                               glm::vec2(0.0f, 0.0f), color });
-        vertices.push_back({ glm::vec2(pos.x + size.x, pos.y),  glm::vec2(1.0f, 0.0f), color });
-        vertices.push_back({ pos + size,                        glm::vec2(1.0f, 1.0f), color });
-        vertices.push_back({ glm::vec2(pos.x, pos.y + size.y),  glm::vec2(0.0f, 1.0f), color });
+        vertices.push_back({ rect.position,                                             glm::vec2(0.0f, 0.0f), color });
+        vertices.push_back({ glm::vec2(rect.position.x + rect.size.x, rect.position.y), glm::vec2(1.0f, 0.0f), color });
+        vertices.push_back({ rect.position + rect.size,                                 glm::vec2(1.0f, 1.0f), color });
+        vertices.push_back({ glm::vec2(rect.position.x, rect.position.y + rect.size.y), glm::vec2(0.0f, 1.0f), color });
     }
     
-    void DrawTexture(const glm::vec2& pos, const glm::vec2& size, unsigned int textureID, const glm::vec4& color)
+    void DrawTexture(const Layout& layout, unsigned int texture, const glm::vec4& color)
     {
         if (vertices.size() >= MAX_VERTICES) return;
         
-        AddQuadCommand(1, textureID);
+        // Вычисляем финальные экранные координаты и размеры
+        CalculatedRect rect = CalculateRect(layout);
         
-        vertices.push_back({ pos,                               glm::vec2(0.0f, 0.0f), color });
-        vertices.push_back({ glm::vec2(pos.x + size.x, pos.y),  glm::vec2(1.0f, 0.0f), color });
-        vertices.push_back({ pos + size,                        glm::vec2(1.0f, 1.0f), color });
-        vertices.push_back({ glm::vec2(pos.x, pos.y + size.y),  glm::vec2(0.0f, 1.0f), color });
+        AddQuadCommand(1, texture);
+        vertices.push_back({ rect.position,                                             glm::vec2(0.0f, 0.0f), color });
+        vertices.push_back({ glm::vec2(rect.position.x + rect.size.x, rect.position.y), glm::vec2(1.0f, 0.0f), color });
+        vertices.push_back({ rect.position + rect.size,                                 glm::vec2(1.0f, 1.0f), color });
+        vertices.push_back({ glm::vec2(rect.position.x, rect.position.y + rect.size.y), glm::vec2(0.0f, 1.0f), color });
     }
     
-    void DrawText(const std::string& text, const glm::vec2& pos, float scale, const glm::vec4& color)
+    void DrawText(const Layout& layout, const std::string& text, const glm::vec4& color)
     {
-        float x = pos.x;
-        float y = pos.y;
+        if (text.empty()) return;
         
-        for (char c : text)
-        {
-            // Обрабатываем только поддерживаемый диапазон ASCII
-            if (c >= 32 && c < 128)
-            {
-                if (vertices.size() >= MAX_VERTICES) break;
+        // 1. Вычисляем физический размер строки текста в пикселях
+        float textWidth = GetTextWidth(text);
+        float textHeight = fontPixelHeight; // Высота шрифта из stb_truetype
+        glm::vec2 textSize(textWidth, textHeight);
+        
+        // 2. Рассчитываем позицию текстового блока на экране через универсальный CalculateRect
+        // Для текста мы ВСЕГДА передаем его реальный физический размер как fixedSize
+        CalculatedRect rect = CalculateRect(layout, textSize);
+        
+//        // Если мы находимся внутри Layout-группы (вертикальный/горизонтальный стек)
+//        if (currentLayoutDir != LayoutDirection::None) {
+//            rect.position = layoutCursor;
+//            
+//            // Корректируем позицию внутри стека на основе Pivot (например, если текст центрирован)
+//            rect.position.x -= layout.pivot.x * rect.size.x;
+//            rect.position.y -= layout.pivot.y * rect.size.y;
+//            
+//            // Сдвигаем курсор контейнера для следующего элемента
+//            if (currentLayoutDir == LayoutDirection::Vertical) {
+//                layoutCursor.y += rect.size.y + layoutSpacing;
+//            } else if (currentLayoutDir == LayoutDirection::Horizontal) {
+//                layoutCursor.x += rect.size.x + layoutSpacing;
+//            }
+//        }
+        
+        // 3. Генерация геометрии символов с помощью stb_truetype
+        float x = rect.position.x;
+        
+        // ВАЖНО: stb_truetype считает координату Y от базовой линии шрифта (baseline).
+        // Наша rect.position.y указывает на левый ВЕРХНИЙ угол текстового блока.
+        // Чтобы текст не улетал вверх за границы блока, мы смещаем стартовую Y вниз на высоту шрифта.
+        float y = rect.position.y + fontPixelHeight;
+        
+        for (char c : text) {
+            // Ограничиваем рендеринг поддерживаемым диапазоном ASCII
+            if (c >= 32 && c < 128) {
+                if (vertices.size() >= MAX_VERTICES) {
+                    // Если буфер переполнен, мы вынуждены прерваться.
+                    // (Поскольку Flush() посреди кадра вызывать нельзя, мы просто прекращаем отрисовку оставшихся символов)
+                    break;
+                }
                 
                 stbtt_aligned_quad q;
-                // Функция берет символ, рассчитывает смещения и выдает координаты вершин экрана и UV
+                // Запрашиваем у stb_truetype расчет текстурных (UV) и экранных координат для символа.
+                // Переменные x и y передаются по указателю, функция автоматически сдвинет x вправо для следующего символа.
                 stbtt_GetBakedQuad(bakedChars, atlasWidth, atlasHeight, c - 32, &x, &y, &q, 1);
                 
+                // Добавляем команду отрисовки шрифта в очередь (система сама объединит буквы в один батч)
                 AddQuadCommand(2, fontTexture);
                 
-                // Заполняем вершины на основе данных из stbtt_aligned_quad
-                // Внимание: инвертируем Y для UV, если экранная система координат (0,0) сверху
+                // Заполняем вершины квада
                 vertices.push_back({ glm::vec2(q.x0, q.y0), glm::vec2(q.s0, q.t0), color });
                 vertices.push_back({ glm::vec2(q.x1, q.y0), glm::vec2(q.s1, q.t0), color });
                 vertices.push_back({ glm::vec2(q.x1, q.y1), glm::vec2(q.s1, q.t1), color });
@@ -337,5 +500,82 @@ namespace HUD {
         if (vao) glDeleteVertexArrays(1, &vao);
         if (shaderProgram) glDeleteProgram(shaderProgram);
         if (fontTexture) glDeleteTextures(1, &fontTexture);
+    }
+}
+
+namespace HUD {
+    
+    // 1. Фиксированный элемент в левом верхнем углу
+    Layout Layout::TopLeft(float x, float y, float width, float height)
+    {
+        Layout p;
+        p.anchorMin = p.anchorMax = glm::vec2(0.0f, 0.0f);
+        p.pivot = glm::vec2(0.0f, 0.0f);
+        p.marginLeft = x;
+        p.marginTop = y;
+        p.marginRight = width;
+        p.marginBottom = height;
+        return p;
+    }
+    
+    // 2. Фиксированный элемент в правом верхнем углу (с автоматическим пивотом)
+    Layout Layout::TopRight(float x, float y, float width, float height)
+    {
+        Layout p;
+        p.anchorMin = p.anchorMax = glm::vec2(1.0f, 0.0f);
+        p.pivot = glm::vec2(1.0f, 0.0f);
+        p.marginLeft = -x;
+        p.marginTop = y;
+        p.marginRight = width;
+        p.marginBottom = height;
+        return p;
+    }
+    
+    Layout Layout::BottomLeft(float x, float y, float width, float height)
+    {
+        Layout p;
+        p.anchorMin = p.anchorMax = glm::vec2(0.0f, 1.0f);
+        p.pivot = glm::vec2(0.0f, 1.0f);
+        p.marginLeft = x;
+        p.marginTop = -y;
+        p.marginRight = width;
+        p.marginBottom = height;
+        return p;
+    }
+    
+    // 2. Фиксированный элемент в правом верхнем углу (с автоматическим пивотом)
+    Layout Layout::BottomRight(float x, float y, float width, float height)
+    {
+        Layout p;
+        p.anchorMin = p.anchorMax = glm::vec2(1.0f, 1.0f);
+        p.pivot = glm::vec2(1.0f, 1.0f);
+        p.marginLeft = -x;
+        p.marginTop = -y;
+        p.marginRight = width;
+        p.marginBottom = height;
+        return p;
+    }
+    
+    // 3. Элемент строго по центру экрана
+    Layout Layout::Center(float width, float height, glm::vec2 offset)
+    {
+        Layout p;
+        p.anchorMin = p.anchorMax = glm::vec2(0.5f, 0.5f);
+        p.pivot = glm::vec2(0.5f, 0.5f); // Центрируем сам элемент
+        p.marginLeft = offset.x;
+        p.marginTop = offset.y;
+        p.marginRight = width;
+        p.marginBottom = height;
+        return p;
+    }
+    
+    // 4. Полное растягивание на весь экран
+    Layout Layout::FullScreen(float margin)
+    {
+        Layout p;
+        p.anchorMin = glm::vec2(0.0f, 0.0f);
+        p.anchorMax = glm::vec2(1.0f, 1.0f);
+        p.marginLeft = p.marginTop = p.marginRight = p.marginBottom = margin;
+        return p;
     }
 }

@@ -171,20 +171,22 @@ class WeaponMP40 : MonoBehaviour
 
     private void drawAmmo()
     {
-        int width = UI::GetScreenWidth();
-        int height = UI::GetScreenHeight();
+        UI::DrawText(
+            UI::LayoutBottomRight(144, 16, 0, 0),
+            "" + clip,
+            Color(0.63f, 0.59f, 0.57f, 1.0f)
+        );
 
-        Color color(1.0f, 1.0f, 1.0f, 1.0f);
+        UI::DrawImage(
+            UI::LayoutBottomRight(16, 0, 128, 64),
+            iconTextureId,
+            Color(1.0f, 1.0f, 1.0f, 1.0f)
+        );
 
-        Vector2 pos = Vector2(width - 16.0f - 154, height - 16.0f);
-        UI::DrawText("" + clip, pos, 1.0f, color);
-
-        Vector2 size(128, 64);
-        pos = Vector2(width - size.x - 8, height - size.y - 16);
-
-        UI::DrawImage(pos, size, iconTextureId, color);
-
-        pos = Vector2(width - 54, height - 64 - 32);
-        UI::DrawText("" + ammo, pos, 1.0f, color);
+        UI::DrawText(
+            UI::LayoutBottomRight(16, 64, 0, 0),
+            "" + ammo,
+            Color(0.63f, 0.59f, 0.57f, 1.0f)
+        );
     }
 }

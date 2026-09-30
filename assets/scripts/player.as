@@ -104,15 +104,12 @@ class Player : MonoBehaviour
         if (footstepSounds.length() > 1)
         {
             do {
-                // Предполагается, что у тебя есть зарегистрированная функция рандома.
-                // Если нет, ниже я покажу, как использовать встроенный в C++ rand()
                 index = Math::RandomInt(0, footstepSounds.length() - 1);
             } while (index == lastSoundIndex);
             
             lastSoundIndex = index;
         }
 
-        // Вызываем твою глобальную функцию miniaudio
         PlaySound(footstepSounds[index]);
     }
 
@@ -124,43 +121,26 @@ class Player : MonoBehaviour
 
     private void drawCrosshair()
     {
-        int width = UI::GetScreenWidth();
-        int height = UI::GetScreenHeight();
-
-        Color color(1.0f, 1.0f, 1.0f, 1.0f);
-
-        Vector2 size = Vector2(4.0f, 4.0f);
-        Vector2 pos = Vector2(
-            width * 0.5f - size.x * 0.5f,
-            height * 0.5f - size.y * 0.5f
+        UI::DrawRect(
+            UI::LayoutCenter(4, 4),
+            Color(1.0f, 1.0f, 1.0f, 1.0f)
         );
-        
-        UI::DrawRect(pos, size, color);
     }
 
     private void drawHealth()
     {
-        //int width = UI::GetScreenWidth();
-        int height = UI::GetScreenHeight();
-
-        Color color(0.9f, 0.9f, 0.9f, 1.0f);
-
-        Vector2 pos = Vector2(16.0f, height - 16.0f);
-        
-        string str = format('{}', health);
-        UI::DrawText(str, pos, 1.0f, color);
+        UI::DrawText(
+            UI::LayoutBottomLeft(16, 16, 0, 0),
+            format('{}', health),
+            Color(0.63f, 0.47f, 0.25f, 1.0f)
+        );
     }
 
     private void drawPain()
     {
-        int width = UI::GetScreenWidth();
-        int height = UI::GetScreenHeight();
-
-        Color color(1.0f, 0.0f, 0.0f, damageAlpha);
-
-        Vector2 size = Vector2(width, height);
-        Vector2 pos(0, 0);
-        
-        UI::DrawRect(pos, size, color);
+        UI::DrawRect(
+            UI::LayoutFullscreen(),
+            Color(1.0f, 0.0f, 0.0f, damageAlpha)
+        );
     }
 }

@@ -249,7 +249,9 @@ static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const g
     
     // 4. Отрисовка и манипуляция гизмо
     // Эта функция сама проверяет ввод мыши и модифицирует matrixPtr (worldMatrix)
-    ImGuizmo::Manipulate(viewPtr, projPtr, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, matrixPtr);
+    
+    float snap[3] = {16.f, 16.f, 16.f};
+    ImGuizmo::Manipulate(viewPtr, projPtr, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, matrixPtr, NULL, snap);
     
     // 5. Если пользователь потянул за стрелочку — применяем изменения
     if (ImGuizmo::IsUsing())
