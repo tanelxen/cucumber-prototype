@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "UID.h"
+
 #include <string>
 #include <vector>
 #include <memory>
@@ -17,7 +19,6 @@ class Viewport;
 class Entity;
 class Component;
 class CollisionComponent;
-class UID;
 
 class WorldScene
 {
@@ -38,7 +39,8 @@ public:
     void load(const std::string& filename);
     
     void saveAsPrefab(Entity* entity, const std::string& filename);
-    Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr);
+    Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid());
+
     void loadPrefab(Entity* entity, const std::string& filename);
     
     void registerComponent(Component* component);

@@ -95,6 +95,7 @@ public:
     }
     
     TransformComponent& getTransform() { return m_transform; }
+    const TransformComponent& getTransform() const { return m_transform; }
     TransformComponent* getTransformPtr() const { return (TransformComponent*)&m_transform; }
     
     void setParent(Entity* newParent, bool keepRelative);
@@ -111,6 +112,19 @@ public:
     void freeComponentMemory(Component* component);
     
     void destroy();
+    
+public:
+    // Связь с префабом
+    std::string prefabAssetPath = "";
+    bool isPrefabRoot = false;
+    
+    UID originalPrefabUid = UID::Invalid();
+    
+    bool isPrefabInstance() const { return !prefabAssetPath.empty(); }
+    bool isPrefabChild() const { return isPrefabInstance() && !isPrefabRoot; }
+    
+    // нужно для diff
+    nlohmann::json serializeToSnapshot() const;
     
 private:
     std::vector<std::unique_ptr<Component>> m_components;
