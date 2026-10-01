@@ -6,16 +6,16 @@
 //
 
 #pragma once
-
-#include <glm/glm.hpp>
+#include <memory>
 
 class Camera;
+class FrameBuffer;
 
 class Viewport
 {
 public:
-//    Viewport();
-    ~Viewport();
+    Viewport();
+    ~Viewport() = default;
     
     void init();
     void setCamera(Camera* camera);
@@ -27,20 +27,17 @@ public:
     
     int getWidth() { return m_width; }
     int getHeight() { return m_height; }
-    int getTexture() { return m_texture; }
+    int getTexture();
     
     Camera* getCamera() { return m_camera; }
     
 //    glm::vec2 getMousePosition();
     
 private:
-    unsigned int m_fbo = 0;
-    unsigned int m_rbo = 0;
-    unsigned int m_texture = 0;
+    std::unique_ptr<FrameBuffer> m_frameBuffer;
     
     int m_width = 1;
     int m_height = 1;
-    float m_scale = 2;
     
 //    glm::vec2 minBounds;
 //    glm::vec2 maxBounds;

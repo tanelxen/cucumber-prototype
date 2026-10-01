@@ -1,6 +1,6 @@
 //
-//  RenderDevice.hpp
-//  microwolf
+//  RenderDevice.h
+//  Cucumber
 //
 //  Created by Fedor Artemenkov on 19.03.26.
 //
@@ -29,11 +29,6 @@ namespace RenderDevice {
     
     handle_t getWhiteTexture();
     
-//    handle_t makeVertexArray(handle_t vertexBuffer, handle_t indexBuffer, const VertexLayout& layout);
-//    handle_t makeVertexArray(handle_t posBuffer, const int posLayout, handle_t nrmBuffer, const int nrmLayout, handle_t indexBuffer);
-    
-//    void setMainViewport(Viewport* viewport);
-    
     void startFrame();
     void submit(RenderCommand cmd);
     void commit(Camera* camera);
@@ -41,12 +36,6 @@ namespace RenderDevice {
     
     inline std::vector<glm::vec3> shCoefficients(9, glm::vec3(0.0f));
 }
-
-enum PassType
-{
-    MainPass            = 1 << 0,
-    UserInterfacePass   = 1 << 1,
-};
 
 enum class BlendMode
 {
@@ -90,5 +79,6 @@ struct RenderCommand
     
     glm::mat4 transform = glm::mat4(1);
     
+    // Animation
     const std::vector<glm::mat4>* bones;
 };

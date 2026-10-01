@@ -33,9 +33,7 @@ set(SRC_COMMON
         src/Application.h
         src/Input.cpp
         src/Input.h
-        
-        src/Mesh.cpp
-        src/Mesh.h
+
         src/ModelLoader.cpp
         src/ModelLoader.h
         src/Skeleton.h
@@ -97,6 +95,10 @@ set(SRC_RENDERER
         src/VertexLayout.h
         src/IndexBuffer.cpp
         src/IndexBuffer.h
+        src/FrameBuffer.cpp
+        src/FrameBuffer.h
+        src/Mesh.cpp
+        src/Mesh.h
         src/Shader.cpp
         src/Shader.h
         src/ShaderVariant.cpp

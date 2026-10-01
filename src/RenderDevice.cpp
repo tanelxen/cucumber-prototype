@@ -1,22 +1,21 @@
 //
 //  RenderDevice.cpp
-//  microwolf
+//  Cucumber
 //
 //  Created by Fedor Artemenkov on 19.03.26.
 //
 
 #include "RenderDevice.h"
 
-#include <stdio.h>
-#include <vector>
+#include "Shader.h"
+#include "ShaderVariant.h"
+#include "Camera.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "Shader.h"
-#include "ShaderVariant.h"
-#include "Camera.h"
-//#include "Viewport.h"
+#include <stdio.h>
+#include <vector>
 
 namespace RenderDevice {
     
@@ -30,8 +29,6 @@ namespace RenderDevice {
     handle_t whiteTextureId;
     handle_t normalTextureId;
     
-//    static Viewport* mainViewport = nullptr;
-    
     void init()
     {
         gladLoadGL();
@@ -42,7 +39,6 @@ namespace RenderDevice {
         const unsigned char* device = glGetString(GL_RENDERER);
         printf("device: %s\n", device);
         
-//        glEnable(GL_FRAMEBUFFER_SRGB);
         glFrontFace(GL_CCW);
         
         flat_shader.init("assets/shaders/cube_shaded.glsl");
@@ -98,6 +94,10 @@ namespace RenderDevice {
         
         glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
+        
+        GLfloat maxAnisotropy = 0.0f;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAnisotropy);
         
         glBindTexture(GL_TEXTURE_2D, 0);
         
@@ -253,32 +253,18 @@ namespace RenderDevice {
         }
     }
     
-//    void setMainViewport(Viewport* viewport)
-//    {
-//        mainViewport = viewport;
-//    }
-    
     void startFrame()
     {
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         
-        //        glCullFace(GL_FRONT);
-//        glCullFace(GL_BACK);
-        
         glClearColor(0.01, 0.01, 0.01, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-//        opaquePass.clear();
-//        transparentPass.clear();
     }
     
     void commit(Camera* camera)
     {
-//        if (mainViewport == nullptr) return;
         if (camera == nullptr) return;
-        
-//        mainViewport->bind();
         
         glm::mat4x4 viewProj = camera->projection * camera->view;
         
@@ -289,8 +275,6 @@ namespace RenderDevice {
         draw(viewProj, transparentPass);
         
         glDepthMask(GL_TRUE);
-        
-//        mainViewport->unbind();
     }
     
     void endFrame()

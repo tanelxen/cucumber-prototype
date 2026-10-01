@@ -25,4 +25,7 @@ struct Application
     void updateInputState();
     
     static Application* currentInstance;
+    
+private:
+    void initSubSystems();
 };

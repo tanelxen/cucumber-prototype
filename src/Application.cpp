@@ -8,7 +8,13 @@
 #include "Application.h"
 
 #include "RenderDevice.h"
+#include "AudioSystem.h"
+#include "ScriptEngine.h"
 #include "GizmoRender.h"
+#include "SpriteRenderer.h"
+#include "ParticleSystem.h"
+#include "DecalManager.h"
+#include "GameUI.h"
 
 #include "UIManager.h"
 #include "World.h"
@@ -23,12 +29,6 @@
 #include <thread>
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
-
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-//    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-//        glfwSetWindowShouldClose(window, GLFW_TRUE);
-}
 
 Application* Application::currentInstance = nullptr;
 
@@ -55,19 +55,14 @@ Application::Application()
 #endif
 
     glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-//    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
-//    glfwWindowHint(GLFW_SAMPLES, 8);
 
     const int window_width = 1440;
     const int window_height = 900;
     m_pWindow = glfwCreateWindow(window_width, window_height, "Cucumber", nullptr, nullptr);
 
-    glfwSetKeyCallback(m_pWindow, key_callback);
-
     glfwMakeContextCurrent(m_pWindow);
 
-    RenderDevice::init();
-    GizmoRender::Get().Initialize();
+    initSubSystems();
     
     m_pScene = new WorldScene();
     
@@ -75,6 +70,7 @@ Application::Application()
     m_pUIManager->setScene(m_pScene);
     m_pUIManager->init(m_pWindow);
     
+    // У нас свое ограничение частоты кадров
     glfwSwapInterval(0);
     
     currentInstance = this;
@@ -125,12 +121,12 @@ void Application::run()
         updateInputState();
         
         m_pUIManager->update(elapsedTime);
-
         m_pScene->update(elapsedTime);
+        
+        ParticleSystem::Update(elapsedTime);
+        DecalManager::Update(elapsedTime);
+        
         m_pScene->draw();
-        
-        glEnable(GL_FRAMEBUFFER_SRGB);
-        
         m_pUIManager->draw();
 
         glfwSwapBuffers(m_pWindow);
@@ -189,5 +185,26 @@ void Application::setCursorEnabled(bool state)
     {
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
         glfwSetInputMode(currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+}
+
+void Application::initSubSystems()
+{
+    RenderDevice::init();
+    GizmoRender::Get().Initialize();
+    
+    AudioSystem::Get().Initialize();
+    SpriteRenderer::Init();
+    ParticleSystem::Init();
+    DecalManager::Init();
+    GameUI::Init();
+    
+    if (ScriptEngine::get().init())
+    {
+        ScriptEngine::get().CompileAllScripts("assets/scripts");
+    }
+    else
+    {
+        std::cerr << "Failed to init AngelScript!" << std::endl;
     }
 }

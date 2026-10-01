@@ -95,7 +95,7 @@ namespace GameUI {
         // Данные шрифта stb_truetype
         GLuint fontTexture = 0;
         stbtt_bakedchar bakedChars[96]; // Храним символы ASCII от 32 до 127
-        float fontPixelHeight = 32.0f;
+        float fontPixelHeight = 46.0f;
         int atlasWidth = 512;
         int atlasHeight = 512;
         

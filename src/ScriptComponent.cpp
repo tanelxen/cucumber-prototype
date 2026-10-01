@@ -84,6 +84,12 @@ void ScriptComponent::init(const std::string& className)
     m_isInitialized = true;
 }
 
+void ScriptComponent::awake()
+{
+    // Все сущности и компоненты на сцене созданы - восстанавливаем связи
+    loadStateSnapshot();
+}
+
 void ScriptComponent::start()
 {
     if (!m_ScriptObject || !m_StartMethod) return;

@@ -12,19 +12,6 @@
 
 class Q3BSPAsset;
 
-//struct HitResult
-//{
-//    glm::vec3 endpos;
-//    glm::vec3 normal;
-//    float fraction;
-//    
-//    bool startsolid;
-//    bool allsolid;
-//    
-//    int textureId;
-//    int surfaceFlags;
-//};
-
 class Q3BspCollision
 {
 public:

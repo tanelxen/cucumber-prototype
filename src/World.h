@@ -1,6 +1,6 @@
 //
-//  SourceMapScene.h
-//  TryOpenGL
+//  WorldScene.h
+//  Cucumber
 //
 //  Created by Fedor Artemenkov on 12.05.25.
 //
@@ -65,11 +65,9 @@ public:
     
 private:
     std::vector<Component*> m_globalUpdatables;
-    std::vector<Component*> m_globalFixedUpdatables;
-    std::vector<Component*> m_globalWaitingForStart;
+    std::vector<Component*> m_allComponents;
     std::vector<CollisionComponent*> m_globalColliders;
     
-    void processPendingStarts();
     void cleanupDeadComponents();
     void cleanupDeadEntities();
     
@@ -79,4 +77,5 @@ private:
     std::vector<Entity*> m_entitiesToDestroy;
 };
 
+// Временный хак
 inline WorldScene* g_currentScene;

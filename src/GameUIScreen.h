@@ -17,15 +17,6 @@ namespace GameUI {
     
     class Screen
     {
-    private:
-        // Храним сырые заготовки виджетов, которые мы прочитали из JSON
-        std::vector<WidgetDefinition> m_widgets;
-        // Быстрый поиск индекса виджета в векторе по его текстовому ID (имени)
-        std::unordered_map<std::string, size_t> m_nameToIndex;
-        
-        // Счетчик ссылок для AngelScript
-        int m_refCount = 1;
-        
     public:
         Screen() = default;
         ~Screen() = default;
@@ -36,6 +27,7 @@ namespace GameUI {
         
         // Загрузка экрана из JSON файла
         void Init(const std::string& path);
+        void Save(const std::string& path);
         
         void Draw();
         
@@ -49,5 +41,21 @@ namespace GameUI {
         void SetTexture(int id, unsigned int textureId);
         void SetText(int id, const std::string& text);
         void SetColor(int id, const glm::vec4& color);
+        
+    public:
+        void AddWidget(const std::string& name, WidgetType type);
+        void RemoveWidget(size_t index);
+        
+        // Доступ к вектору виджетов для инспектора и иерархии
+        std::vector<WidgetDefinition>& GetWidgets() { return m_widgets; }
+        
+    private:
+        // Храним сырые заготовки виджетов, которые мы прочитали из JSON
+        std::vector<WidgetDefinition> m_widgets;
+        // Быстрый поиск индекса виджета в векторе по его текстовому ID (имени)
+        std::unordered_map<std::string, size_t> m_nameToIndex;
+        
+        // Счетчик ссылок для AngelScript
+        int m_refCount = 1;
     };
 }

@@ -46,7 +46,6 @@ public:
         
         g_currentScene->registerComponent(rawPtr);
         
-        rawPtr->awake();
         return rawPtr;
     }
     

@@ -152,3 +152,68 @@ namespace GameUI {
         }
     }
 }
+
+namespace GameUI {
+    
+    void Screen::Save(const std::string& path) {
+        json data;
+        data["widgets"] = json::array();
+        
+        for (const auto& w : m_widgets) {
+            json item;
+            // Запись типа
+            if (w.type == WidgetType::Rect) item["type"] = "rect";
+            else if (w.type == WidgetType::Image) item["type"] = "image";
+            else if (w.type == WidgetType::Text) item["type"] = "text";
+            
+            // Если вы добавили поле name в WidgetDefinition: item["name"] = w.name;
+            item["text"] = w.text;
+            item["textureId"] = w.textureId;
+            item["color"] = { w.color.x, w.color.y, w.color.z, w.color.w };
+            
+            json lay;
+            lay["anchorMinX"] = w.layout.anchorMin.x;
+            lay["anchorMinY"] = w.layout.anchorMin.y;
+            lay["anchorMaxX"] = w.layout.anchorMax.x;
+            lay["anchorMaxY"] = w.layout.anchorMax.y;
+            lay["left"] = w.layout.marginLeft;
+            lay["top"] = w.layout.marginTop;
+            lay["right"] = w.layout.marginRight;
+            lay["bottom"] = w.layout.marginBottom;
+            lay["pivotX"] = w.layout.pivot.x;
+            lay["pivotY"] = w.layout.pivot.y;
+            
+            item["layout"] = lay;
+            data["widgets"].push_back(item);
+        }
+        
+        std::ofstream file(path);
+        if (file.is_open()) {
+            file << data.dump(4); // Запись с красивыми отступами
+        }
+    }
+
+    // Методы для манипуляции списком элементов в редакторе
+    void Screen::AddWidget(const std::string& name, WidgetType type)
+    {
+        WidgetDefinition def;
+        def.type = type;
+        def.layout = Layout::Center(100, 100); // Пресет по умолчанию
+        m_widgets.push_back(def);
+        m_nameToIndex[name] = m_widgets.size() - 1;
+    }
+    
+    void Screen::RemoveWidget(size_t index)
+    {
+        if (index >= m_widgets.size()) return;
+        m_widgets.erase(m_widgets.begin() + index);
+        
+        // Перестраиваем мапу индексов
+        m_nameToIndex.clear();
+        for (size_t i = 0; i < m_widgets.size(); ++i) {
+            if (!m_widgets[i].text.empty() || m_widgets[i].textureId != 0) { // или если у вас хранится w.name
+                // Рекомендуется добавить явное поле std::string name внутрь WidgetDefinition для удобства редактора
+            }
+        }
+    }
+}

@@ -34,8 +34,6 @@ UIManager::UIManager()
     m_pMainView = new Viewport();
     m_pMainView->init();
     
-//    RenderDevice::setMainViewport(m_pMainView);
-    
     m_pViewportPanel = new ViewportPanel("Perspective");
     m_pViewportPanel->setViewport(m_pMainView);
     m_pViewportPanel->m_manager = this;
@@ -80,12 +78,14 @@ void UIManager::update(float dt)
     }
     
     if (m_is_picking_mode) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand); // Или ImGuiMouseCursor_TextInput
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 }
 
 void UIManager::draw()
 {
+    glEnable(GL_FRAMEBUFFER_SRGB);
+    
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -119,6 +119,7 @@ void UIManager::draw()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+// FIXME: Это жуткий костыль
 void UIManager::setScene(WorldScene *scene)
 {
     m_pScenePanel->setScene(scene);
@@ -127,7 +128,6 @@ void UIManager::setScene(WorldScene *scene)
 
 void UIManager::init(struct GLFWwindow *window)
 {
-    // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -138,9 +138,6 @@ void UIManager::init(struct GLFWwindow *window)
     ImGui_ImplOpenGL3_Init("#version 150");
     
     io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f);
-    
-//    ImGUIFonts::fontSmall = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Regular.ttf", 14.0f);
-    //    fontLarge = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Bold.ttf", 16.0f);
     
     // Rounding
     ImGui::GetStyle().WindowRounding = 4.0;
@@ -334,15 +331,6 @@ void UIManager::endPicking()
     m_is_picking_mode = false;
 }
 
-static ImVec4 ColorFromHexStr(const char* hex)
-{
-    int r, g, b;
-    // Skip '#' if present
-    if (hex[0] == '#') hex++;
-    std::sscanf(hex, "%02x%02x%02x", &r, &g, &b);
-    return ImVec4(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
-}
-
 void DrawScriptConsoleWindow()
 {
     ImGui::Begin("Script Console");
@@ -353,45 +341,6 @@ void DrawScriptConsoleWindow()
     }
     
     ImGui::Separator();
-    
-//    // Область вывода сообщений (скроллящаяся)
-//    ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
-//    
-//    const auto& logs = ScriptEngine::get().GetLogMessages();
-//    for (const auto& log : logs) {
-//        ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // Белый по умолчанию (Info)
-//        const char* prefix = "[INFO]";
-//        
-//        if (log.type == ScriptLogType::Warning) {
-//            color = ImVec4(1.0f, 0.8f, 0.2f, 1.0f); // Желтый (Warning)
-//            prefix = "[WARN]";
-//        }
-//        else if (log.type == ScriptLogType::Error) {
-//            color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f); // Красный (Error)
-//            prefix = "[ERRO]";
-//        }
-//        
-//        // Выводим текст с цветовой подсветкой
-//        ImGui::PushStyleColor(ImGuiCol_Text, color);
-//        
-//        // Форматируем строку: Файл(Строка,Колонка): Сообщение
-//        ImGui::TextWrapped("%s %s(%d, %d): %s",
-//                           prefix,
-//                           log.section.c_str(),
-//                           log.row,
-//                           log.col,
-//                           log.text.c_str()
-//                           );
-//        
-//        ImGui::PopStyleColor();
-//    }
-//    
-//    // Автоматический скролл вниз при появлении новых ошибок
-//    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-//        ImGui::SetScrollHereY(1.0f);
-//    }
-//    
-//    ImGui::EndChild();
     
     const auto& logs = ScriptEngine::get().GetLogMessages();
     
@@ -438,14 +387,6 @@ void DrawScriptConsoleWindow()
                                    log.text.c_str()
                                    );
             }
-            
-//            // Делаем строку выделяемой целиком
-//            bool is_selected = false;
-//            if (ImGui::Selectable(logs[i].text.c_str(), &is_selected))
-//            {
-//                // При клике копируем строку в буфер обмена Windows/Linux
-//                ImGui::SetClipboardText(logs[i].text.c_str());
-//            }
             
             ImGui::PopStyleColor();
         }

@@ -1,6 +1,6 @@
 //
-//  SourceMapScene.cpp
-//  TryOpenGL
+//  WorldScene.cpp
+//  Cucumber
 //
 //  Created by Fedor Artemenkov on 12.05.25.
 //
@@ -9,12 +9,9 @@
 
 #include "Application.h"
 #include "UIManager.h"
-#include "InspectorPanel.h"
 
-#include "Camera.h"
-
-#include "Grid.h"
 #include "GizmoRender.h"
+#include "Grid.h"
 
 #include "ModelLoader.h"
 
@@ -28,11 +25,7 @@
 #include "AudioComponent.h"
 #include "MeshComponent.h"
 
-#include "Viewport.h"
-
 #include "RenderDevice.h"
-#include "AudioSystem.h"
-#include "ScriptEngine.h"
 
 #include "Sky.h"
 
@@ -43,7 +36,6 @@
 #include "PhysicsCommon.h"
 
 #include "SpriteRenderer.h"
-#include "ParticleSystem.h"
 #include "DecalManager.h"
 #include "GameUI.h"
 
@@ -52,9 +44,12 @@
 #include <iostream>
 #include <fstream>
 
+// Вообще отрисовку сетки надо перенести в GizmoRenderer, но пока что тут
 static Grid g_grid;
+
 static Sky g_sky;
 
+// Скорее всего переедет в отдельную Entity
 static Q3BspMesh g_mesh;
 static Q3BspCollision g_collision;
 
@@ -62,22 +57,8 @@ WorldScene::WorldScene()
 {
     g_grid.init();
     g_sky.init();
-    AudioSystem::Get().Initialize();
     
-    SpriteRenderer::Init();
-    ParticleSystem::Init();
-    DecalManager::Init();
-    GameUI::Init();
-    
-    if (ScriptEngine::get().init())
-    {
-        ScriptEngine::get().CompileAllScripts("assets/scripts");
-    }
-    else
-    {
-        std::cerr << "Failed to init AngelScript!" << std::endl;
-    }
-    
+    // Временный хак пока не решу куда вставить bsp-меш и коллизию
     loadBSP("assets/wolf/maps/escape2.bsp");
     
     g_currentScene = this;
@@ -89,8 +70,6 @@ WorldScene::~WorldScene() = default;
 
 void WorldScene::update(float dt)
 {
-//    processPendingStarts();
-    
     if (m_isSimulationMode)
     {
         for (auto* component : m_globalUpdatables)
@@ -101,18 +80,12 @@ void WorldScene::update(float dt)
         }
     }
     
-    for (auto* component : m_globalWaitingForStart)
+    for (auto* component : m_allComponents)
     {
         component->gizmo();
     }
     
-    ParticleSystem::Update(dt);
-    DecalManager::Update(dt);
-    
-    // 2. СНАЧАЛА зачищаем указатели «смертников» из систем обновлений Сцены
     cleanupDeadComponents();
-    
-    // 3. И ТОЛЬКО ПОТОМ физически удаляем сущности из памяти а с ними и сами компоненты
     cleanupDeadEntities();
 }
 
@@ -130,7 +103,6 @@ void WorldScene::draw()
     for (auto& entity : m_entities)
     {
         if (!entity->m_isActive) continue;
-//        if (entity->isPendingKill()) continue;
         
         auto meshComp = entity->getComponent<MeshComponent>();
         
@@ -151,36 +123,36 @@ void WorldScene::draw()
         }
     }
     
-    // FIXME: установка вьюпорта должна быть в RenderDevice
+    // Установка вьюпорта должна быть в RenderDevice, наверно
     m_pAttachedViewport->bind();
-    
-    if (m_drawSkybox)
     {
-        auto camera = m_pAttachedViewport->getCamera();
-        g_sky.draw(camera->view, camera->projection);
+        if (m_drawSkybox)
+        {
+            auto camera = m_pAttachedViewport->getCamera();
+            g_sky.draw(camera->view, camera->projection);
+        }
+        
+        if (!m_isSimulationMode)
+        {
+            auto camera = m_pAttachedViewport->getCamera();
+            GizmoRender::Get().Flush(camera->view, camera->projection);
+        }
+        
+        RenderDevice::commit(m_pAttachedViewport->getCamera());
+        
+        {
+            auto camera = m_pAttachedViewport->getCamera();
+            SpriteRenderer::Flush(camera->view, camera->projection);
+            DecalManager::Flush(camera->view, camera->projection);
+        }
+        
+        {
+            int width = m_pAttachedViewport->getWidth();
+            int height = m_pAttachedViewport->getHeight();
+            GameUI::Resize(width, height);
+            GameUI::Flush();
+        }
     }
-    
-    if (!m_isSimulationMode)
-    {
-        auto camera = m_pAttachedViewport->getCamera();
-        GizmoRender::Get().Flush(camera->view, camera->projection);
-    }
-    
-    RenderDevice::commit(m_pAttachedViewport->getCamera());
-    
-    {
-        auto camera = m_pAttachedViewport->getCamera();
-        SpriteRenderer::Flush(camera->view, camera->projection);
-        DecalManager::Flush(camera->view, camera->projection);
-    }
-    
-    {
-        int width = m_pAttachedViewport->getWidth();
-        int height = m_pAttachedViewport->getHeight();
-        GameUI::Resize(width, height);
-        GameUI::Flush();
-    }
-    
     m_pAttachedViewport->unbind();
     
     RenderDevice::endFrame();
@@ -196,41 +168,8 @@ void WorldScene::selectEntityAtIndex(int index)
     }
 }
 
-void SerializeEntity(nlohmann::json& entityJson, const Entity* entity)
-{
-    entityJson["name"] = entity->m_name;
-    entityJson["uid"] = entity->uid;
-    entityJson["parent"] = entity->parent ? entity->parent->uid : UID::Invalid();
-    
-    nlohmann::json componentsArray = nlohmann::json::array();
-    
-    {
-        auto comp = entity->getTransformPtr();
-        
-        nlohmann::json compNode;
-        compNode["type"] = comp->getTypeName();
-        
-        nlohmann::json compData;
-        comp->save(compData);
-        compNode["data"] = compData;
-        
-        componentsArray.push_back(compNode);
-    }
-    
-    for (const auto& comp : entity->getComponents())
-    {
-        nlohmann::json compNode;
-        compNode["type"] = comp->getTypeName();
-        
-        nlohmann::json compData;
-        comp->save(compData);
-        compNode["data"] = compData;
-        
-        componentsArray.push_back(compNode);
-    }
-    
-    entityJson["components"] = componentsArray;
-}
+static void SerializeEntity(nlohmann::json& entityJson, const Entity* entity);
+static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity);
 
 void WorldScene::save(const std::string& filename)
 {
@@ -250,85 +189,8 @@ void WorldScene::save(const std::string& filename)
     file << sceneJson.dump(4);
 }
 
-static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
-{
-    auto componentsArray = entityJson.at("components");
-    
-    for (const auto& compNode : componentsArray)
-    {
-        std::string compName = compNode.at("type").get<std::string>();
-        const nlohmann::json& compData = compNode.at("data");
-        
-        Component* newComp = nullptr;
-        
-        // Фабрика компонентов по их текстовому имени
-        if (compName == "TransformComponent")
-        {
-//            newComp = entity->addComponent<TransformComponent>();
-            newComp = &entity->getTransform();
-        }
-        else if (compName == "MeshComponent")
-        {
-            newComp = entity->addComponent<MeshComponent>();
-            
-            // После создания компонента, не забудьте накатить на него ресурсы!
-            // Берём путь к glb, который прочитается внутри Deserialize, и грузим через ResourceManager
-            std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel("assets/" + path);
-            
-            auto meshComp = static_cast<MeshComponent*>(newComp);
-            meshComp->mesh = model.mesh;
-            meshComp->materials = model.embeddedMaterials;
-        }
-        else if (compName == "AnimatorComponent")
-        {
-            newComp = entity->addComponent<AnimatorComponent>();
-            
-            std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel("assets/" + path);
-            
-            auto animComp = static_cast<AnimatorComponent*>(newComp);
-            animComp->setSkeleton(model.skeleton);
-            animComp->m_clips = model.animations;
-            animComp->path = path; // FIXME: HACK
-        }
-        else if (compName == "AudioComponent")
-        {
-            newComp = entity->addComponent<AudioComponent>();
-            
-            std::string path = compData.at("source");
-            
-            auto audioComp = static_cast<AudioComponent*>(newComp);
-            audioComp->init("assets/" + path);
-        }
-        else if (compName == "ScriptComponent")
-        {
-            newComp = entity->addComponent<ScriptComponent>();
-        }
-        else if (compName == "CameraComponent")
-        {
-            newComp = entity->addComponent<CameraComponent>();
-        }
-        else if (compName == "MovementComponent")
-        {
-            newComp = entity->addComponent<MovementComponent>();
-        }
-        else if (compName == "CollisionComponent")
-        {
-            newComp = entity->addComponent<CollisionComponent>();
-        }
-        
-        // Загружаем уникальное состояние (время, позицию, скорость и т.д.)
-        if (newComp)
-        {
-            newComp->load(compData);
-        }
-    }
-}
-
 void WorldScene::load(const std::string& filename)
 {
-    // 1. Открываем и читаем JSON-файл
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Не удалось открыть файл сцены: " << filename << std::endl;
@@ -343,7 +205,6 @@ void WorldScene::load(const std::string& filename)
         return;
     }
     
-    // Проверяем базовую структуру файла
     if (!sceneJson.contains("entities") || !sceneJson["entities"].is_array()) {
         std::cerr << "Неверный формат сцены: отсутствует массив 'entities'" << std::endl;
         return;
@@ -383,19 +244,16 @@ void WorldScene::load(const std::string& filename)
             Entity* parent = entityMap[parentId];
             
             if (child && parent) {
-                child->setParent(parent, false); // Связываем их!
+                child->setParent(parent, false);
             }
         }
     }
     
-    for (auto& entity : m_entities)
+    // ВСЕ сущности созданы, ВСЕ parent-child связи восстановлены.
+    // Теперь безопасно вызываем awake() для абсолютно всех компонентов на сцене:
+    for (auto* component : m_allComponents)
     {
-        auto scripts = entity->getComponents<ScriptComponent>();
-        
-        for (auto& script : scripts)
-        {
-            script->loadStateSnapshot();
-        }
+        component->awake();
     }
 }
 
@@ -445,14 +303,8 @@ void WorldScene::queueEntityDestruction(Entity* entity)
 
 void WorldScene::registerComponent(Component *component)
 {
-    component->awake(); // Awake вызывается СРАЗУ при создании
-    
     if (component->HasFlag(Component::RequiresUpdate)) {
         m_globalUpdatables.push_back(component);
-    }
-    // Точно так же для физики:
-    if (component->HasFlag(Component::RequiresFixedUpdate)) {
-        m_globalFixedUpdatables.push_back(component);
     }
     
     // Регистрируем коллайдеры в выделенный список
@@ -460,47 +312,23 @@ void WorldScene::registerComponent(Component *component)
         m_globalColliders.push_back(collider);
     }
     
-    m_globalWaitingForStart.push_back(component);
+    m_allComponents.push_back(component);
 }
 
 void WorldScene::unregisterComponent(Component *component)
 {
-    // Убираем из очереди Start, если он еще не успел вызваться
-    m_globalWaitingForStart.erase(std::remove(m_globalWaitingForStart.begin(), m_globalWaitingForStart.end(), component),
-                                  m_globalWaitingForStart.end()
+    m_allComponents.erase(std::remove(m_allComponents.begin(), m_allComponents.end(), component),
+                                  m_allComponents.end()
                                   );
     
     m_globalUpdatables.erase(std::remove(m_globalUpdatables.begin(), m_globalUpdatables.end(), component),
                              m_globalUpdatables.end()
                              );
     
-    m_globalFixedUpdatables.erase(std::remove(m_globalFixedUpdatables.begin(), m_globalFixedUpdatables.end(), component),
-                                  m_globalFixedUpdatables.end()
-                                  );
-    
     // Удаляем из списка коллайдеров
+    // А нужен ли тут dynamic_cast???
     if (auto* collider = dynamic_cast<CollisionComponent*>(component)) {
         m_globalColliders.erase(std::remove(m_globalColliders.begin(), m_globalColliders.end(), collider), m_globalColliders.end());
-    }
-}
-
-void WorldScene::processPendingStarts()
-{
-    if (m_globalWaitingForStart.empty()) return;
-    
-    auto processingList = std::move(m_globalWaitingForStart);
-    m_globalWaitingForStart.clear();
-    
-    for (auto* component : processingList)
-    {
-        if (component->owner->m_isActive && component->enabled)
-        {
-            component->start();
-        }
-        else
-        {
-            m_globalWaitingForStart.push_back(component);
-        }
     }
 }
 
@@ -558,16 +386,10 @@ void WorldScene::startSimulation(Viewport* viewport)
     // 2. Если нашли игровую камеру — подменяем её во вьюпорте
     if (gameCamera) {
         m_pAttachedViewport->setCamera(gameCamera);
-        // Опционально: отключаем контроллер свободной камеры вьюпорта,
-        // чтобы мышь/WASD редактора не двигали игровую камеру
-//        m_pAttachedViewport->getCameraController()->setActive(false);
     }
     
     // 3. Запускаем логику симуляции (например, вызов функций Start у скриптов)
-    // onSimulationStart();
-    
-    // FIXME: HACK
-    for (auto* component : m_globalWaitingForStart)
+    for (auto* component : m_allComponents)
     {
         component->start();
     }
@@ -578,40 +400,7 @@ void WorldScene::stopSimulation()
     m_isSimulationMode = false;
 }
 
-
-// Хелпер для вызова AngelScript коллбэка
-void NotifyScriptCallback(Entity* entityToNotify, const std::string& callbackName, Entity* otherEntity)
-{
-    if (!entityToNotify || callbackName.empty() || !otherEntity) return;
-    
-    // Ищем скрипт на объекте, который должен получить уведомление
-    auto scriptComp = entityToNotify->getComponent<ScriptComponent>();
-    if (!scriptComp) return;
-    
-    // В AngelScript вызов метода объекта выглядит примерно так через asIScriptContext:
-    asIScriptEngine* engine = ScriptEngine::get().GetRawEngine();
-    
-    // Ищем метод в объекте скрипта (у вас в ScriptComponent скорее всего хранится asIScriptObject)
-    asIScriptObject* scriptObject = scriptComp->m_ScriptObject;
-    if (!scriptObject) return;
-    
-    asIScriptFunction* func = scriptObject->GetObjectType()->GetMethodByName(callbackName.c_str());
-    if (!func) return; // Метод не объявлен в скрипте (например, у объекта просто нет функции OnTriggerEnter)
-    
-    asIScriptContext* ctx = engine->CreateContext();
-    ctx->Prepare(func);
-    ctx->SetObject(scriptObject);
-    
-    // Передаем @otherEntity в качестве первого аргумента (индекс 0)
-    ctx->SetArgAddress(0, otherEntity);
-    
-    int r = ctx->Execute();
-    if (r != asEXECUTION_FINISHED) {
-        // Обработка ошибок выполнения скрипта
-    }
-    ctx->Release();
-}
-
+// Временно вручную - потом через Jolt
 void WorldScene::trace(HitResult &result,
                        const glm::vec3 &q_start,
                        const glm::vec3 &q_end,
@@ -694,20 +483,116 @@ void WorldScene::trace(HitResult &result,
         result.surfaceFlags = 0;
         result.startsolid = (closestFraction == 0.0f);
         result.allsolid = false; // Для динамических объектов рассчитывается индивидуально
-        
-        /*
-        // --- КОЛЛБЭК ДЛЯ РАКЕТЫ ИЛИ СНАРЯДА ---
-        // Если тот, кто пускал луч (ignoreCollider), имеет специальный скрипт для взрыва
-        if (ignore)
-        {
-            // Например, если ракета врезалась во врага, вызываем у нее "OnProjectileHit"
-            NotifyScriptCallback(ignore, "OnProjectileHit", closestCollider->owner);
-        }
-         */
     }
-//    else if (result.fraction < 1.0f && ignore)
-//    {
-//        // Ракеты также должны взрываться при ударе о статичную BSP-карту (стены уровня)
-//        NotifyScriptCallback(ignore, "OnProjectileHit", nullptr);
-//    }
+}
+
+// FIXME: надо вынести в фабрику компонентов
+static void SerializeEntity(nlohmann::json& entityJson, const Entity* entity)
+{
+    entityJson["name"] = entity->m_name;
+    entityJson["uid"] = entity->uid;
+    entityJson["parent"] = entity->parent ? entity->parent->uid : UID::Invalid();
+    
+    nlohmann::json componentsArray = nlohmann::json::array();
+    
+    {
+        auto comp = entity->getTransformPtr();
+        
+        nlohmann::json compNode;
+        compNode["type"] = comp->getTypeName();
+        
+        nlohmann::json compData;
+        comp->save(compData);
+        compNode["data"] = compData;
+        
+        componentsArray.push_back(compNode);
+    }
+    
+    for (const auto& comp : entity->getComponents())
+    {
+        nlohmann::json compNode;
+        compNode["type"] = comp->getTypeName();
+        
+        nlohmann::json compData;
+        comp->save(compData);
+        compNode["data"] = compData;
+        
+        componentsArray.push_back(compNode);
+    }
+    
+    entityJson["components"] = componentsArray;
+}
+
+// Надо будет вынести в фабрику компонентов
+static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
+{
+    auto componentsArray = entityJson.at("components");
+    
+    for (const auto& compNode : componentsArray)
+    {
+        std::string compName = compNode.at("type").get<std::string>();
+        const nlohmann::json& compData = compNode.at("data");
+        
+        Component* newComp = nullptr;
+        
+        // Фабрика компонентов по их текстовому имени
+        if (compName == "TransformComponent")
+        {
+            newComp = &entity->getTransform();
+        }
+        else if (compName == "MeshComponent")
+        {
+            newComp = entity->addComponent<MeshComponent>();
+            
+            std::string path = compData.at("source_glb");
+            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            
+            auto meshComp = static_cast<MeshComponent*>(newComp);
+            meshComp->mesh = model.mesh;
+            meshComp->materials = model.embeddedMaterials;
+        }
+        else if (compName == "AnimatorComponent")
+        {
+            newComp = entity->addComponent<AnimatorComponent>();
+            
+            std::string path = compData.at("source_glb");
+            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            
+            auto animComp = static_cast<AnimatorComponent*>(newComp);
+            animComp->setSkeleton(model.skeleton);
+            animComp->m_clips = model.animations;
+            animComp->path = path; // HACK
+        }
+        else if (compName == "AudioComponent")
+        {
+            newComp = entity->addComponent<AudioComponent>();
+            
+            std::string path = compData.at("source");
+            
+            auto audioComp = static_cast<AudioComponent*>(newComp);
+            audioComp->init("assets/" + path);
+        }
+        else if (compName == "ScriptComponent")
+        {
+            newComp = entity->addComponent<ScriptComponent>();
+        }
+        else if (compName == "CameraComponent")
+        {
+            newComp = entity->addComponent<CameraComponent>();
+        }
+        else if (compName == "MovementComponent")
+        {
+            newComp = entity->addComponent<MovementComponent>();
+        }
+        else if (compName == "CollisionComponent")
+        {
+            newComp = entity->addComponent<CollisionComponent>();
+        }
+        
+        // Загружаем уникальное состояние
+        if (newComp)
+        {
+            newComp->load(compData);
+        }
+    }
 }

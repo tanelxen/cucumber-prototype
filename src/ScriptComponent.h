@@ -40,7 +40,7 @@ public:
     void loadStateSnapshot();      // Вызывается ПОСЛЕ перекомпиляции
     void recreateScriptObject();   // Пересоздает asIScriptObject из нового модуля
     
-//    void awake() override;
+    void awake() override;
     
     void start() override;
     void update(float dt) override;

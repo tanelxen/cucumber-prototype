@@ -28,6 +28,4 @@ private:
     std::string m_vertexTemplate;
     std::string m_fragmentTemplate;
     std::unordered_map<uint32_t, std::unique_ptr<ShaderVariant>> m_variants;
-    
-    
 };

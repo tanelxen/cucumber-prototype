@@ -43,7 +43,6 @@ public:
     
     bool m_is_picking_mode = false;
     std::function<void(Entity*)> m_active_picking_callback = nullptr;
-//    Entity* m_selected_entity = nullptr;
     
 private:
     ViewportPanel* m_pViewportPanel;
