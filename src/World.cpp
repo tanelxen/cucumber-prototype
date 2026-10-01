@@ -257,6 +257,147 @@ void WorldScene::load(const std::string& filename)
     }
 }
 
+void WorldScene::saveAsPrefab(Entity* entity, const std::string &filename)
+{
+    nlohmann::json prefabJson;
+    
+    prefabJson["name"] = entity->m_name;
+    prefabJson["root"] = entity->uid;
+    prefabJson["entities"] = nlohmann::json::array();
+    
+    // Лямбда-функция захватывает prefabJson по ссылке [&prefabJson]
+    auto serializeRecursively = [&prefabJson](auto& self, Entity* currentEntity) -> void {
+        if (!currentEntity) return; // Защита от нулевого указателя
+        
+        nlohmann::json entityJson;
+        SerializeEntity(entityJson, currentEntity);
+        prefabJson["entities"].push_back(entityJson);
+        
+        for (const auto& child : currentEntity->children)
+        {
+            self(self, child); // Рекурсивный вызов: передаем себя и ребенка
+        }
+    };
+    
+    // Запускаем рекурсию для корневого элемента
+    serializeRecursively(serializeRecursively, entity);
+    
+    std::ofstream file(filename);
+    file << prefabJson.dump(4);
+}
+
+void WorldScene::loadPrefab(Entity* entity, const std::string &filename)
+{
+    entity = instantiatePrefab(filename, nullptr);
+}
+
+static void RemapJsonUIDs(nlohmann::json& j, const std::unordered_map<std::string, std::string>& txtRemap);
+
+Entity* WorldScene::instantiatePrefab(const std::string& filename, Entity* customParent)
+{
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Не удалось открыть файл префаба: " << filename << std::endl;
+        return nullptr;
+    }
+    
+    nlohmann::json prefabJson;
+    try {
+        file >> prefabJson;
+    } catch (const nlohmann::json::parse_error& e) {
+        std::cerr << "Ошибка парсинга JSON префаба: " << e.what() << std::endl;
+        return nullptr;
+    }
+    
+    nlohmann::json entitiesArray;
+    if (prefabJson.is_array()) {
+        entitiesArray = prefabJson;
+    } else if (prefabJson.contains("entities")) {
+        entitiesArray = prefabJson["entities"];
+    } else {
+        entitiesArray = nlohmann::json::array({ prefabJson });
+    }
+    
+    // Таблица соответствий текстовых UID: [Старая строка] -> [Новая строка]
+    std::unordered_map<std::string, std::string> stringUidRemap;
+    std::unordered_map<UID, UID> rawUidRemap;
+    
+    // ШАГ 1: Генерируем новые ID и составляем карту замен
+    for (const auto& entityJson : entitiesArray)
+    {
+        UID oldUid = entityJson.at("uid").get<UID>();
+        UID newUid; // Конструктор по умолчанию создает новый случайный ID
+        
+        stringUidRemap[oldUid.toText()] = newUid.toText();
+        rawUidRemap[oldUid] = newUid;
+    }
+    
+    // ШАГ 2: АВТОМАТИЧЕСКИЙ РЕМАППИНГ ВСЕГО JSON
+    // Проходим по всему массиву. Все упоминания старых UID внутри любых компонентов
+    // (будь то ссылки на другие Entity или связи между компонентами) заменяются на новые.
+    RemapJsonUIDs(entitiesArray, stringUidRemap);
+    
+    // ШАГ 3: Десериализация (используем ваш стандартный DeserializeEntity!)
+    std::vector<Entity*> instantiatedEntities;
+    std::unordered_map<UID, Entity*> localIdToEntityMap;
+    
+    for (const auto& entityJson : entitiesArray)
+    {
+        std::string name = entityJson.value("name", "Prefab_Instance");
+        UID newUid = entityJson.at("uid").get<UID>(); // Здесь уже НОВЫЙ ремапленный UID
+        
+        auto entity = std::make_unique<Entity>(name);
+        entity->uid = newUid;
+        
+        if (entityJson.contains("components"))
+        {
+            // Вызываем вашу старую функцию! Никаких правок в компонентах не нужно.
+            DeserializeEntity(entityJson, entity.get());
+        }
+        
+        Entity* rawPtr = entity.get();
+        localIdToEntityMap[newUid] = rawPtr;
+        instantiatedEntities.push_back(rawPtr);
+        
+        m_entities.push_back(std::move(entity));
+    }
+    
+    // ШАГ 4: Восстановление иерархии Parent-Child
+    Entity* rootEntity = nullptr;
+    for (const auto& entityJson : entitiesArray)
+    {
+        UID newUid = entityJson.at("uid").get<UID>();
+        UID newParentUid = entityJson.value("parent", UID::Invalid()); // Здесь parent уже тоже ремапленный!
+        
+        Entity* child = localIdToEntityMap[newUid];
+        
+        if (newParentUid.isValid())
+        {
+            Entity* parent = localIdToEntityMap[newParentUid];
+            if (child && parent) {
+                child->setParent(parent, false);
+            }
+        }
+        else if (!rootEntity)
+        {
+            rootEntity = child;
+        }
+    }
+    
+    if (customParent && rootEntity)
+    {
+        rootEntity->setParent(customParent, false);
+    }
+    
+    for (Entity* entity : instantiatedEntities)
+    {
+        entity->awake();
+    }
+    
+    return rootEntity;
+}
+
+
 Entity* WorldScene::findEntityByName(const std::string &name)
 {
     auto it = std::find_if(m_entities.begin(), m_entities.end(),
@@ -593,6 +734,38 @@ static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
         if (newComp)
         {
             newComp->load(compData);
+        }
+    }
+}
+
+#include <algorithm>
+
+static void RemapJsonUIDs(nlohmann::json& j, const std::unordered_map<std::string, std::string>& txtRemap)
+{
+    if (j.is_string())
+    {
+        std::string val = j.get<std::string>();
+        if (val.starts_with("uid://")) // Проверяем, что строка является UID
+        {
+            auto it = txtRemap.find(val);
+            if (it != txtRemap.end())
+            {
+                j = it->second; // Заменяем старый UID на новый прямо в JSON
+            }
+        }
+    }
+    else if (j.is_object())
+    {
+        for (auto& [key, value] : j.items())
+        {
+            RemapJsonUIDs(value, txtRemap);
+        }
+    }
+    else if (j.is_array())
+    {
+        for (auto& element : j)
+        {
+            RemapJsonUIDs(element, txtRemap);
         }
     }
 }

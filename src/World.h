@@ -37,6 +37,10 @@ public:
     void save(const std::string& filename);
     void load(const std::string& filename);
     
+    void saveAsPrefab(Entity* entity, const std::string& filename);
+    Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr);
+    void loadPrefab(Entity* entity, const std::string& filename);
+    
     void registerComponent(Component* component);
     
     void queueComponentDestruction(Component* component);

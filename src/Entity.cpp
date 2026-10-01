@@ -44,6 +44,14 @@ void Entity::destroyComponent(Component* component)
     }
 }
 
+void Entity::awake()
+{
+    for (auto& component : m_components)
+    {
+        component->awake();
+    }
+}
+
 void Entity::freeComponentMemory(Component* component)
 {
     // 1. Удаляем из мапы быстрого поиска GetComponents

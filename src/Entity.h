@@ -24,6 +24,8 @@ public:
     Entity(const std::string &name);
     ~Entity();
     
+    void awake();
+    
     std::string m_name;
     UID uid;
     
