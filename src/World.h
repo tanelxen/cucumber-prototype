@@ -39,7 +39,7 @@ public:
     void load(const std::string& filename);
     
     void saveAsPrefab(Entity* entity, const std::string& filename);
-    Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid());
+    Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid(), const nlohmann::json& sceneOverrides = nlohmann::json::object());
 
     void loadPrefab(Entity* entity, const std::string& filename);
     

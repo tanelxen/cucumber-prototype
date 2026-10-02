@@ -460,7 +460,10 @@ void ScriptComponent::saveStateSnapshot()
 void ScriptComponent::loadStateSnapshot()
 {
     loadScriptStateFromValues(m_StateSnapshot);
-    m_StateSnapshot.clear();
+    
+    // HACK: нужно чтобы awake смог вызваться повторно после загрузки сцены
+    // поэтому не удаляем снэпшот
+    //m_StateSnapshot.clear();
 }
 
 void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)

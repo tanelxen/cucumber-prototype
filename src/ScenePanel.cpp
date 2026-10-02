@@ -53,7 +53,7 @@ void ScenePanel::draw()
             auto count = (int)m_scene->m_entities.size();
             
             Entity* root;
-            m_scene->loadPrefab(root, std::filesystem::relative(path, "./assets"));
+            m_scene->loadPrefab(root, std::filesystem::relative(path, "./"));
             m_scene->selectEntityAtIndex(count);
             selectedIndex = count;
         }

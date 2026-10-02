@@ -54,11 +54,7 @@
                                 "owner": "uid://1wijqfin7cyr",
                                 "type": "AnimatorComponent"
                             },
-                            "health": 40,
-                            "player": {
-                                "type": "Entity",
-                                "uid": "uid://b"
-                            }
+                            "health": 40
                         }
                     },
                     "type": "ScriptComponent"

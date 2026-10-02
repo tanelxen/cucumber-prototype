@@ -162,3 +162,38 @@ void Entity::invalidateTransform()
         child->invalidateTransform();
     }
 }
+
+nlohmann::json Entity::serializeToSnapshot() const
+{
+    nlohmann::json json;
+    json["name"] = m_name;
+    
+    auto componentsArray = nlohmann::json::array();
+    
+    {
+        auto comp = getTransformPtr();
+        
+        nlohmann::json compNode;
+        compNode["type"] = comp->getTypeName();
+        
+        nlohmann::json compData;
+        comp->save(compData);
+        compNode["data"] = compData;
+        
+        componentsArray.push_back(compNode);
+    }
+    
+    for (auto& comp : m_components)
+    {
+        nlohmann::json compJson;
+        compJson["type"] = comp->getTypeName();
+        
+        nlohmann::json compData;
+        comp->save(compData);
+        compJson["data"] = compData;
+        
+        componentsArray.push_back(compJson);
+    }
+    json["components"] = componentsArray;
+    return json;
+}
