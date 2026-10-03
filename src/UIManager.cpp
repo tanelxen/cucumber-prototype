@@ -240,6 +240,11 @@ void UIManager::drawMenuBar()
                 }
             }
             
+            if (ImGui::MenuItem("Clear Scene"))
+            {
+                Application::currentInstance->m_pScene->clear();
+            }
+            
             ImGui::Separator();
             
             if (ImGui::MenuItem("Reload Scripts"))

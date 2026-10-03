@@ -66,8 +66,10 @@ std::string UID::toText() const
 
 UID::UID(const std::string& text)
 {
-    if (text.length() <= 6 || !text.starts_with("uid://") || text == "uid://<invalid>") {
-        return UID::Invalid();
+    m_value = 0;
+    
+    if (text.length() <= 6 || !text.starts_with("uid://") || text.starts_with("uid://<invalid")) {
+        return;
     }
     
     uint64_t uid = 0;

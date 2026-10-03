@@ -12,7 +12,7 @@
 
 struct UID
 {
-    uint64_t m_value;
+    uint64_t m_value = 0;
     
     UID();
     UID(const std::string& text);

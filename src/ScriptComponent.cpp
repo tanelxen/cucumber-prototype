@@ -545,6 +545,7 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
                 *ptrToHandle = comp;
             }
             
+            /*
             // 1. Очищаем бит хэндла, чтобы GetTypeInfoById понял, о каком классе речь
             int actualTypeId = propTypeId & ~asTYPEID_OBJHANDLE;
             
@@ -576,6 +577,7 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
                     // MyBaseClass* myClass = static_cast<MyBaseClass*>(actualObjPtr);
                 }
             }
+             */
         }
         else if (propTypeId & asTYPEID_MASK_OBJECT)
         {
@@ -605,16 +607,14 @@ void ScriptComponent::load(const nlohmann::json& j)
 {
     m_ClassName = j.at("className").get<std::string>();
     
-    recreateScriptObject();
-    
     if (j.contains("fields"))
     {
-//        loadScriptStateFromValues(j.at("fields"));
-        
-        // Сохраним в качестве снепшота
-        // Загрузим когда все сущности будут созданы
-        // чтобы восстановить все связи
         m_StateSnapshot = j.at("fields");
+    }
+    
+    if (!m_isInitialized)
+    {
+        init(m_ClassName);
     }
 }
 

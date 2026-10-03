@@ -68,7 +68,15 @@ WorldScene::WorldScene()
 
 WorldScene::~WorldScene() = default;
 
-
+void WorldScene::clear()
+{
+    for (auto& entity : m_entities)
+    {
+        entity->destroy();
+    }
+    
+    g_UIManager->setEntity(nullptr);
+}
 
 void WorldScene::update(float dt)
 {
@@ -170,28 +178,126 @@ void WorldScene::selectEntityAtIndex(int index)
     }
 }
 
-static void SerializeEntity(nlohmann::json& entityJson, const Entity* entity);
 static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity);
 
 void WorldScene::save(const std::string& filename)
 {
     nlohmann::json sceneJson;
-    
-    sceneJson["name"] = "test";
-    sceneJson["entities"] = nlohmann::json::array();
+    auto entitiesArray = nlohmann::json::array();
     
     for (const auto& entity : m_entities)
     {
+        // Дочерние объекты префабов пропускаем, они запишутся внутри своего корня в блок overrides
         if (entity->isPrefabChild()) continue;
         
         nlohmann::json entityJson;
-        SerializeEntity(entityJson, entity.get());
-        sceneJson["entities"].push_back(entityJson);
+        entityJson["uid"] = entity->uid;
+        entityJson["name"] = entity->getName();
+        
+        if (entity->getParent()) {
+            entityJson["parent"] = entity->getParent()->uid;
+        }
+        
+        if (entity->isPrefabRoot)
+        {
+            // Это префаб! Сохраняем ссылку на файл
+            entityJson["prefab_path"] = entity->prefabAssetPath;
+            
+            // Собираем оверрайды по всему дереву этого префаба
+            nlohmann::json overridesJson = nlohmann::json::object();
+            
+            // Вспомогательная лямбда для рекурсивного сбора оверрайдов компонентов
+            std::function<void(const Entity*)> collectEntityOverrides = [&](const Entity* ent) {
+                nlohmann::json compOverrides = nlohmann::json::array();
+                
+
+                nlohmann::json transformData = nlohmann::json::object();
+                compOverrides.push_back(transformData);
+                
+                ent->getTransform().saveOverrides(transformData);
+                
+                if (!transformData.empty())
+                {
+                    nlohmann::json compNode;
+                    compNode["type"] = ent->getTransform().getTypeName();
+                    compNode["data"] = transformData;
+                    compOverrides.push_back(compNode);
+                }
+                
+                for (auto& comp : ent->getComponents())
+                {
+                    nlohmann::json compData = nlohmann::json::object();
+                    
+                    // Вызываем метод save() компонента.
+                    // Внутри него компонент запишет данные ТОЛЬКО если property.isOverridden() == true
+                    comp->saveOverrides(compData);
+                    
+                    if (!compData.empty()) {
+                        nlohmann::json compNode;
+                        compNode["type"] = comp->getTypeName();
+                        compNode["data"] = compData;
+                        compOverrides.push_back(compNode);
+                    }
+                }
+                
+                if (!compOverrides.empty()) {
+                    overridesJson[ent->originalPrefabUid.toText()] = compOverrides;
+                }
+                
+                for (auto* child : ent->getChildren()) {
+                    collectEntityOverrides(child);
+                }
+            };
+            
+            collectEntityOverrides(entity.get());
+            
+            if (!overridesJson.empty()) {
+                entityJson["overrides"] = overridesJson;
+            }
+        }
+        else
+        {
+            // Обычный объект сцены — сохраняем все компоненты целиком
+            auto componentsArray = nlohmann::json::array();
+
+            {
+                auto comp = entity->getTransformPtr();
+                
+                nlohmann::json compNode;
+                compNode["type"] = comp->getTypeName();
+                
+                nlohmann::json compData;
+                comp->save(compData);
+                compNode["data"] = compData;
+                
+                componentsArray.push_back(compNode);
+            }
+            
+            for (const auto& comp : entity->getComponents())
+            {
+                nlohmann::json compNode;
+                compNode["type"] = comp->getTypeName();
+                
+                nlohmann::json compData;
+                comp->save(compData);
+                compNode["data"] = compData;
+                
+                componentsArray.push_back(compNode);
+            }
+            
+            entityJson["components"] = componentsArray;
+        }
+        
+        entitiesArray.push_back(entityJson);
     }
+    
+    sceneJson["entities"] = entitiesArray;
     
     std::ofstream file(filename);
     file << sceneJson.dump(4);
 }
+
+static void DeserializeOverrides(const nlohmann::json& compOverridesArray, Entity* liveEntity);
 
 void WorldScene::load(const std::string& filename)
 {
@@ -215,6 +321,8 @@ void WorldScene::load(const std::string& filename)
     }
     
     std::unordered_map<UID, Entity*> entityMap;
+    // Мапа для последующего восстановления связей parent-child обычных сущностей
+    std::vector<std::pair<Entity*, UID>> nonPrefabParentsToResolve;
     
     // ==========================================
     // ПРОХОД 1: Создание Entity и их компонентов
@@ -226,12 +334,40 @@ void WorldScene::load(const std::string& filename)
             std::string prefabPath = entityJson["prefab_path"];
             UID savedRootUid = entityJson["uid"].get<UID>();
             
-            // Получаем блок оверрайдов для этого конкретного префаба, если он есть
-            nlohmann::json overrides = entityJson.value("overrides", nlohmann::json::object());
+            // 1. Создаем чистый префаб в памяти.
+            // Все Property выставлены через setFromPrefab(), флаги isOverridden() == false.
+            Entity* prefabRoot = instantiatePrefab(prefabPath, nullptr, savedRootUid);
             
-            // Просто спавним префаб, передавая ему оверрайды.
-            // Он сам соберет себя правильно с первого прохода!
-            instantiatePrefab(prefabPath, nullptr, savedRootUid, overrides);
+            if (!prefabRoot) continue;
+            
+            // 2. Накатываем оверрайды сцены
+            if (entityJson.contains("overrides"))
+            {
+                const auto& overrides = entityJson["overrides"];
+                
+                // Строим быструю мапу [originalPrefabUid -> Живой Entity* на сцене] для этого инстанса
+                std::unordered_map<UID, Entity*> originalToLiveMap;
+                std::function<void(Entity*)> mapSubtree = [&](Entity* ent) {
+                    originalToLiveMap[ent->originalPrefabUid] = ent;
+                    for (auto* child : ent->getChildren()) { mapSubtree(child); }
+                };
+                mapSubtree(prefabRoot);
+                
+                // Идем по оверрайдам из JSON сцены
+                for (auto& [origUidStr, compOverridesArray] : overrides.items())
+                {
+                    UID origUid(origUidStr);
+                    if (originalToLiveMap.contains(origUid))
+                    {
+                        Entity* liveEntity = originalToLiveMap[origUid];
+                        
+                        // Передаем массив измененных компонентов в специальную функцию наката оверрайдов.
+                        // Она найдет существующие компоненты на объекте и вызовет их обычный метод load().
+                        // Так как поля запишутся через обычный оператор =, они автоматически взведут флаг isOverridden() = true!
+                        DeserializeOverrides(compOverridesArray, liveEntity);
+                    }
+                }
+            }
         }
         else
         {
@@ -240,6 +376,15 @@ void WorldScene::load(const std::string& filename)
             
             auto entity = std::make_unique<Entity>(name);
             entity->uid = entityJson.at("uid").get<UID>();
+            
+            if (entityJson.contains("parent"))
+            {
+                UID parentId = entityJson.at("parent").get<UID>();
+                
+                if (parentId != 0) {
+                    nonPrefabParentsToResolve.push_back({entity.get(), parentId});
+                }
+            }
             
             if (entityJson.contains("components"))
             {
@@ -251,30 +396,39 @@ void WorldScene::load(const std::string& filename)
         }
     }
     
-    // ВТОРОЙ ПРОХОД: Восстанавливаем связи иерархии Parent-Child по ID
-    for (const auto& j : sceneJson["entities"])
+    // Восстанавливаем parent-child связи для ОБЫЧНЫХ сущностей сцены
+    for (auto& [child, parentUID] : nonPrefabParentsToResolve)
     {
-        UID entityId = j.at("uid").get<UID>();
-        UID parentId = j.at("parent").get<UID>();
-        
-        if (parentId != 0)
-        {
-            Entity* child = entityMap[entityId];
-            Entity* parent = entityMap[parentId];
-            
-            if (child && parent) {
-                child->setParent(parent, false);
-            }
-        }
+        Entity* parent = findEntityByUID(parentUID);
+        if (parent && child) child->setParent(parent, false);
     }
+    
+//    // ВТОРОЙ ПРОХОД: Восстанавливаем связи иерархии Parent-Child по ID
+//    for (const auto& j : sceneJson["entities"])
+//    {
+//        UID entityId = j.at("uid").get<UID>();
+//        UID parentId = j.at("parent").get<UID>();
+//        
+//        if (parentId != 0)
+//        {
+//            Entity* child = entityMap[entityId];
+//            Entity* parent = entityMap[parentId];
+//            
+//            if (child && parent) {
+//                child->setParent(parent, false);
+//            }
+//        }
+//    }
     
     // ВСЕ сущности созданы, ВСЕ parent-child связи восстановлены.
     // Теперь безопасно вызываем awake() для абсолютно всех компонентов на сцене:
-    for (auto* component : m_allComponents)
+    for (auto& entity : m_entities)
     {
-        component->awake();
+        entity->awake();
     }
 }
+
+static void SerializeEntity(nlohmann::json& entityJson, const Entity* entity, bool writeTransform);
 
 void WorldScene::saveAsPrefab(Entity* entity, const std::string &filename)
 {
@@ -289,12 +443,14 @@ void WorldScene::saveAsPrefab(Entity* entity, const std::string &filename)
         if (!currentEntity) return; // Защита от нулевого указателя
         
         nlohmann::json entityJson;
-        SerializeEntity(entityJson, currentEntity);
+        
+        bool writeTransform = currentEntity->parent != nullptr;
+        SerializeEntity(entityJson, currentEntity, writeTransform);
         prefabJson["entities"].push_back(entityJson);
         
         for (const auto& child : currentEntity->children)
         {
-            self(self, child); // Рекурсивный вызов: передаем себя и ребенка
+            self(self, child);
         }
     };
     
@@ -305,17 +461,9 @@ void WorldScene::saveAsPrefab(Entity* entity, const std::string &filename)
     file << prefabJson.dump(4);
 }
 
-void WorldScene::loadPrefab(Entity* entity, const std::string &filename)
-{
-    entity = instantiatePrefab(filename, nullptr);
-}
-
 static void RemapJsonUIDs(nlohmann::json& j, const std::unordered_map<std::string, std::string>& txtRemap);
 
-Entity* WorldScene::instantiatePrefab(const std::string& filename,
-                                      Entity* customParent,
-                                      UID forcedRootUid,
-                                      const nlohmann::json& sceneOverrides)
+Entity* WorldScene::instantiatePrefab(const std::string& filename, Entity* customParent, UID forcedRootUid)
 {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -331,69 +479,35 @@ Entity* WorldScene::instantiatePrefab(const std::string& filename,
         return nullptr;
     }
     
-    g_prefabs[filename] = prefabJson;
-    
     nlohmann::json entitiesArray = prefabJson.is_array() ? prefabJson : prefabJson["entities"];
     
-    // Таблицы ремаппинга
+    // 1. Стандартный ремаппинг ID (как мы делали ранее)
     std::unordered_map<std::string, std::string> stringUidRemap;
-    
-    // ВАЖНО: Мапа, которая поможет нам вернуть оригинальный ID при создании сущности
     std::unordered_map<std::string, UID> newStringToOldUidMap;
-    
     UID rootOldUid = UID::Invalid();
     
-    // Шаг 1: Находим оригинальный корень и генерируем новые ID
-    for (const auto& entityJson : entitiesArray) {
+    for (const auto& entityJson : entitiesArray)
+    {
         UID oldUid = entityJson.at("uid").get<UID>();
+        UID parentUID = entityJson.value("parent", UID::Invalid());
         
-        // По вашему ограничению у корня нет родителя в файле префаба
-        if (!entityJson.contains("parent") || entityJson["parent"].is_null() || entityJson["parent"].get<std::string>().empty()) {
+        if (!parentUID.isValid()) {
             rootOldUid = oldUid;
         }
         
         UID newUid = (oldUid == rootOldUid && forcedRootUid.isValid()) ? forcedRootUid : UID();
-        
         stringUidRemap[oldUid.toText()] = newUid.toText();
-        newStringToOldUidMap[newUid.toText()] = oldUid; // запоминаем связь "Новый -> Старый"
+        newStringToOldUidMap[newUid.toText()] = oldUid;
     }
     
-    // Если по структуре parent не нашли корень, берем первый элемент файла за корень
     if (!rootOldUid.isValid() && !entitiesArray.empty()) {
         rootOldUid = entitiesArray.at(0).at("uid").get<UID>();
-        // Пересчитываем новый ID для него, если был передан forcedRootUid
-        if (forcedRootUid.isValid()) {
-            std::string oldRootStr = rootOldUid.toText();
-            std::string oldNewUidStr = stringUidRemap[oldRootStr];
-            
-            // Корректируем мапы под forcedRootUid
-            newStringToOldUidMap.erase(oldNewUidStr);
-            stringUidRemap[oldRootStr] = forcedRootUid.toText();
-            newStringToOldUidMap[forcedRootUid.toText()] = rootOldUid;
-        }
     }
     
-    // Шаг 2: Накатываем патчи оверрайдов на сырой JSON (работает со старыми UID)
-    if (!sceneOverrides.empty()) {
-        for (auto& entityJson : entitiesArray) {
-            // Извлекаем UID аккуратно, так как он еще старый
-            UID oldUid = entityJson.at("uid").get<UID>();
-            std::string oldUidStr = oldUid.toText();
-            
-            if (sceneOverrides.contains(oldUidStr)) {
-                try {
-                    entityJson = entityJson.patch(sceneOverrides[oldUidStr]);
-                } catch (const nlohmann::json::exception& e) {
-                    std::cerr << "Ошибка пре-патчинга JSON: " << e.what() << std::endl;
-                }
-            }
-        }
-    }
-    
-    // Шаг 3: Автоматический ремаппинг ID в JSON (теперь все "uid" и "parent" внутри JSON становятся новыми)
+    // 2. Ремаппинг ID в JSON префаба
     RemapJsonUIDs(entitiesArray, stringUidRemap);
     
-    // Шаг 4: Десериализация и создание объектов
+    // 3. Создание объектов
     std::vector<Entity*> instantiatedEntities;
     std::unordered_map<UID, Entity*> localIdToEntityMap;
     Entity* rootEntityPtr = nullptr;
@@ -407,17 +521,16 @@ Entity* WorldScene::instantiatePrefab(const std::string& filename,
         entity->uid = newUid;
         entity->prefabAssetPath = filename;
         
-        // Восстанавливаем оригинальный UID с помощью нашей мапы
         UID originalOldUid = newStringToOldUidMap[newUid.toText()];
         entity->originalPrefabUid = originalOldUid;
         
-        // ЖЕЛЕЗОБЕТОННАЯ ПРОВЕРКА НА КОРЕНЬ:
-        // Просто сравниваем оригинальный ID сущности с сохраненным оригинальным корнем!
         if (originalOldUid == rootOldUid) {
             entity->isPrefabRoot = true;
-            rootEntityPtr = entity.get(); // Сразу запоминаем указатель на корень
+            rootEntityPtr = entity.get();
         }
         
+        // Загружаем компоненты. На этом этапе компоненты внутри своего метода load()
+        // должны вызывать метод .setFromPrefab(), чтобы m_value и m_prefabValue стали одинаковыми!
         if (entityJson.contains("components")) {
             DeserializeEntity(entityJson, entity.get());
         }
@@ -437,8 +550,7 @@ Entity* WorldScene::instantiatePrefab(const std::string& filename,
         std::string parentStr = entityJson["parent"].get<std::string>();
         if (parentStr.empty()) continue;
         
-        UID newParentUid = UID(parentStr); // Используйте ваш метод восстановления UID из строки
-        
+        UID newParentUid(parentStr);
         Entity* child = localIdToEntityMap[newUid];
         Entity* parent = localIdToEntityMap[newParentUid];
         
@@ -461,6 +573,7 @@ Entity* WorldScene::instantiatePrefab(const std::string& filename,
     
     return rootEntityPtr;
 }
+
 
 
 
@@ -693,27 +806,20 @@ void WorldScene::trace(HitResult &result,
     }
 }
 
-static void SerializePrefabSpecification(nlohmann::json& entityJson, const Entity* rootEntity);
-
-// FIXME: надо вынести в фабрику компонентов
-static void SerializeEntity(nlohmann::json& entityJson, const Entity* entity)
+// Надо будет вынести в фабрику компонентов
+// Почти тот же код в сериализации обычных сущностей сцены
+static void SerializeEntity(nlohmann::json& entityJson, const Entity* entity, bool writeTransform)
 {
     entityJson["name"] = entity->m_name;
     entityJson["uid"] = entity->uid;
-    entityJson["parent"] = entity->parent ? entity->parent->uid : UID::Invalid();
     
-    // Если это корень префаба, сохраняем только ссылку на файл
-    if (entity->isPrefabRoot)
-    {
-        entityJson["prefab_path"] = entity->prefabAssetPath;
-        
-        // Сохраняем diff с орищинальным префабом
-        SerializePrefabSpecification(entityJson, entity);
-        return; // Больше ничего для префаба в файл сцены не пишем (остальное в .prefab)
+    if (entity->parent) {
+        entityJson["parent"] = entity->parent->uid;
     }
     
     nlohmann::json componentsArray = nlohmann::json::array();
     
+    if (writeTransform)
     {
         auto comp = entity->getTransformPtr();
         
@@ -851,125 +957,38 @@ static void RemapJsonUIDs(nlohmann::json& j, const std::unordered_map<std::strin
     }
 }
 
-static void UnremapJsonUIDs(nlohmann::json& j, const std::unordered_map<std::string, std::string>& reverseTxtRemap)
+static void DeserializeOverrides(const nlohmann::json& compOverridesArray, Entity* liveEntity)
 {
-    if (j.is_string())
+    for (const auto& compNode : compOverridesArray)
     {
-        std::string val = j.get<std::string>();
-        if (val.starts_with("uid://"))
+        if (compNode.empty()) continue;
+        
+        std::string compName = compNode.at("type").get<std::string>();
+        const nlohmann::json& compData = compNode.at("data");
+        
+        Component* targetComp = nullptr;
+        
+        // Ищем компонент, который уже был создан на этой Entity дефолтным префабом.
+        // Здесь мы используем вашу систему типов/мапирования компонентов.
+        if (compName == "TransformComponent") {
+            targetComp = &liveEntity->getTransform();
+        }
+        else if (compName == "ScriptComponent") {
+            // Если у вас может быть несколько скриптов, тут потребуется поиск по имени класса скрипта.
+            // Но для базовой структуры:
+            targetComp = liveEntity->getComponent<ScriptComponent>();
+        }
+        // ... (добавьте сюда остальные ваши компоненты: MeshComponent, AudioComponent и т.д.) ...
+        
+        // Если компонент найден, мы просто накатываем на него частичные данные оверрайда
+        if (targetComp)
         {
-            auto it = reverseTxtRemap.find(val);
-            if (it != reverseTxtRemap.end())
-            {
-                j = it->second; // Возвращаем оригинальный UID из префаба вместо сценового
-            }
+            targetComp->load(compData);
         }
-    }
-    else if (j.is_object())
-    {
-        for (auto& [key, value] : j.items())
+        else
         {
-            UnremapJsonUIDs(value, reverseTxtRemap);
-        }
-    }
-    else if (j.is_array())
-    {
-        for (auto& element : j)
-        {
-            UnremapJsonUIDs(element, reverseTxtRemap);
+            std::cerr << "Предупреждение: Попытка наката оверрайда на несуществующий компонент "
+            << compName << " у Entity " << liveEntity->getName() << std::endl;
         }
     }
 }
-
-nlohmann::json GetEntityPrefabDiff(const Entity* sceneEntity,
-                                   const nlohmann::json& originalPrefabJson,
-                                   const std::unordered_map<std::string, std::string>& reverseTxtRemap) // Передаем карту реверса
-{
-    // 1. Получаем чистый JSON текущего состояния сущности со сцены
-    nlohmann::json currentSnapshot = sceneEntity->serializeToSnapshot();
-    
-    // 2. ОЧИСТКА: Переводим все новые сценовые UID внутри компонентов обратно в оригинальные префабные
-    UnremapJsonUIDs(currentSnapshot, reverseTxtRemap);
-    
-    // 3. Ищем оригинальный JSON этой сущности внутри файла префаба
-    nlohmann::json originalSnapshot;
-    bool found = false;
-    
-    // Ищем в массиве entities префаба
-    for (const auto& entJson : originalPrefabJson["entities"])
-    {
-        if (entJson["uid"].get<UID>() == sceneEntity->originalPrefabUid) {
-            // Создаем такой же чистый snapshot оригинального объекта (только имя и компоненты)
-            originalSnapshot["name"] = entJson["name"];
-            originalSnapshot["components"] = entJson["components"];
-            found = true;
-            break;
-        }
-    }
-    
-    if (!found) return nlohmann::json::object();
-    
-    // 4. Теперь diff найдет ТОЛЬКО реальные изменения геймплейных настроек,
-    // а корректно перемапленные ссылки на внутренние UID префаба будут проигнорированы!
-    nlohmann::json patch = nlohmann::json::diff(originalSnapshot, currentSnapshot);
-    
-    return patch;
-}
-
-void CollectOverridesRecursive(const Entity* entity,
-                               const nlohmann::json& originalPrefabJson,
-                               const std::unordered_map<std::string, std::string>& reverseTxtRemap, // Передаем мапу дальше по дереву
-                               nlohmann::json& overridesJson)
-{
-    // Получаем чистый diff, защищенный от ложных срабатываний на UID
-    nlohmann::json entityDiff = GetEntityPrefabDiff(entity, originalPrefabJson, reverseTxtRemap);
-    
-    if (!entityDiff.empty()) {
-        overridesJson[entity->originalPrefabUid.toText()] = entityDiff;
-    }
-    
-    for (auto* child : entity->children) {
-        CollectOverridesRecursive(child, originalPrefabJson, reverseTxtRemap, overridesJson);
-    }
-}
-
-// Главная функция сериализации инстанса префаба в сцену
-static void SerializePrefabSpecification(nlohmann::json& entityJson, const Entity* rootEntity)
-{
-    entityJson["uid"] = rootEntity->uid.toText();
-    entityJson["name"] = rootEntity->m_name;
-    entityJson["prefab_path"] = rootEntity->prefabAssetPath;
-    
-    if (rootEntity->parent) {
-        entityJson["parent"] = rootEntity->parent->uid.toText();
-    }
-    
-//    nlohmann::json originalPrefabJson = PrefabManager::get().loadJson(rootEntity->prefabAssetPath);
-    nlohmann::json originalPrefabJson = g_prefabs[rootEntity->prefabAssetPath];
-    
-    // СТРОИМ КАРТУ РЕВЕРСА ДЛЯ ВСЕГО ДЕРЕВА ПРЕФАБА
-    std::unordered_map<std::string, std::string> reverseTxtRemap;
-    
-    // Лямбда для быстрого сбора ID со всей иерархии этого префаба
-    std::function<void(const Entity*)> buildReverseMap = [&](const Entity* ent) {
-        if (ent->isPrefabInstance()) {
-            // Ключ: новый ID на сцене (например, "uid://new_123")
-            // Значение: оригинальный ID из файла (например, "uid://old_orc_hand")
-            reverseTxtRemap[ent->uid.toText()] = ent->originalPrefabUid.toText();
-        }
-        for (auto* child : ent->children) {
-            buildReverseMap(child);
-        }
-    };
-    buildReverseMap(rootEntity);
-    
-    nlohmann::json overridesJson = nlohmann::json::object();
-    
-    // Запускаем сбор
-    CollectOverridesRecursive(rootEntity, originalPrefabJson, reverseTxtRemap, overridesJson);
-    
-    if (!overridesJson.empty()) {
-        entityJson["overrides"] = overridesJson;
-    }
-}
-

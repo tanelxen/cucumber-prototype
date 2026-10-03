@@ -1,92 +1,89 @@
 {
     "entities": [
         {
-            "name": "Zombie",
-            "overrides": {
-                "uid://htan0lx8hfj1x": [
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/position/0",
-                        "value": -200.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/position/1",
-                        "value": 129.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/position/2",
-                        "value": -800.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/rotation/1",
-                        "value": -90.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/3/data/fields/health",
-                        "value": 30
-                    },
-                    {
-                        "op": "add",
-                        "path": "/components/3/data/fields/player",
-                        "value": {
-                            "type": "Entity",
-                            "uid": "uid://glwv4cij0v8b2"
-                        }
-                    }
-                ]
-            },
-            "parent": "uid://<invalid>",
-            "prefab_path": "../../assets/prefabs/zombie.json",
-            "uid": "uid://id0bwif7nqnx"
-        },
-        {
             "name": "Player",
             "overrides": {
                 "uid://eg10jwxm6txt2": [
                     {
-                        "op": "replace",
-                        "path": "/components/3/data/fields/clip",
-                        "value": 31
+                        "data": {
+                            "position": [
+                                0.0,
+                                0.0,
+                                -1.0
+                            ]
+                        },
+                        "type": "TransformComponent"
                     }
                 ],
                 "uid://favu1um0rhq6e": [
                     {
-                        "op": "replace",
-                        "path": "/components/0/data/position/0",
-                        "value": 128.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/position/1",
-                        "value": 129.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/position/2",
-                        "value": -900.0
-                    },
-                    {
-                        "op": "replace",
-                        "path": "/components/0/data/rotation/1",
-                        "value": 90.0
+                        "data": {
+                            "position": [
+                                160.0,
+                                129.0,
+                                -900.0
+                            ],
+                            "rotation": [
+                                0.0,
+                                90.0,
+                                0.0
+                            ]
+                        },
+                        "type": "TransformComponent"
                     }
                 ],
                 "uid://oro2ef1gi7si": [
                     {
-                        "op": "replace",
-                        "path": "/components/0/data/rotation/0",
-                        "value": 0.9052127003669739
+                        "data": {
+                            "position": [
+                                0.0,
+                                64.0,
+                                0.0
+                            ]
+                        },
+                        "type": "TransformComponent"
                     }
                 ]
             },
-            "parent": "uid://<invalid>",
             "prefab_path": "../../assets/prefabs/player.json",
-            "uid": "uid://glwv4cij0v8b2"
+            "uid": "uid://eeqhuqdbypfbd"
+        },
+        {
+            "name": "Zombie",
+            "overrides": {
+                "uid://htan0lx8hfj1x": [
+                    {
+                        "data": {
+                            "className": "Zombie",
+                            "fields": {
+                                "health": 100,
+                                "player": {
+                                    "type": "Entity",
+                                    "uid": "uid://eeqhuqdbypfbd"
+                                }
+                            }
+                        },
+                        "type": "ScriptComponent"
+                    },
+                    {
+                        "data": {
+                            "position": [
+                                -224.0,
+                                130.0,
+                                -900.0
+                            ],
+                            "rotation": [
+                                0.0,
+                                -90.0,
+                                0.0
+                            ]
+                        },
+                        "type": "TransformComponent"
+                    }
+                ]
+            },
+            "prefab_path": "../../assets/prefabs/zombie.json",
+            "uid": "uid://de3haqigrhyqj"
         }
-    ],
-    "name": "test"
+    ]
 }

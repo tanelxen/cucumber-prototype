@@ -16,22 +16,61 @@
 void TransformComponent::save(nlohmann::json& j) const
 {
     j = nlohmann::json {
-        {"position", {m_position.x, m_position.y,   m_position.z}},
+        {"position", {m_position.get().x, m_position.get().y,   m_position.get().z}},
         {"rotation", {m_euler.x,    m_euler.y,      m_euler.z}},
         {"scale",    {m_scale.x,    m_scale.y,      m_scale.z}}
     };
 }
 
+void TransformComponent::saveOverrides(nlohmann::json& outData) const
+{
+    // Пишем ТОЛЬКО то, что реально отличается от исходного префаба
+    if (!owner->isPrefabChild() || m_position.isOverridden())
+    {
+        outData["position"] = { m_position.get().x, m_position.get().y, m_position.get().z };
+    }
+    
+    if (!owner->isPrefabChild())
+    {
+        outData["rotation"] = { m_euler.x, m_euler.y, m_euler.z };
+    }
+//    outData["scale"] = { m_scale.x, m_scale.y, m_scale.z };
+    
+//    if (m_rotation.isOverridden())
+//    {
+//        outData["rotation"] = { m_rotation.get().x, m_rotation.get().y, m_rotation.get().z };
+//    }
+//    
+//    if (m_scale.isOverridden())
+//    {
+//        outData["scale"] = { m_scale.get().x, m_scale.get().y, m_scale.get().z };
+//    }
+}
+
 void TransformComponent::load(const nlohmann::json& j)
 {
-    auto pos = j.at("position").get<std::vector<float>>();
-    m_position = glm::vec3(pos[0], pos[1], pos[2]);
+    // Обычный load() используется и для полной загрузки, и для оверрайдов.
+    // Если поле есть в JSON, мы его считываем.
     
-    auto rot = j.at("rotation").get<std::vector<float>>();
-    m_euler = glm::vec3(rot[0], rot[1], rot[2]);
+//    if (owner->isPrefabRoot) return;
     
-    auto scl = j.at("scale").get<std::vector<float>>();
-    m_scale = glm::vec3(scl[0], scl[1], scl[2]);
+    if (j.contains("position"))
+    {
+        auto pos = j.at("position").get<std::vector<float>>();
+        m_position = glm::vec3(pos[0], pos[1], pos[2]);
+    }
+    
+    if (j.contains("rotation"))
+    {
+        auto rot = j.at("rotation").get<std::vector<float>>();
+        m_euler = glm::vec3(rot[0], rot[1], rot[2]);
+    }
+    
+    if (j.contains("scale"))
+    {
+        auto scl = j.at("scale").get<std::vector<float>>();
+        m_scale = glm::vec3(scl[0], scl[1], scl[2]);
+    }
 }
 
 // Вектора направлений берутся из актуальной мировой матрицы
@@ -98,7 +137,10 @@ void TransformComponent::setWorldMatrix(const glm::mat4& newWorldMatrix)
     // Раскладываем локальную матрицу на компоненты
     glm::vec3 skew;
     glm::vec4 perspective;
-    glm::decompose(newLocalMatrix, m_scale, m_rotation, m_position, skew, perspective);
+    glm::vec3 pos;
+    glm::decompose(newLocalMatrix, m_scale, m_rotation, pos, skew, perspective);
+    
+    m_position = pos;
     
     // Обновляем сохраненные углы Эйлера для UI
     m_euler = glm::degrees(glm::eulerAngles(m_rotation));
@@ -113,7 +155,7 @@ void TransformComponent::updateLocalMatrix()
     
     if (enabled)
     {
-        m_localMatrix = glm::translate(m_localMatrix, m_position);
+        m_localMatrix = glm::translate(m_localMatrix, m_position.get());
         m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.y), glm::vec3(0, 1, 0));
         m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.x), glm::vec3(1, 0, 0));
         m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.z), glm::vec3(0, 0, 1));

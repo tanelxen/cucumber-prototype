@@ -62,6 +62,8 @@ set(SRC_COMMON
         src/UID.h
         
         src/PhysicsCommon.h
+        
+        src/Property.h
 )
 
 set(SRC_COMPONENTS

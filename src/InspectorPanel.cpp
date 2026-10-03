@@ -466,8 +466,10 @@ void DrawTransformComponent(TransformComponent* transform)
 {
     // 1. ПОЗИЦИЯ
     glm::vec3 pos = transform->getPosition();
+    bool isModified = transform->isPositionOverriden();
+    
     // Передаем копию. Если пользователь покрутил ползунок, функция вернет true
-    if (DrawVec3Control("Position", pos, 0.0f, 100.0f)) {
+    if (DrawVec3Control(isModified ? "Position*" : "Position", pos, 0.0f, 100.0f)) {
         transform->setPosition(pos); // Срабатывает сеттер и инвалидация!
     }
     

@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "Property.h"
+
 #include "../vendor/json.hpp"
 #include <typeindex>
 
@@ -31,8 +33,14 @@ public:
     
     virtual void gizmo() {}
     
-    virtual void save(nlohmann::json& j) const = 0;
-    virtual void load(const nlohmann::json& j) = 0;
+    // Полное сохранение (для файлов префабов и обычных сущностей сцены)
+    virtual void save(nlohmann::json& outData) const = 0;
+    
+    // Сохранение ТОЛЬКО измененных полей (для оверрайдов префаба на сцене)
+    virtual void saveOverrides(nlohmann::json& outData) const { };
+    
+    virtual void load(const nlohmann::json& inData) = 0;
+    
     virtual const std::string getTypeName() const = 0;
     
     virtual std::type_index GetTypeIndex() const {

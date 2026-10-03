@@ -34,6 +34,10 @@ public:
     Entity* parent = nullptr;
     std::vector<Entity*> children;
     
+    std::string getName() { return m_name; }
+    Entity* getParent() { return parent; }
+    std::vector<Entity*> getChildren() const { return children; }
+    
     // Добавление компонента
     template<typename T, typename... TArgs>
     T* addComponent(TArgs&&... args)
