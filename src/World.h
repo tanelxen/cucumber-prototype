@@ -41,6 +41,7 @@ public:
     void clear();
     
     void saveAsPrefab(Entity* entity, const std::string& filename);
+    void savePrefabFlat(const std::string& filename, const Entity* rootEntity);
     Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid());
     
     void registerComponent(Component* component);

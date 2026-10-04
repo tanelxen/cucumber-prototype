@@ -160,7 +160,7 @@ void ScenePanel::draw()
                     const char* path = tinyfd_saveFileDialog("Save Prefab", "./assets/prefabs/", 2, filter, NULL);
                     
                     if (path != nullptr) {
-                        m_scene->saveAsPrefab(m_scene->m_entities[i].get(), path);
+                        m_scene->savePrefabFlat(path, m_scene->m_entities[i].get());
                     }
                 }
                 

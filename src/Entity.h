@@ -38,6 +38,10 @@ public:
     Entity* getParent() { return parent; }
     std::vector<Entity*> getChildren() const { return children; }
     
+    // Для получения сущностей внутри префаба в стиле Godot
+    Entity* findEntityByPath(const std::string& path) const;
+    std::string getPathRelativeTo(const Entity* root) const;
+    
     // Добавление компонента
     template<typename T, typename... TArgs>
     T* addComponent(TArgs&&... args)

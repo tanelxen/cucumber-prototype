@@ -415,7 +415,8 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
                 {
                     snapshot[propName] = {
                         {"type", typeName},
-                        {"uid", entity->uid}
+                        {"uid", entity->uid},
+                        {"path", entity->getPathRelativeTo(owner)}
                     };
                 }
             }
@@ -428,7 +429,8 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
                 {
                     snapshot[propName] = {
                         {"type", typeName},
-                        {"owner", comp->owner->uid}
+                        {"owner", comp->owner->uid},
+                        {"path", comp->owner->getPathRelativeTo(owner)}
                     };
                 }
             }
@@ -441,7 +443,8 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
                 {
                     snapshot[propName] = {
                         {"type", typeName},
-                        {"owner", comp->owner->uid}
+                        {"owner", comp->owner->uid},
+                        {"path", comp->owner->getPathRelativeTo(owner)}
                     };
                 }
             }
@@ -459,7 +462,13 @@ void ScriptComponent::saveStateSnapshot()
 
 void ScriptComponent::loadStateSnapshot()
 {
-    loadScriptStateFromValues(m_StateSnapshot);
+    for (auto& snapshot : m_StateSnapshot)
+    {
+        // Первый снепшот это значения из префаба, второй - оверрайды инстанца на сцене
+        loadScriptStateFromValues(snapshot);
+    }
+    
+    std::cout << std::endl;
     
     // HACK: нужно чтобы awake смог вызваться повторно после загрузки сцены
     // поэтому не удаляем снэпшот
@@ -520,9 +529,11 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
             }
             else if (type == "TransformComponent")
             {
-                UID ownerUID = propData["owner"].get<std::string>();
+//                UID ownerUID = propData["owner"].get<std::string>();
+                std::string path = propData["path"].get<std::string>();
                 
-                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+//                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+                Entity* entity = owner->findEntityByPath(path);
                 if (entity == nullptr) continue;
                 
                 TransformComponent* comp = entity->getComponent<TransformComponent>();
@@ -533,9 +544,11 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
             }
             else if (type == "AnimatorComponent")
             {
-                UID ownerUID = propData["owner"].get<std::string>();
+//                UID ownerUID = propData["owner"].get<std::string>();
+                std::string path = propData["path"].get<std::string>();
                 
-                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+//                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
+                Entity* entity = owner->findEntityByPath(path);
                 if (entity == nullptr) continue;
                 
                 AnimatorComponent* comp = entity->getComponent<AnimatorComponent>();
@@ -609,7 +622,7 @@ void ScriptComponent::load(const nlohmann::json& j)
     
     if (j.contains("fields"))
     {
-        m_StateSnapshot = j.at("fields");
+        m_StateSnapshot += j.at("fields");
     }
     
     if (!m_isInitialized)

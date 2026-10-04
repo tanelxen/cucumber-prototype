@@ -197,3 +197,68 @@ nlohmann::json Entity::serializeToSnapshot() const
     json["components"] = componentsArray;
     return json;
 }
+
+#include <sstream>
+
+Entity* Entity::findEntityByPath(const std::string& path) const
+{
+    if (path.empty() || path == ".") {
+        return const_cast<Entity*>(this);
+    }
+    
+    std::vector<std::string> tokens;
+    std::stringstream ss(path);
+    std::string token;
+    
+    // Разбиваем путь по разделителю '/'
+    while (std::getline(ss, token, '/')) {
+        if (!token.empty()) {
+            tokens.push_back(token);
+        }
+    }
+    
+    Entity* current = const_cast<Entity*>(this);
+    
+    for (const std::string& nodeName : tokens) {
+        if (!current) return nullptr;
+        
+        if (nodeName == "..") {
+            // Поднимаемся к родителю
+            current = current->getParent();
+        } else {
+            // Ищем среди прямых детей по имени
+            Entity* foundChild = nullptr;
+            for (auto* child : current->getChildren()) {
+                if (child->getName() == nodeName) {
+                    foundChild = child;
+                    break;
+                }
+            }
+            current = foundChild; // Спускаемся на уровень ниже
+        }
+    }
+    
+    return current;
+}
+
+std::string Entity::getPathRelativeTo(const Entity* root) const
+{
+    if (this == root) return ".";
+    
+    std::vector<std::string> pathParts;
+    const Entity* current = this;
+    
+    while (current && current != root) {
+        pathParts.push_back(current->m_name);
+        current = current->parent;
+    }
+    
+    // Собираем путь в правильном порядке (от корня к ребенку)
+    std::string result = "";
+    for (auto it = pathParts.rbegin(); it != pathParts.rend(); ++it) {
+        if (!result.empty()) result += "/";
+        result += *it;
+    }
+    
+    return result;
+}

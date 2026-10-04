@@ -1,110 +1,84 @@
-{
-    "entities": [
-        {
-            "components": [
-                {
-                    "data": {
-                        "position": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "rotation": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "scale": [
-                            1.0,
-                            1.0,
-                            1.0
-                        ]
-                    },
-                    "type": "TransformComponent"
+[
+    {
+        "components": [
+            {
+                "data": {
+                    "collisionMask": 4294901763,
+                    "layer": 2,
+                    "maxs": [
+                        15.0,
+                        72.0,
+                        -15.0
+                    ],
+                    "mins": [
+                        -15.0,
+                        0.0,
+                        15.0
+                    ],
+                    "trigger": false
                 },
-                {
-                    "data": {
-                        "collisionMask": 4294901763,
-                        "layer": 2,
-                        "maxs": [
-                            15.0,
-                            72.0,
-                            -15.0
-                        ],
-                        "mins": [
-                            -15.0,
-                            0.0,
-                            15.0
-                        ],
-                        "trigger": false
-                    },
-                    "type": "CollisionComponent"
+                "type": "CollisionComponent"
+            },
+            {
+                "data": {
+                    "forward_speed": 110.0
                 },
-                {
-                    "data": {
-                        "forward_speed": 110.0
-                    },
-                    "type": "MovementComponent"
+                "type": "MovementComponent"
+            },
+            {
+                "data": {
+                    "className": "Zombie",
+                    "fields": {
+                        "animator": {
+                            "owner": "uid://1wijqfin7cyr",
+                            "path": "Mesh",
+                            "type": "AnimatorComponent"
+                        },
+                        "health": 40
+                    }
                 },
-                {
-                    "data": {
-                        "className": "Zombie",
-                        "fields": {
-                            "animator": {
-                                "owner": "uid://1wijqfin7cyr",
-                                "type": "AnimatorComponent"
-                            },
-                            "health": 40
-                        }
-                    },
-                    "type": "ScriptComponent"
-                }
-            ],
-            "name": "Zombie",
-            "parent": "uid://<invalid>",
-            "uid": "uid://htan0lx8hfj1x"
-        },
-        {
-            "components": [
-                {
-                    "data": {
-                        "position": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "rotation": [
-                            0.0,
-                            180.0,
-                            0.0
-                        ],
-                        "scale": [
-                            1.0,
-                            1.0,
-                            1.0
-                        ]
-                    },
-                    "type": "TransformComponent"
+                "type": "ScriptComponent"
+            }
+        ],
+        "name": "Zombie"
+    },
+    {
+        "components": [
+            {
+                "data": {
+                    "position": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        180.0,
+                        0.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
                 },
-                {
-                    "data": {
-                        "source_glb": "meshes/gltf/hl_zombie.glb"
-                    },
-                    "type": "MeshComponent"
+                "type": "TransformComponent"
+            },
+            {
+                "data": {
+                    "source_glb": "meshes/gltf/hl_zombie.glb"
                 },
-                {
-                    "data": {
-                        "clip": "<none>",
-                        "source_glb": "meshes/gltf/hl_zombie.glb"
-                    },
-                    "type": "AnimatorComponent"
-                }
-            ],
-            "name": "Mesh",
-            "parent": "uid://htan0lx8hfj1x",
-            "uid": "uid://1wijqfin7cyr"
-        }
-    ],
-    "name": "Zombie",
-    "root": "uid://htan0lx8hfj1x"
-}
+                "type": "MeshComponent"
+            },
+            {
+                "data": {
+                    "clip": "<none>",
+                    "source_glb": "meshes/gltf/hl_zombie.glb"
+                },
+                "type": "AnimatorComponent"
+            }
+        ],
+        "name": "Mesh",
+        "parent": "."
+    }
+]

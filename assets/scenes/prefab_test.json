@@ -3,19 +3,8 @@
         {
             "name": "Player",
             "overrides": {
-                "uid://eg10jwxm6txt2": [
-                    {
-                        "data": {
-                            "position": [
-                                0.0,
-                                0.0,
-                                -1.0
-                            ]
-                        },
-                        "type": "TransformComponent"
-                    }
-                ],
-                "uid://favu1um0rhq6e": [
+                ".": [
+                    {},
                     {
                         "data": {
                             "position": [
@@ -32,13 +21,27 @@
                         "type": "TransformComponent"
                     }
                 ],
-                "uid://oro2ef1gi7si": [
+                "Head": [
+                    {},
                     {
                         "data": {
                             "position": [
                                 0.0,
                                 64.0,
                                 0.0
+                            ]
+                        },
+                        "type": "TransformComponent"
+                    }
+                ],
+                "Head/Weapon": [
+                    {},
+                    {
+                        "data": {
+                            "position": [
+                                0.0,
+                                0.0,
+                                -1.0
                             ]
                         },
                         "type": "TransformComponent"
@@ -51,12 +54,12 @@
         {
             "name": "Zombie",
             "overrides": {
-                "uid://htan0lx8hfj1x": [
+                ".": [
                     {
                         "data": {
                             "className": "Zombie",
                             "fields": {
-                                "health": 100,
+                                "health": 60,
                                 "player": {
                                     "type": "Entity",
                                     "uid": "uid://eeqhuqdbypfbd"
@@ -80,6 +83,9 @@
                         },
                         "type": "TransformComponent"
                     }
+                ],
+                "Mesh": [
+                    {}
                 ]
             },
             "prefab_path": "../../assets/prefabs/zombie.json",
