@@ -35,13 +35,7 @@ public:
     
     void selectEntityAtIndex(int index);
     
-    void save(const std::string& filename);
-    void load(const std::string& filename);
-    
     void clear();
-    
-    bool createPrefabFromEntity(Entity* rootEntity, const std::string& savePath);
-    Entity* instantiatePrefab(const std::string& filename, Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid());
     
     void registerComponent(Component* component);
     
@@ -68,14 +62,6 @@ public:
     bool m_drawSkybox = true;
     
     bool m_isSimulationMode = false;
-    
-public:
-    Entity* m_editingPrefabRoot = nullptr;
-    
-    bool isInPrefabEditMode() const { return m_editingPrefabRoot != nullptr; }
-    Entity* getEditingPrefabRoot() { return m_editingPrefabRoot; }
-    
-    void togglePrefabEditMode(Entity* entity);
     
 private:
     std::vector<Component*> m_globalUpdatables;

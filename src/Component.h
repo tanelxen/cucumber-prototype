@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include "Property.h"
-
 #include "../vendor/json.hpp"
 #include <typeindex>
 

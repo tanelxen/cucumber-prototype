@@ -7,6 +7,8 @@
 
 #include "ScenePanel.h"
 #include "UIManager.h"
+
+#include "SceneSerializer.h"
 #include "World.h"
 #include "Entity.h"
 
@@ -55,9 +57,11 @@ void ScenePanel::draw()
             std::filesystem::path project_root = std::filesystem::current_path();
             auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
             
-            m_scene->instantiatePrefab(rel_path, nullptr);
-            m_scene->selectEntityAtIndex(count);
-            selectedIndex = count;
+            if (SceneSerializer::InstantiatePrefab(m_scene, rel_path))
+            {
+                m_scene->selectEntityAtIndex(count);
+                selectedIndex = count;
+            }
         }
     }
     
@@ -164,7 +168,8 @@ void ScenePanel::draw()
                         std::filesystem::path project_root = std::filesystem::current_path();
                         auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
                         
-                        m_scene->createPrefabFromEntity(m_scene->m_entities[i].get(), rel_path);
+                        auto rootEntity = m_scene->m_entities[i].get();
+                        SceneSerializer::CreatePrefabFromEntity(m_scene, rootEntity, rel_path);
                     }
                 }
                 

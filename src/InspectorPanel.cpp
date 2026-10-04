@@ -655,6 +655,17 @@ static bool DrawExposedWidget(const std::string& label, nlohmann::json& ioValue)
 
 static void saveCurrentPrefabInterface(Entity* prefabRoot);
 
+static Entity* m_editingPrefabRoot = nullptr;
+
+static bool isInPrefabEditMode() { return m_editingPrefabRoot != nullptr; }
+static Entity* getEditingPrefabRoot() { return m_editingPrefabRoot; }
+
+static void togglePrefabEditMode(Entity* entity)
+{
+    if (m_editingPrefabRoot == entity) m_editingPrefabRoot = nullptr; // Выйти
+    else if (entity->isPrefabRoot) m_editingPrefabRoot = entity;      // Войти
+}
+
 static void DrawPrefabInterfaceEditor(Entity* prefabRoot)
 {
     ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "--- PREFAB EDIT MODE ---");
@@ -664,7 +675,7 @@ static void DrawPrefabInterfaceEditor(Entity* prefabRoot)
     }
     ImGui::SameLine();
     if (ImGui::Button("Exit Edit Mode")) {
-        g_currentScene->togglePrefabEditMode(prefabRoot);
+        togglePrefabEditMode(prefabRoot);
         return;
     }
     ImGui::Separator();
@@ -986,16 +997,16 @@ void InspectorPanel::DrawInspector(Entity* selectedEntity)
     if (!selectedEntity) return;
     
     // Если это префаб, даем кнопку переключения режима
-    if (selectedEntity->isPrefabRoot && !g_currentScene->isInPrefabEditMode())
+    if (selectedEntity->isPrefabRoot && !isInPrefabEditMode())
     {
         if (ImGui::Button("Edit Prefab Interface")) {
-            g_currentScene->togglePrefabEditMode(selectedEntity);
+            togglePrefabEditMode(selectedEntity);
         }
         ImGui::Separator();
     }
     
     // Отрисовка в зависимости от режима
-    if (selectedEntity->isPrefabRoot && g_currentScene->m_editingPrefabRoot == selectedEntity)
+    if (selectedEntity->isPrefabRoot && m_editingPrefabRoot == selectedEntity)
     {
         // РЕЖИМ 1: Настройка внешнего интерфейса (экспорта) префаба
         DrawPrefabInterfaceEditor(selectedEntity);

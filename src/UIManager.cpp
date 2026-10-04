@@ -216,6 +216,8 @@ void UIManager::init(struct GLFWwindow *window)
     colors[ImGuiCol_ScrollbarBg]         = ImVec4(0.15, 0.15, 0.15, 1.0);
 }
 
+#include "SceneSerializer.h"
+
 void UIManager::drawMenuBar()
 {
     if (ImGui::BeginMainMenuBar())
@@ -227,8 +229,9 @@ void UIManager::drawMenuBar()
                 char const * filter[2] = { "*.scene", "*.json" };
                 const char* path = tinyfd_saveFileDialog("Save Scene", "./assets/scenes/", 2, filter, NULL);
                 
-                if (path != nullptr) {
-                    Application::currentInstance->m_pScene->save(path);
+                if (path != nullptr)
+                {
+                    SceneSerializer::SaveScene(Application::currentInstance->m_pScene, path);
                 }
             }
             
@@ -237,8 +240,9 @@ void UIManager::drawMenuBar()
                 char const * filter[2] = { "*.json", "*.scene" };
                 const char* path = tinyfd_openFileDialog("Load Scene", "./assets/scenes/", 2, filter, NULL, 0);
                 
-                if (path != nullptr) {
-                    Application::currentInstance->m_pScene->load(path);
+                if (path != nullptr)
+                {
+                    SceneSerializer::LoadScene(Application::currentInstance->m_pScene, path);
                 }
             }
             

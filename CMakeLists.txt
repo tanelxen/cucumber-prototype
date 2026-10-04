@@ -43,11 +43,6 @@ set(SRC_COMMON
         src/Viewport.cpp
         src/Viewport.h
         
-        src/World.cpp
-        src/World.h
-        src/Entity.cpp
-        src/Entity.h
-        
         src/Sky.cpp
         src/Sky.h
         
@@ -62,8 +57,16 @@ set(SRC_COMMON
         src/UID.h
         
         src/PhysicsCommon.h
-        
+)
+
+set(SRC_SCENE
+        src/World.cpp
+        src/World.h
+        src/Entity.cpp
+        src/Entity.h
         src/ExposedProperty.h
+        src/SceneSerializer.cpp
+        src/SceneSerializer.h
 )
 
 set(SRC_COMPONENTS
@@ -168,19 +171,21 @@ set(SRC_IMGUI
 
 add_executable( ${PROJECT_NAME}
         ${SRC_COMMON}
-        ${SRC_Q3}
+        ${SRC_SCENE}
         ${SRC_COMPONENTS}
         ${SRC_RENDERER}
         ${SRC_PANELS}
         ${SRC_GameUI}
+        ${SRC_Q3}
         ${SRC_IMGUI}
 )
 
 source_group("Common" FILES ${SRC_COMMON})
-source_group("Quake 3" FILES ${SRC_Q3})
+source_group("Scene" FILES ${SRC_SCENE})
 source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
+source_group("Quake 3" FILES ${SRC_Q3})
 source_group("Game UI" FILES ${SRC_GameUI})
 source_group("imgui" FILES ${SRC_IMGUI})
 
