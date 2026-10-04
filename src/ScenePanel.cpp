@@ -95,7 +95,7 @@ void ScenePanel::draw()
             
             const char* name = entity->m_name.empty() ? "?" : entity->m_name.c_str();
             
-            bool isOpened = ImGui::TreeNodeEx(&entity, flags, "%s", name);
+            bool isOpened = ImGui::TreeNodeEx(&entity, flags, entity->isPrefabRoot ? "[P] %s" : "%s", name);
             
 
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
@@ -159,8 +159,12 @@ void ScenePanel::draw()
                     char const * filter[2] = { "*.prefab", "*.json" };
                     const char* path = tinyfd_saveFileDialog("Save Prefab", "./assets/prefabs/", 2, filter, NULL);
                     
-                    if (path != nullptr) {
-                        m_scene->savePrefabFlat(path, m_scene->m_entities[i].get());
+                    if (path != nullptr)
+                    {
+                        std::filesystem::path project_root = std::filesystem::current_path();
+                        auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
+                        
+                        m_scene->createPrefabFromEntity(m_scene->m_entities[i].get(), rel_path);
                     }
                 }
                 

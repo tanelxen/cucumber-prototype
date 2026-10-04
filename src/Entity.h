@@ -8,6 +8,7 @@
 #pragma once
 
 #include "TransformComponent.h"
+#include "ExposedProperty.h"
 #include "World.h"
 
 #include "UID.h"
@@ -34,8 +35,8 @@ public:
     Entity* parent = nullptr;
     std::vector<Entity*> children;
     
-    std::string getName() { return m_name; }
-    Entity* getParent() { return parent; }
+    std::string getName() const { return m_name; }
+    Entity* getParent() const { return parent; }
     std::vector<Entity*> getChildren() const { return children; }
     
     // Для получения сущностей внутри префаба в стиле Godot
@@ -102,6 +103,21 @@ public:
         return result;
     }
     
+    Component* getComponentByName(const std::string& typeName)
+    {
+        if (typeName == m_transform.getTypeName())
+        {
+            return &m_transform;
+        }
+        
+        auto it = std::find_if(m_components.begin(), m_components.end(),
+                               [&typeName](const std::unique_ptr<Component>& comp) {
+            return comp && comp->getTypeName() == typeName;
+        });
+        
+        return (it != m_components.end()) ? it->get() : nullptr;
+    }
+    
     TransformComponent& getTransform() { return m_transform; }
     const TransformComponent& getTransform() const { return m_transform; }
     TransformComponent* getTransformPtr() const { return (TransformComponent*)&m_transform; }
@@ -133,6 +149,23 @@ public:
     
     // нужно для diff
     nlohmann::json serializeToSnapshot() const;
+    
+public:
+    // Кэш внешнего интерфейса (заполняется только у корня префаба)
+    std::vector<CachedExposedProperty> m_exposedInterfaceCache;
+    
+    // Вспомогательная мапа для быстрого отслеживания оверрайдов на сцене: [ИмяСвойства -> АктивноЛи]
+    // Заменяет сложную логику флагов Property<T> на уровне внешней сцены!
+    std::unordered_map<std::string, bool> m_interfaceOverridesFlags;
+    
+    void markInterfaceOverrideDirty(const std::string& displayName, bool isDirty = true) {
+        m_interfaceOverridesFlags[displayName] = isDirty;
+    }
+    
+    bool isInterfaceOverrideDirty(const std::string& displayName) const {
+        auto it = m_interfaceOverridesFlags.find(displayName);
+        return it != m_interfaceOverridesFlags.end() ? it->second : false;
+    }
     
 private:
     std::vector<std::unique_ptr<Component>> m_components;

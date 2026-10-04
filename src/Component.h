@@ -35,11 +35,11 @@ public:
     
     // Полное сохранение (для файлов префабов и обычных сущностей сцены)
     virtual void save(nlohmann::json& outData) const = 0;
-    
-    // Сохранение ТОЛЬКО измененных полей (для оверрайдов префаба на сцене)
-    virtual void saveOverrides(nlohmann::json& outData) const { };
-    
     virtual void load(const nlohmann::json& inData) = 0;
+    
+    // Необходимо для связи с префабом
+    virtual nlohmann::json getExposedValue(const std::string& propName) { };
+    virtual void setExposedValue(const std::string& propName, const nlohmann::json& value) { };
     
     virtual const std::string getTypeName() const = 0;
     

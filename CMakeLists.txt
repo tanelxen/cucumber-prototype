@@ -63,7 +63,7 @@ set(SRC_COMMON
         
         src/PhysicsCommon.h
         
-        src/Property.h
+        src/ExposedProperty.h
 )
 
 set(SRC_COMPONENTS

@@ -1,84 +1,106 @@
-[
-    {
-        "components": [
-            {
-                "data": {
-                    "collisionMask": 4294901763,
-                    "layer": 2,
-                    "maxs": [
-                        15.0,
-                        72.0,
-                        -15.0
-                    ],
-                    "mins": [
-                        -15.0,
-                        0.0,
-                        15.0
-                    ],
-                    "trigger": false
+{
+    "entities": [
+        {
+            "components": [
+                {
+                    "data": {
+                        "collisionMask": 4294901763,
+                        "layer": 2,
+                        "maxs": [
+                            15.0,
+                            72.0,
+                            -15.0
+                        ],
+                        "mins": [
+                            -15.0,
+                            0.0,
+                            15.0
+                        ],
+                        "trigger": false
+                    },
+                    "type": "CollisionComponent"
                 },
-                "type": "CollisionComponent"
-            },
-            {
-                "data": {
-                    "forward_speed": 110.0
+                {
+                    "data": {
+                        "forward_speed": 110.0
+                    },
+                    "type": "MovementComponent"
                 },
-                "type": "MovementComponent"
-            },
-            {
-                "data": {
-                    "className": "Zombie",
-                    "fields": {
-                        "animator": {
-                            "owner": "uid://1wijqfin7cyr",
-                            "path": "Mesh",
-                            "type": "AnimatorComponent"
-                        },
-                        "health": 40
-                    }
+                {
+                    "data": {
+                        "className": "Zombie",
+                        "fields": {
+                            "animator": {
+                                "owner": "uid://1wijqfin7cyr",
+                                "path": "Mesh",
+                                "type": "AnimatorComponent"
+                            },
+                            "health": 40,
+                            "player": {
+                                "path": "Player",
+                                "type": "Entity",
+                                "uid": "uid://favu1um0rhq6e"
+                            }
+                        }
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Zombie",
+            "parent": ""
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            180.0,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
                 },
-                "type": "ScriptComponent"
-            }
-        ],
-        "name": "Zombie"
-    },
-    {
-        "components": [
-            {
-                "data": {
-                    "position": [
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    "rotation": [
-                        0.0,
-                        180.0,
-                        0.0
-                    ],
-                    "scale": [
-                        1.0,
-                        1.0,
-                        1.0
-                    ]
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/hl_zombie.glb"
+                    },
+                    "type": "MeshComponent"
                 },
-                "type": "TransformComponent"
-            },
-            {
-                "data": {
-                    "source_glb": "meshes/gltf/hl_zombie.glb"
-                },
-                "type": "MeshComponent"
-            },
-            {
-                "data": {
-                    "clip": "<none>",
-                    "source_glb": "meshes/gltf/hl_zombie.glb"
-                },
-                "type": "AnimatorComponent"
-            }
-        ],
-        "name": "Mesh",
-        "parent": "."
-    }
-]
+                {
+                    "data": {
+                        "clip": "<none>",
+                        "source_glb": "meshes/gltf/hl_zombie.glb"
+                    },
+                    "type": "AnimatorComponent"
+                }
+            ],
+            "name": "Mesh",
+            "parent": "."
+        }
+    ],
+    "exposed_properties": [
+        {
+            "component_type": "TransformComponent",
+            "display_name": "Position",
+            "property_name": "position",
+            "target_path": "."
+        },
+        {
+            "component_type": "TransformComponent",
+            "display_name": "Rotation",
+            "property_name": "rotation",
+            "target_path": "."
+        }
+    ]
+}

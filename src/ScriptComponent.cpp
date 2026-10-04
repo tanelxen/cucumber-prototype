@@ -519,9 +519,19 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
             
             if (type == "Entity")
             {
-                UID uid = propData["uid"].get<std::string>();
+                Entity* entity = nullptr;
                 
-                Entity* entity = g_currentScene->findEntityByUID(uid);
+                if (propData.contains("path"))
+                {
+                    std::string path = propData["path"].get<std::string>();
+                    entity = owner->findEntityByPath(path);
+                }
+                else if (propData.contains("uid"))
+                {
+                    UID ownerUID = propData["uid"].get<std::string>();
+                    entity = g_currentScene->findEntityByUID(ownerUID);
+                }
+                
                 if (entity == nullptr) continue;
                 
                 void** ptrToHandle = static_cast<void**>(m_ScriptObject->GetAddressOfProperty(i));
@@ -529,11 +539,19 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
             }
             else if (type == "TransformComponent")
             {
-//                UID ownerUID = propData["owner"].get<std::string>();
-                std::string path = propData["path"].get<std::string>();
+                Entity* entity = nullptr;
                 
-//                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
-                Entity* entity = owner->findEntityByPath(path);
+                if (propData.contains("path"))
+                {
+                    std::string path = propData["path"].get<std::string>();
+                    entity = owner->findEntityByPath(path);
+                }
+                else if (propData.contains("owner"))
+                {
+                    UID ownerUID = propData["owner"].get<std::string>();
+                    entity = g_currentScene->findEntityByUID(ownerUID);
+                }
+
                 if (entity == nullptr) continue;
                 
                 TransformComponent* comp = entity->getComponent<TransformComponent>();
@@ -544,11 +562,19 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
             }
             else if (type == "AnimatorComponent")
             {
-//                UID ownerUID = propData["owner"].get<std::string>();
-                std::string path = propData["path"].get<std::string>();
+                Entity* entity = nullptr;
                 
-//                Entity* entity = g_currentScene->findEntityByUID(ownerUID);
-                Entity* entity = owner->findEntityByPath(path);
+                if (propData.contains("path"))
+                {
+                    std::string path = propData["path"].get<std::string>();
+                    entity = owner->findEntityByPath(path);
+                }
+                else if (propData.contains("owner"))
+                {
+                    UID ownerUID = propData["owner"].get<std::string>();
+                    entity = g_currentScene->findEntityByUID(ownerUID);
+                }
+                
                 if (entity == nullptr) continue;
                 
                 AnimatorComponent* comp = entity->getComponent<AnimatorComponent>();

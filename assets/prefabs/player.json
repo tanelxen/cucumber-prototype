@@ -1,128 +1,144 @@
-[
-    {
-        "components": [
-            {
-                "data": {
-                    "forward_speed": 320.0
+{
+    "entities": [
+        {
+            "components": [
+                {
+                    "data": {
+                        "forward_speed": 320.0
+                    },
+                    "type": "MovementComponent"
                 },
-                "type": "MovementComponent"
-            },
-            {
-                "data": {
-                    "collisionMask": 4294901763,
-                    "layer": 1,
-                    "maxs": [
-                        15.0,
-                        72.0,
-                        -15.0
-                    ],
-                    "mins": [
-                        -15.0,
-                        0.0,
-                        15.0
-                    ],
-                    "trigger": false
+                {
+                    "data": {
+                        "collisionMask": 4294901763,
+                        "layer": 1,
+                        "maxs": [
+                            15.0,
+                            72.0,
+                            -15.0
+                        ],
+                        "mins": [
+                            -15.0,
+                            0.0,
+                            15.0
+                        ],
+                        "trigger": false
+                    },
+                    "type": "CollisionComponent"
                 },
-                "type": "CollisionComponent"
-            },
-            {
-                "data": {
-                    "className": "Player",
-                    "fields": {
-                        "headTransform": {
-                            "owner": "uid://oro2ef1gi7si",
-                            "path": "Head",
-                            "type": "TransformComponent"
-                        },
-                        "health": 100,
-                        "mouse_speed": 8.0
-                    }
+                {
+                    "data": {
+                        "className": "Player",
+                        "fields": {
+                            "headTransform": {
+                                "owner": "uid://oro2ef1gi7si",
+                                "path": "Head",
+                                "type": "TransformComponent"
+                            },
+                            "health": 100,
+                            "mouse_speed": 8.0
+                        }
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Player"
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            64.0,
+                            0.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            0.0,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
                 },
-                "type": "ScriptComponent"
-            }
-        ],
-        "name": "Player"
-    },
-    {
-        "components": [
-            {
-                "data": {
-                    "position": [
-                        0.0,
-                        64.0,
-                        0.0
-                    ],
-                    "rotation": [
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    "scale": [
-                        1.0,
-                        1.0,
-                        1.0
-                    ]
+                {
+                    "data": null,
+                    "type": "CameraComponent"
+                }
+            ],
+            "name": "Head",
+            "parent": "."
+        },
+        {
+            "components": [
+                {
+                    "data": {
+                        "position": [
+                            0.0,
+                            0.0,
+                            -1.0
+                        ],
+                        "rotation": [
+                            0.0,
+                            90.0,
+                            0.0
+                        ],
+                        "scale": [
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
+                    },
+                    "type": "TransformComponent"
                 },
-                "type": "TransformComponent"
-            },
-            {
-                "data": null,
-                "type": "CameraComponent"
-            }
-        ],
-        "name": "Head",
-        "parent": "."
-    },
-    {
-        "components": [
-            {
-                "data": {
-                    "position": [
-                        0.0,
-                        0.0,
-                        -1.0
-                    ],
-                    "rotation": [
-                        0.0,
-                        90.0,
-                        0.0
-                    ],
-                    "scale": [
-                        1.0,
-                        1.0,
-                        1.0
-                    ]
+                {
+                    "data": {
+                        "source_glb": "meshes/gltf/v_mp40.glb"
+                    },
+                    "type": "MeshComponent"
                 },
-                "type": "TransformComponent"
-            },
-            {
-                "data": {
-                    "source_glb": "meshes/gltf/v_mp40.glb"
+                {
+                    "data": {
+                        "clip": "<none>",
+                        "source_glb": "meshes/gltf/v_mp40.glb"
+                    },
+                    "type": "AnimatorComponent"
                 },
-                "type": "MeshComponent"
-            },
-            {
-                "data": {
-                    "clip": "<none>",
-                    "source_glb": "meshes/gltf/v_mp40.glb"
-                },
-                "type": "AnimatorComponent"
-            },
-            {
-                "data": {
-                    "className": "WeaponMP40",
-                    "fields": {
-                        "ammo": 0,
-                        "boneIndex": 5,
-                        "clip": 32,
-                        "damage": 10,
-                        "fireInterval": 0.10000000149011612
-                    }
-                },
-                "type": "ScriptComponent"
-            }
-        ],
-        "name": "Weapon",
-        "parent": "Head"
-    }
-]
+                {
+                    "data": {
+                        "className": "WeaponMP40",
+                        "fields": {
+                            "ammo": 0,
+                            "boneIndex": 5,
+                            "clip": 32,
+                            "damage": 10,
+                            "fireInterval": 0.1
+                        }
+                    },
+                    "type": "ScriptComponent"
+                }
+            ],
+            "name": "Weapon",
+            "parent": "Head"
+        }
+    ],
+    "exposed_properties": [
+        {
+            "component_type": "TransformComponent",
+            "display_name": "Position",
+            "property_name": "position",
+            "target_path": "."
+        },
+        {
+            "component_type": "TransformComponent",
+            "display_name": "Rotation",
+            "property_name": "rotation",
+            "target_path": "."
+        }
+    ]
+}

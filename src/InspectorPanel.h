@@ -22,4 +22,8 @@ public:
     
 private:
     Entity* m_entity;
+    
+    void DrawInspector(Entity* selectedEntity);
+    void DrawNormalEntityComponents(Entity* entity);
+    void DrawPrefabInstanceInspector(Entity* prefabRoot);
 };

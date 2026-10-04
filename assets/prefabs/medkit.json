@@ -4,26 +4,6 @@
             "components": [
                 {
                     "data": {
-                        "position": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "rotation": [
-                            0.0,
-                            0.0,
-                            0.0
-                        ],
-                        "scale": [
-                            1.0,
-                            1.0,
-                            1.0
-                        ]
-                    },
-                    "type": "TransformComponent"
-                },
-                {
-                    "data": {
                         "source_glb": "meshes/gltf/health_l.glb"
                     },
                     "type": "MeshComponent"
@@ -57,9 +37,21 @@
                 }
             ],
             "name": "Medkit",
-            "uid": "uid://cjybsb6j18skk"
+            "parent": ""
         }
     ],
-    "name": "Medkit",
-    "root": "uid://cjybsb6j18skk"
+    "exposed_properties": [
+        {
+            "component_type": "TransformComponent",
+            "display_name": "Position",
+            "property_name": "position",
+            "target_path": "."
+        },
+        {
+            "component_type": "TransformComponent",
+            "display_name": "Rotation",
+            "property_name": "rotation",
+            "target_path": "."
+        }
+    ]
 }

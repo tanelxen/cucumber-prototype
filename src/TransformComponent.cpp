@@ -16,35 +16,10 @@
 void TransformComponent::save(nlohmann::json& j) const
 {
     j = nlohmann::json {
-        {"position", {m_position.get().x, m_position.get().y,   m_position.get().z}},
+        {"position", {m_position.x, m_position.y,   m_position.z}},
         {"rotation", {m_euler.x,    m_euler.y,      m_euler.z}},
         {"scale",    {m_scale.x,    m_scale.y,      m_scale.z}}
     };
-}
-
-void TransformComponent::saveOverrides(nlohmann::json& outData) const
-{
-    // Пишем ТОЛЬКО то, что реально отличается от исходного префаба
-    if (!owner->isPrefabChild() || m_position.isOverridden())
-    {
-        outData["position"] = { m_position.get().x, m_position.get().y, m_position.get().z };
-    }
-    
-    if (!owner->isPrefabChild())
-    {
-        outData["rotation"] = { m_euler.x, m_euler.y, m_euler.z };
-    }
-//    outData["scale"] = { m_scale.x, m_scale.y, m_scale.z };
-    
-//    if (m_rotation.isOverridden())
-//    {
-//        outData["rotation"] = { m_rotation.get().x, m_rotation.get().y, m_rotation.get().z };
-//    }
-//    
-//    if (m_scale.isOverridden())
-//    {
-//        outData["scale"] = { m_scale.get().x, m_scale.get().y, m_scale.get().z };
-//    }
 }
 
 void TransformComponent::load(const nlohmann::json& j)
@@ -155,7 +130,7 @@ void TransformComponent::updateLocalMatrix()
     
     if (enabled)
     {
-        m_localMatrix = glm::translate(m_localMatrix, m_position.get());
+        m_localMatrix = glm::translate(m_localMatrix, m_position);
         m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.y), glm::vec3(0, 1, 0));
         m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.x), glm::vec3(1, 0, 0));
         m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.z), glm::vec3(0, 0, 1));
@@ -219,3 +194,43 @@ glm::vec3 TransformComponent::getScale() const
     return m_scale;
 }
 
+nlohmann::json TransformComponent::getExposedValue(const std::string& propName)
+{
+    if (propName == "position") return { m_position.x,  m_position.y,   m_position.z    };
+    if (propName == "rotation") return { m_euler.x,     m_euler.y,      m_euler.z       };
+    if (propName == "scale")    return { m_scale.x,     m_scale.y,      m_scale.z       };
+    return nlohmann::json();
+}
+
+void TransformComponent::setExposedValue(const std::string& propName, const nlohmann::json& value)
+{
+    if (propName == "position")
+    {
+        auto pos = value.get<std::vector<float>>();
+        m_position = glm::vec3(pos[0], pos[1], pos[2]);
+        
+        if (owner) {
+            owner->invalidateTransform();
+        }
+    }
+    
+    if (propName == "rotation")
+    {
+        auto pos = value.get<std::vector<float>>();
+        m_euler = glm::vec3(pos[0], pos[1], pos[2]);
+        
+        if (owner) {
+            owner->invalidateTransform();
+        }
+    }
+    
+    if (propName == "scale")
+    {
+        auto pos = value.get<std::vector<float>>();
+        m_scale = glm::vec3(pos[0], pos[1], pos[2]);
+        
+        if (owner) {
+            owner->invalidateTransform();
+        }
+    }
+}

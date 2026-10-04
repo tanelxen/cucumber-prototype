@@ -25,12 +25,13 @@ struct TransformComponent : public Component
     const std::string getTypeName() const override { return "TransformComponent"; }
     
     void save(nlohmann::json& j) const override;
-    void saveOverrides(nlohmann::json& outData) const override;
     void load(const nlohmann::json& j) override;
+    
+    nlohmann::json getExposedValue(const std::string& propName) override;
+    void setExposedValue(const std::string& propName, const nlohmann::json& value) override;
     
     void setPosition(const glm::vec3& pos);
     glm::vec3 getPosition() const;
-    bool isPositionOverriden() { return m_position.isOverridden(); }
     
     glm::vec3 getWorldPosition();
     
@@ -67,7 +68,7 @@ private:
     void updateLocalMatrix();
     
 private:
-    Property<glm::vec3> m_position = glm::vec3(0);
+    glm::vec3 m_position = { 0.0f, 0.0f, 0.0f };
     glm::quat m_rotation = { 1.0f, 0.0f, 0.0f, 0.0f };
     glm::vec3 m_euler = { 0.0f, 0.0f, 0.0f };
     glm::vec3 m_scale = { 1.0f, 1.0f, 1.0f };
