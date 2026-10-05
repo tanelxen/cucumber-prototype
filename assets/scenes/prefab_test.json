@@ -91,5 +91,6 @@
             "prefab_path": "../../assets/prefabs/zombie.json",
             "uid": "uid://de3haqigrhyqj"
         }
-    ]
+    ],
+    "type": "scene"
 }

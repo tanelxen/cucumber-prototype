@@ -16,6 +16,7 @@
 #include "DecalManager.h"
 #include "GameUI.h"
 
+#include "SceneManager.h"
 #include "UIManager.h"
 #include "World.h"
 #include "Input.h"
@@ -64,11 +65,11 @@ Application::Application()
 
     initSubSystems();
     
-    m_pScene = new WorldScene();
-    
     m_pUIManager = new UIManager();
-    m_pUIManager->setScene(m_pScene);
     m_pUIManager->init(m_pWindow);
+    
+    // Инициализируем стартовую пустую сцену в менеджере!
+    SceneManager::Get().createNewScene();
     
     // У нас свое ограничение частоты кадров
     glfwSwapInterval(0);
@@ -78,8 +79,6 @@ Application::Application()
 
 Application::~Application()
 {
-    delete m_pScene;
-    
     glfwDestroyWindow(m_pWindow);
     glfwTerminate();
 }
@@ -121,12 +120,21 @@ void Application::run()
         updateInputState();
         
         m_pUIManager->update(elapsedTime);
-        m_pScene->update(elapsedTime);
+        
+        auto activeScene = SceneManager::Get().getActiveScene();
+        if (activeScene)
+        {
+            activeScene->update(elapsedTime);
+        }
         
         ParticleSystem::Update(elapsedTime);
         DecalManager::Update(elapsedTime);
         
-        m_pScene->draw();
+        if (activeScene)
+        {
+            activeScene->draw();
+        }
+        
         m_pUIManager->draw();
 
         glfwSwapBuffers(m_pWindow);

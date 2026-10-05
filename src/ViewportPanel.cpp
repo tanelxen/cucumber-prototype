@@ -11,6 +11,7 @@
 #include "CameraController.h"
 #include "Camera.h"
 
+#include "SceneManager.h"
 #include "World.h"
 #include "Entity.h"
 
@@ -50,7 +51,9 @@ void ViewportPanel::update(float dt)
 //        m_pCameraController->update(dt);
 //    }
     
-    if (g_currentScene->m_isSimulationMode == false)
+    auto activeScene = SceneManager::Get().getActiveScene();
+    
+    if (activeScene && activeScene->m_isSimulationMode == false)
     {
         m_pCameraController->update(dt);
     }
@@ -58,20 +61,23 @@ void ViewportPanel::update(float dt)
 
 void ViewportPanel::draw()
 {
+    auto activeScene = SceneManager::Get().getActiveScene();
+    if (!activeScene) return;
+    
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
     ImGui::Begin(m_name.c_str());
     
-    ImGui::Checkbox("Grid", &g_currentScene->m_drawGrid);
+    ImGui::Checkbox("Grid", &activeScene->m_drawGrid);
     ImGui::SameLine();
-    ImGui::Checkbox("Sky", &g_currentScene->m_drawSkybox);
+    ImGui::Checkbox("Sky", &activeScene->m_drawSkybox);
     
     ImGui::SameLine(ImGui::GetWindowWidth() - 48);
     
-    if (g_currentScene->m_isSimulationMode)
+    if (activeScene->m_isSimulationMode)
     {
         if (DrawStopButton())
         {
-            g_currentScene->stopSimulation();
+            SceneManager::Get().stopSimulation();
             m_viewport->setCamera(m_pCamera);
         }
     }
@@ -79,7 +85,7 @@ void ViewportPanel::draw()
     {
         if (DrawPlayButton())
         {
-            g_currentScene->startSimulation(m_viewport);
+            SceneManager::Get().startSimulation(m_viewport);
         }
     }
     
@@ -119,7 +125,7 @@ void ViewportPanel::draw()
         ImGui::SetWindowFocus();
     }
     
-    if (g_currentScene->m_isSimulationMode == false)
+    if (activeScene->m_isSimulationMode == false)
     {
         auto camera = m_viewport->getCamera();
         DrawGizmo(m_entity, camera->view, camera->projection, contentPos, contentSize);

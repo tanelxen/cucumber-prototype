@@ -113,8 +113,6 @@ void ScriptComponent::update(float dt)
 
 ScriptComponent::~ScriptComponent()
 {
-    std::cout << "~ScriptComponent(): " << std::endl;
-    
     if (m_ScriptObject) {
         m_ScriptObject->Release();
     }
@@ -413,11 +411,16 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
                 
                 if (entity)
                 {
-                    snapshot[propName] = {
-                        {"type", typeName},
-                        {"uid", entity->uid},
-                        {"path", entity->getPathRelativeTo(owner)}
-                    };
+                    snapshot[propName]["type"] = typeName;
+                    
+                    if (owner->isPrefabInstance() && !owner->isPrefabRoot)
+                    {
+                        snapshot[propName]["path"] = entity->getPathRelativeTo(owner);
+                    }
+                    else
+                    {
+                        snapshot[propName]["uid"] = entity->uid;
+                    }
                 }
             }
             
@@ -427,11 +430,16 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
                 
                 if (comp && comp->owner)
                 {
-                    snapshot[propName] = {
-                        {"type", typeName},
-                        {"owner", comp->owner->uid},
-                        {"path", comp->owner->getPathRelativeTo(owner)}
-                    };
+                    snapshot[propName]["type"] = typeName;
+                    
+                    if (owner->isPrefabInstance() && !owner->isPrefabRoot)
+                    {
+                        snapshot[propName]["path"] = comp->owner->getPathRelativeTo(owner);
+                    }
+                    else
+                    {
+                        snapshot[propName]["owner"] = comp->owner->uid;
+                    }
                 }
             }
             
@@ -441,11 +449,16 @@ void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
                 
                 if (comp && comp->owner)
                 {
-                    snapshot[propName] = {
-                        {"type", typeName},
-                        {"owner", comp->owner->uid},
-                        {"path", comp->owner->getPathRelativeTo(owner)}
-                    };
+                    snapshot[propName]["type"] = typeName;
+                    
+                    if (owner->isPrefabInstance() && !owner->isPrefabRoot)
+                    {
+                        snapshot[propName]["path"] = comp->owner->getPathRelativeTo(owner);
+                    }
+                    else
+                    {
+                        snapshot[propName]["owner"] = comp->owner->uid;
+                    }
                 }
             }
         }
@@ -529,7 +542,7 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
                 else if (propData.contains("uid"))
                 {
                     UID ownerUID = propData["uid"].get<std::string>();
-                    entity = g_currentScene->findEntityByUID(ownerUID);
+                    entity = owner->scene->findEntityByUID(ownerUID);
                 }
                 
                 if (entity == nullptr) continue;
@@ -549,7 +562,7 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
                 else if (propData.contains("owner"))
                 {
                     UID ownerUID = propData["owner"].get<std::string>();
-                    entity = g_currentScene->findEntityByUID(ownerUID);
+                    entity = owner->scene->findEntityByUID(ownerUID);
                 }
 
                 if (entity == nullptr) continue;
@@ -572,7 +585,7 @@ void ScriptComponent::loadScriptStateFromValues(const nlohmann::json& snapshot)
                 else if (propData.contains("owner"))
                 {
                     UID ownerUID = propData["owner"].get<std::string>();
-                    entity = g_currentScene->findEntityByUID(ownerUID);
+                    entity = owner->scene->findEntityByUID(ownerUID);
                 }
                 
                 if (entity == nullptr) continue;

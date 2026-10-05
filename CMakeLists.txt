@@ -67,6 +67,8 @@ set(SRC_SCENE
         src/ExposedProperty.h
         src/SceneSerializer.cpp
         src/SceneSerializer.h
+        src/SceneManager.cpp
+        src/SceneManager.h
 )
 
 set(SRC_COMPONENTS

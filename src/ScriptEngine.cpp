@@ -21,6 +21,7 @@
 #include "DecalManager.h"
 #include "GameUI.h"
 
+#include "SceneManager.h"
 #include "World.h"
 
 #include "GameUI_AS.h"
@@ -135,7 +136,8 @@ void ScriptPrintCallback(const std::string& text)
 
 static Entity* FindEntityByName(const std::string& name)
 {
-    return g_currentScene->findEntityByName(name);
+    auto activeScene = SceneManager::Get().getActiveScene();
+    return activeScene ? activeScene->findEntityByName(name) : nullptr;
 }
 
 // Сюда мы будем добавлять функции движка, доступные в скриптах
@@ -231,8 +233,11 @@ void ScriptEngine::HotReloadAllScripts(const std::string& scriptsFolder)
     
     std::cout << "Starting Hot Reload..." << std::endl;
     
+    auto activeScene = SceneManager::Get().getActiveScene();
+    if (!activeScene) return nullptr;
+    
     // 1. ШАГ: Сохраняем состояние ВСЕХ скриптов на сцене
-    for (auto& entity : g_currentScene->m_entities)
+    for (auto& entity : activeScene->m_entities)
     {
         std::vector<ScriptComponent*> scripts;
         entity->getComponents(scripts);
@@ -253,7 +258,7 @@ void ScriptEngine::HotReloadAllScripts(const std::string& scriptsFolder)
     }
     
     // 3. ШАГ: Восстанавливаем объекты скриптов с сохраненными данными
-    for (auto& entity : g_currentScene->m_entities)
+    for (auto& entity : activeScene->m_entities)
     {
         std::vector<ScriptComponent*> scripts;
         entity->getComponents(scripts);
@@ -704,13 +709,15 @@ namespace {
     
     bool MakeRaycast(const glm::vec3& start, const glm::vec3& dir, float distance, RaycastResult& hit, Entity* ignore)
     {
+        auto activeScene = SceneManager::Get().getActiveScene();
+        if (!activeScene) return false;
+        
         HitResult result;
         result.endpos = { 0, 0, 0 };
         result.normal = { 0, 1, 0 };
         
         uint32_t mask = LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE;
-        
-        g_currentScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0), ignore, mask);
+        activeScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0), ignore, mask);
         
         hit.point = Quake2OpenGL(result.endpos);
         hit.normal = Quake2OpenGL(result.normal);

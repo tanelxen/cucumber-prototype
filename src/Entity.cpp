@@ -21,7 +21,6 @@ Entity::Entity(const std::string& name) : m_name(std::move(name))
 
 Entity::~Entity()
 {
-    std::cout << "~Entity(): " << m_name << std::endl;
 }
 
 void Entity::destroyComponent(Component* component)
@@ -32,7 +31,7 @@ void Entity::destroyComponent(Component* component)
     component->enabled = false; // Сразу выключаем, чтобы он не апдейтился в этом кадре
     
     // Передаем Сцене задачу физически удалить его в конце кадра
-    g_currentScene->queueComponentDestruction(component);
+    scene->queueComponentDestruction(component);
     
     // Удаляем из мапы быстрого поиска GetComponents
     auto range = m_componentMap.equal_range(typeid(*component));
@@ -80,7 +79,7 @@ void Entity::destroy()
     }
     
     // Ставим саму сущность в очередь Сцены на удаление в конце кадра
-    g_currentScene->queueEntityDestruction(this);
+    scene->queueEntityDestruction(this);
 }
 
 void Entity::setParent(Entity* newParent, bool keepRelative)

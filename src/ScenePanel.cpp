@@ -8,6 +8,7 @@
 #include "ScenePanel.h"
 #include "UIManager.h"
 
+#include "SceneManager.h"
 #include "SceneSerializer.h"
 #include "World.h"
 #include "Entity.h"
@@ -22,24 +23,32 @@ ScenePanel::ScenePanel() : EditorPanel("Scene")
     
 }
 
-void ScenePanel::setScene(WorldScene *scene)
-{
-    m_scene = scene;
-}
+//void ScenePanel::setScene(WorldScene *scene)
+//{
+//    m_scene = scene;
+//}
 
 void ScenePanel::draw()
 {
+    auto activeScene = SceneManager::Get().getActiveScene();
+    
+    if (!activeScene) {
+        ImGui::Begin("Scene"); ImGui::Text("No active scene"); ImGui::End();
+        return;
+    }
+    
     static int selectedIndex = -1;
     
     ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoCollapse);
     
     if (ImGui::Button("+"))
     {
-        auto count = (int)m_scene->m_entities.size();
+        auto count = (int)activeScene->m_entities.size();
         auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
+        entity->scene = activeScene;
         
-        m_scene->m_entities.push_back(std::move(entity));
-        m_scene->selectEntityAtIndex(count);
+        activeScene->m_entities.push_back(std::move(entity));
+        activeScene->selectEntityAtIndex(count);
         selectedIndex = count;
     }
     
@@ -52,14 +61,14 @@ void ScenePanel::draw()
         
         if (path != nullptr)
         {
-            auto count = (int)m_scene->m_entities.size();
+            auto count = (int)activeScene->m_entities.size();
             
             std::filesystem::path project_root = std::filesystem::current_path();
             auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
             
-            if (SceneSerializer::InstantiatePrefab(m_scene, rel_path))
+            if (SceneSerializer::InstantiatePrefab(activeScene, rel_path))
             {
-                m_scene->selectEntityAtIndex(count);
+                activeScene->selectEntityAtIndex(count);
                 selectedIndex = count;
             }
         }
@@ -75,15 +84,15 @@ void ScenePanel::draw()
         flags |= ImGuiTreeNodeFlags_Selected;
     }
     
-    if (ImGui::TreeNodeEx(&m_scene, flags, "Scene"))
+    if (ImGui::TreeNodeEx(&activeScene, flags, activeScene->isPrefabContext() ? "Prefab" : "Scene"))
     {
         if (ImGui::IsItemClicked()) {
             selectedIndex = -1;
         }
         
-        for (int i = 0; i < m_scene->m_entities.size(); ++i)
+        for (int i = 0; i < activeScene->m_entities.size(); ++i)
         {
-            auto& entity = m_scene->m_entities[i];
+            auto& entity = activeScene->m_entities[i];
             
             // Настройки флагов для текущего узла дерева
             ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
@@ -104,7 +113,7 @@ void ScenePanel::draw()
 
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
             {
-                Entity* picked_entity = m_scene->m_entities[i].get();
+                Entity* picked_entity = activeScene->m_entities[i].get();
                 
                 if (g_UIManager->m_is_picking_mode) {
                     // Если мы в режиме пипетки, вызываем сохраненную лямбду
@@ -116,7 +125,7 @@ void ScenePanel::draw()
                 } else {
                     // Обычная логика выбора объекта для инспектора
                     //                m_selected_entity = picked_entity;
-                    m_scene->selectEntityAtIndex(i);
+                    activeScene->selectEntityAtIndex(i);
                     selectedIndex = i;
                 }
             }
@@ -145,9 +154,9 @@ void ScenePanel::draw()
             {
                 if (ImGui::MenuItem("Удалить объект"))
                 {
-                    if (i < m_scene->m_entities.size())
+                    if (i < activeScene->m_entities.size())
                     {
-                        m_scene->m_entities[i]->destroy();
+                        activeScene->m_entities[i]->destroy();
                     }
                     
                     g_UIManager->setEntity(nullptr);
@@ -157,6 +166,17 @@ void ScenePanel::draw()
 //                if (ImGui::MenuItem("Создать дочерний объект")) {
 //                    // Логика создания
 //                }
+                
+                {
+                    auto rootEntity = activeScene->m_entities[i].get();
+                    
+                    // Если этот объект на сцене пришел из префаба — даем возможность его открыть!
+                    if (!rootEntity->prefabAssetPath.empty() && ImGui::MenuItem("Редактировать префаб"))
+                    {
+                        // Открываем префаб, сцена уровня автоматически скрывается в бэкграунд!
+                        SceneManager::Get().enterPrefabEditMode(rootEntity->prefabAssetPath);
+                    }
+                }
                 
                 if (ImGui::MenuItem("Сохранить как префаб"))
                 {
@@ -168,8 +188,8 @@ void ScenePanel::draw()
                         std::filesystem::path project_root = std::filesystem::current_path();
                         auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
                         
-                        auto rootEntity = m_scene->m_entities[i].get();
-                        SceneSerializer::CreatePrefabFromEntity(m_scene, rootEntity, rel_path);
+                        auto rootEntity = activeScene->m_entities[i].get();
+                        SceneSerializer::CreatePrefabFromEntity(activeScene, rootEntity, rel_path);
                     }
                 }
                 

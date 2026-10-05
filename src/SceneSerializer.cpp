@@ -6,6 +6,8 @@
 //
 
 #include "SceneSerializer.h"
+
+#include "SceneManager.h"
 #include "World.h"
 
 #include "Entity.h"
@@ -25,6 +27,64 @@
 #include "../vendor/json_fwd.hpp"
 #include <fstream>
 #include <iostream>
+
+bool SceneSerializer::LoadFile(WorldScene* scene, const std::string& filename)
+{
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "[SceneSerializer] Не удалось открыть файл: " << filename << std::endl;
+        return false;
+    }
+    
+    nlohmann::json rootJson;
+    try {
+        file >> rootJson;
+    } catch (const nlohmann::json::parse_error& e) {
+        std::cerr << "[SceneSerializer] Ошибка парсинга JSON: " << e.what() << std::endl;
+        return false;
+    }
+    
+    if (!rootJson.contains("type") || !rootJson["type"].is_string()) {
+        std::cerr << "Неизвестный формат: отсутствует параметр 'type'" << std::endl;
+        return false;
+    }
+    
+    scene->clear();
+    scene->m_filePath = filename;
+    
+    std::string type = rootJson["type"];
+    
+    if (type == "scene")
+    {
+        return LoadSceneFromMemory(scene, rootJson);
+    }
+    
+    if (type == "prefab")
+    {
+        scene->m_type = SceneType::Prefab;
+        file.close(); // Переоткроем файл внутри InstantiatePrefab
+        
+        Entity* prefabRoot = InstantiatePrefab(scene, filename);
+        
+        if (prefabRoot)
+        {
+            // Переводим в режим редактирования исходника префаба: снимаем маркеры копии
+            std::function<void(Entity*)> clearPrefabFlags = [&](Entity* ent) {
+                ent->prefabAssetPath = "";
+                ent->isPrefabRoot = false;
+                for (auto* child : ent->getChildren()) { clearPrefabFlags(child); }
+            };
+            
+            clearPrefabFlags(prefabRoot);
+            scene->awake();
+            return true;
+        }
+        
+        return false;
+    }
+
+    return true;
+}
 
 Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string& filename, Entity* customParent, UID forcedRootUid)
 {
@@ -58,6 +118,7 @@ Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string&
     {
         std::string name = entityJson.value("name", "Entity");
         auto entity = std::make_unique<Entity>(name);
+        entity->scene = scene;
         
         entity->prefabAssetPath = filename;
         
@@ -137,21 +198,22 @@ bool SceneSerializer::CreatePrefabFromEntity(WorldScene* scene, Entity* rootEnti
     if (!rootEntity) return false;
     
     nlohmann::json prefabJson = nlohmann::json::object();
+    prefabJson["type"] = "prefab";
     
     // 1. Создаем дефолтную (базовую) таблицу экспорта.
     prefabJson["exposed_properties"] = {
-        {
-            {"display_name", "Position"},
-            {"target_path", "."},
-            {"component_type", "TransformComponent"},
-            {"property_name", "position"}
-        },
-        {
-            {"display_name", "Rotation"},
-            {"target_path", "."},
-            {"component_type", "TransformComponent"},
-            {"property_name", "rotation"}
-        }
+//        {
+//            {"display_name", "Position"},
+//            {"target_path", "."},
+//            {"component_type", "TransformComponent"},
+//            {"property_name", "position"}
+//        },
+//        {
+//            {"display_name", "Rotation"},
+//            {"target_path", "."},
+//            {"component_type", "TransformComponent"},
+//            {"property_name", "rotation"}
+//        }
     };
     
     // 2. Собираем плоский список сущностей иерархии
@@ -248,147 +310,92 @@ bool SceneSerializer::CreatePrefabFromEntity(WorldScene* scene, Entity* rootEnti
     return true;
 }
 
-
-bool SceneSerializer::LoadScene(WorldScene* scene, const std::string& filename)
-{
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Не удалось открыть файл сцены: " << filename << std::endl;
-        return false;
-    }
-    
-    nlohmann::json sceneJson;
-    try {
-        file >> sceneJson;
-    } catch (const nlohmann::json::parse_error& e) {
-        std::cerr << "Ошибка парсинга JSON: " << e.what() << std::endl;
-        return false;
-    }
-    
-    if (!sceneJson.contains("entities") || !sceneJson["entities"].is_array()) {
-        std::cerr << "Неверный формат сцены: отсутствует массив 'entities'" << std::endl;
-        return false;
-    }
-    
-    scene->clear();
-    
-    std::unordered_map<UID, Entity*> entityMap;
-    // Мапа для последующего восстановления связей parent-child обычных сущностей
-    std::vector<std::pair<Entity*, UID>> nonPrefabParentsToResolve;
-    
-    // ==========================================
-    // ПРОХОД 1: Создание Entity и их компонентов
-    // ==========================================
-    for (const auto& entityJson : sceneJson["entities"])
-    {
-        if (entityJson.contains("prefab_path"))
-        {
-            std::string prefabPath = entityJson["prefab_path"];
-            UID savedRootUid = entityJson["uid"].get<UID>();
-            
-            // 1. Просто спавним чистую структуру из префаба.
-            Entity* prefabRoot = InstantiatePrefab(scene, prefabPath, nullptr, savedRootUid);
-            
-            if (!prefabRoot) continue;
-            
-            // 2. Если спавн прошел успешно и в сцене сохранены уникальные трансформации
-            if (prefabRoot && entityJson.contains("transform_override"))
-            {
-                // Перезаписываем дефолтный трансформ сценовыми данными
-                prefabRoot->getTransformPtr()->load(entityJson["transform_override"]);
-            }
-            
-            // Читаем метаданные префаба, чтобы знать его интерфейс (таблицу экспорта)
-            nlohmann::json prefabFileJson;
-            std::ifstream pFile(prefabPath);
-            pFile >> prefabFileJson;
-            
-            std::vector<ExposedProperty> exposedInterface;
-            if (prefabFileJson.contains("exposed_properties"))
-            {
-                for (const auto& propJson : prefabFileJson["exposed_properties"])
-                {
-                    ExposedProperty prop;
-                    prop.load(propJson);
-                    exposedInterface.push_back(prop);
-                }
-            }
-            
-            // 3. Накатываем оверрайды интерфейса из файла сцены
-            if (entityJson.contains("interface_overrides"))
-            {
-                const auto& sceneOverrides = entityJson["interface_overrides"];
-                
-                for (const auto& prop : exposedInterface)
-                {
-                    // Если сцена переопределила это внешнее свойство
-                    if (sceneOverrides.contains(prop.displayName))
-                    {
-                        nlohmann::json newValue = sceneOverrides[prop.displayName];
-                        
-                        // Находим целевую сущность внутри префаба по её NodePath!
-                        Entity* targetEntity = prefabRoot->findEntityByPath(prop.targetNodePath);
-                        if (targetEntity)
-                        {
-                            // Находим нужный компонент на этой сущности
-                            Component* comp = targetEntity->getComponentByName(prop.componentType);
-                            if (comp)
-                            {
-                                // Записываем значение напрямую во внутренность префаба!
-                                comp->setExposedValue(prop.propertyName, newValue);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        else
-        {
-            std::string name = entityJson.value("name", "Unnamed_Entity");
-            std::cout << "Load " << name << std::endl;
-            
-            auto entity = std::make_unique<Entity>(name);
-            entity->uid = entityJson.at("uid").get<UID>();
-            
-            if (entityJson.contains("parent"))
-            {
-                UID parentId = entityJson.at("parent").get<UID>();
-                
-                if (parentId != 0) {
-                    nonPrefabParentsToResolve.push_back({entity.get(), parentId});
-                }
-            }
-            
-            if (entityJson.contains("components"))
-            {
-                DeserializeEntity(entityJson, entity.get());
-            }
-            
-            entityMap[entity->uid] = entity.get();
-            scene->m_entities.push_back(std::move(entity));
-        }
-    }
-    
-    // Восстанавливаем parent-child связи для ОБЫЧНЫХ сущностей сцены
-    for (auto& [child, parentUID] : nonPrefabParentsToResolve)
-    {
-        Entity* parent = scene->findEntityByUID(parentUID);
-        if (parent && child) child->setParent(parent, false);
-    }
-    
-    // ВСЕ сущности созданы, ВСЕ parent-child связи восстановлены.
-    // Теперь безопасно вызываем awake() для абсолютно всех компонентов на сцене:
-    for (auto& entity : scene->m_entities)
-    {
-        entity->awake();
-    }
-    
-    return true;
-}
-
 bool SceneSerializer::SaveScene(const WorldScene* scene, const std::string& filename)
 {
     nlohmann::json sceneJson;
+    auto entitiesArray = nlohmann::json::array();
+    
+    SaveSceneToMemory(scene, sceneJson);
+    
+    std::ofstream file(filename);
+    file << sceneJson.dump(4);
+}
+
+void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
+{
+    auto componentsArray = entityJson.at("components");
+    
+    for (const auto& compNode : componentsArray)
+    {
+        std::string compName = compNode.at("type").get<std::string>();
+        const nlohmann::json& compData = compNode.at("data");
+        
+        Component* newComp = nullptr;
+        
+        // Фабрика компонентов по их текстовому имени
+        if (compName == "TransformComponent")
+        {
+            newComp = &entity->getTransform();
+        }
+        else if (compName == "MeshComponent")
+        {
+            newComp = entity->addComponent<MeshComponent>();
+            
+            std::string path = compData.at("source_glb");
+            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            
+            auto meshComp = static_cast<MeshComponent*>(newComp);
+            meshComp->mesh = model.mesh;
+            meshComp->materials = model.embeddedMaterials;
+        }
+        else if (compName == "AnimatorComponent")
+        {
+            newComp = entity->addComponent<AnimatorComponent>();
+            
+            std::string path = compData.at("source_glb");
+            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            
+            auto animComp = static_cast<AnimatorComponent*>(newComp);
+            animComp->setSkeleton(model.skeleton);
+            animComp->m_clips = model.animations;
+            animComp->path = path; // HACK
+        }
+        else if (compName == "AudioComponent")
+        {
+            newComp = entity->addComponent<AudioComponent>();
+            
+            std::string path = compData.at("source");
+            
+            auto audioComp = static_cast<AudioComponent*>(newComp);
+            audioComp->init("assets/" + path);
+        }
+        else if (compName == "ScriptComponent")
+        {
+            newComp = entity->addComponent<ScriptComponent>();
+        }
+        else if (compName == "CameraComponent")
+        {
+            newComp = entity->addComponent<CameraComponent>();
+        }
+        else if (compName == "MovementComponent")
+        {
+            newComp = entity->addComponent<MovementComponent>();
+        }
+        else if (compName == "CollisionComponent")
+        {
+            newComp = entity->addComponent<CollisionComponent>();
+        }
+        
+        // Загружаем уникальное состояние
+        if (newComp)
+        {
+            newComp->load(compData);
+        }
+    }
+}
+
+bool SceneSerializer::SaveSceneToMemory(const WorldScene* scene, nlohmann::json& sceneJson)
+{
     auto entitiesArray = nlohmann::json::array();
     
     for (const auto& entity : scene->m_entities)
@@ -474,80 +481,127 @@ bool SceneSerializer::SaveScene(const WorldScene* scene, const std::string& file
     }
     
     sceneJson["entities"] = entitiesArray;
+    sceneJson["type"] = "scene";
     
-    std::ofstream file(filename);
-    file << sceneJson.dump(4);
+    return true;
 }
 
-void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
+bool SceneSerializer::LoadSceneFromMemory(WorldScene* scene, const nlohmann::json& sceneJson)
 {
-    auto componentsArray = entityJson.at("components");
+    scene->clear();
+    scene->m_type = SceneType::Level;
     
-    for (const auto& compNode : componentsArray)
+    std::unordered_map<UID, Entity*> entityMap;
+    // Мапа для последующего восстановления связей parent-child обычных сущностей
+    std::vector<std::pair<Entity*, UID>> nonPrefabParentsToResolve;
+    
+    // ==========================================
+    // ПРОХОД 1: Создание Entity и их компонентов
+    // ==========================================
+    for (const auto& entityJson : sceneJson["entities"])
     {
-        std::string compName = compNode.at("type").get<std::string>();
-        const nlohmann::json& compData = compNode.at("data");
-        
-        Component* newComp = nullptr;
-        
-        // Фабрика компонентов по их текстовому имени
-        if (compName == "TransformComponent")
+        if (entityJson.contains("prefab_path"))
         {
-            newComp = &entity->getTransform();
-        }
-        else if (compName == "MeshComponent")
-        {
-            newComp = entity->addComponent<MeshComponent>();
+            std::string prefabPath = entityJson["prefab_path"];
+            UID savedRootUid = entityJson["uid"].get<UID>();
             
-            std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            // 1. Просто спавним чистую структуру из префаба.
+            Entity* prefabRoot = InstantiatePrefab(scene, prefabPath, nullptr, savedRootUid);
             
-            auto meshComp = static_cast<MeshComponent*>(newComp);
-            meshComp->mesh = model.mesh;
-            meshComp->materials = model.embeddedMaterials;
-        }
-        else if (compName == "AnimatorComponent")
-        {
-            newComp = entity->addComponent<AnimatorComponent>();
+            if (!prefabRoot) continue;
             
-            std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            // 2. Если спавн прошел успешно и в сцене сохранены уникальные трансформации
+            if (prefabRoot && entityJson.contains("transform_override"))
+            {
+                // Перезаписываем дефолтный трансформ сценовыми данными
+                prefabRoot->getTransformPtr()->load(entityJson["transform_override"]);
+            }
             
-            auto animComp = static_cast<AnimatorComponent*>(newComp);
-            animComp->setSkeleton(model.skeleton);
-            animComp->m_clips = model.animations;
-            animComp->path = path; // HACK
-        }
-        else if (compName == "AudioComponent")
-        {
-            newComp = entity->addComponent<AudioComponent>();
+            // Читаем метаданные префаба, чтобы знать его интерфейс (таблицу экспорта)
+            nlohmann::json prefabFileJson;
+            std::ifstream pFile(prefabPath);
+            pFile >> prefabFileJson;
             
-            std::string path = compData.at("source");
+            std::vector<ExposedProperty> exposedInterface;
+            if (prefabFileJson.contains("exposed_properties"))
+            {
+                for (const auto& propJson : prefabFileJson["exposed_properties"])
+                {
+                    ExposedProperty prop;
+                    prop.load(propJson);
+                    exposedInterface.push_back(prop);
+                }
+            }
             
-            auto audioComp = static_cast<AudioComponent*>(newComp);
-            audioComp->init("assets/" + path);
+            // 3. Накатываем оверрайды интерфейса из файла сцены
+            if (entityJson.contains("interface_overrides"))
+            {
+                const auto& sceneOverrides = entityJson["interface_overrides"];
+                
+                for (const auto& prop : exposedInterface)
+                {
+                    // Если сцена переопределила это внешнее свойство
+                    if (sceneOverrides.contains(prop.displayName))
+                    {
+                        nlohmann::json newValue = sceneOverrides[prop.displayName];
+                        
+                        // Находим целевую сущность внутри префаба по её NodePath!
+                        Entity* targetEntity = prefabRoot->findEntityByPath(prop.targetNodePath);
+                        if (targetEntity)
+                        {
+                            // Находим нужный компонент на этой сущности
+                            Component* comp = targetEntity->getComponentByName(prop.componentType);
+                            if (comp)
+                            {
+                                // Записываем значение напрямую во внутренность префаба!
+                                comp->setExposedValue(prop.propertyName, newValue);
+                            }
+                        }
+                    }
+                }
+            }
         }
-        else if (compName == "ScriptComponent")
+        else
         {
-            newComp = entity->addComponent<ScriptComponent>();
-        }
-        else if (compName == "CameraComponent")
-        {
-            newComp = entity->addComponent<CameraComponent>();
-        }
-        else if (compName == "MovementComponent")
-        {
-            newComp = entity->addComponent<MovementComponent>();
-        }
-        else if (compName == "CollisionComponent")
-        {
-            newComp = entity->addComponent<CollisionComponent>();
-        }
-        
-        // Загружаем уникальное состояние
-        if (newComp)
-        {
-            newComp->load(compData);
+            std::string name = entityJson.value("name", "Unnamed_Entity");
+            std::cout << "Load " << name << std::endl;
+            
+            auto entity = std::make_unique<Entity>(name);
+            entity->uid = entityJson.at("uid").get<UID>();
+            entity->scene = scene;
+            
+            if (entityJson.contains("parent"))
+            {
+                UID parentId = entityJson.at("parent").get<UID>();
+                
+                if (parentId != 0) {
+                    nonPrefabParentsToResolve.push_back({entity.get(), parentId});
+                }
+            }
+            
+            if (entityJson.contains("components"))
+            {
+                DeserializeEntity(entityJson, entity.get());
+            }
+            
+            entityMap[entity->uid] = entity.get();
+            scene->m_entities.push_back(std::move(entity));
         }
     }
+    
+    // Восстанавливаем parent-child связи для ОБЫЧНЫХ сущностей сцены
+    for (auto& [child, parentUID] : nonPrefabParentsToResolve)
+    {
+        Entity* parent = scene->findEntityByUID(parentUID);
+        if (parent && child) child->setParent(parent, false);
+    }
+    
+    // ВСЕ сущности созданы, ВСЕ parent-child связи восстановлены.
+    // Теперь безопасно вызываем awake() для абсолютно всех компонентов на сцене:
+    for (auto& entity : scene->m_entities)
+    {
+        entity->awake();
+    }
+    
+    return true;
 }

@@ -32,6 +32,8 @@ public:
     
     bool m_isActive = true;
     
+    WorldScene* scene;
+    
     Entity* parent = nullptr;
     std::vector<Entity*> children;
     
@@ -55,7 +57,7 @@ public:
         m_components.push_back(std::move(newComponent));
         m_componentMap.insert({typeid(T), rawPtr});
         
-        g_currentScene->registerComponent(rawPtr);
+        scene->registerComponent(rawPtr);
         
         return rawPtr;
     }

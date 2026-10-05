@@ -139,7 +139,7 @@ void MovementComponent::trace_ground()
     point.z -= 0.25;
     
     HitResult result;
-    g_currentScene->trace(result, m_position, point, player_mins, player_maxs, owner);
+    owner->scene->trace(result, m_position, point, player_mins, player_maxs, owner);
     
     if (result.fraction == 1.0f || (m_movementBits & MOVEMENT_JUMP_THIS_FRAME))
     {
@@ -295,7 +295,7 @@ void MovementComponent::step_slide(bool gravity, float dt)
     down.z -= STEPSIZE;
     
     HitResult result;
-    g_currentScene->trace(result, start_o, down, player_mins, player_maxs, owner);
+    owner->scene->trace(result, start_o, down, player_mins, player_maxs, owner);
     
     glm::vec3 up = {0, 0, 1};
     
@@ -309,7 +309,7 @@ void MovementComponent::step_slide(bool gravity, float dt)
     up.z += STEPSIZE;
     
     // test the player position if they were a stepheight higher
-    g_currentScene->trace(result, up, up, player_mins, player_maxs, owner);
+    owner->scene->trace(result, up, up, player_mins, player_maxs, owner);
     
     if (result.allsolid)
     {
@@ -327,7 +327,7 @@ void MovementComponent::step_slide(bool gravity, float dt)
     down = m_position;
     down.z -= STEPSIZE;
     
-    g_currentScene->trace(result, m_position, down, player_mins, player_maxs, owner);
+    owner->scene->trace(result, m_position, down, player_mins, player_maxs, owner);
     
     if (!result.allsolid)
     {
@@ -381,7 +381,7 @@ bool MovementComponent::slide(bool gravity, float dt)
         /* calculate future position and attempt the move */
         HitResult work;
         glm::vec3 end = m_position + m_velocity * time_left;
-        g_currentScene->trace(work, m_position, end, player_mins, player_maxs, owner);
+        owner->scene->trace(work, m_position, end, player_mins, player_maxs, owner);
         
         //        printf("(fraction = %.1f) (allsolid = %i) \n", work.fraction, work.allsolid);
         

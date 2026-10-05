@@ -53,5 +53,6 @@
             "property_name": "rotation",
             "target_path": "."
         }
-    ]
+    ],
+    "type": "prefab"
 }

@@ -18,8 +18,6 @@ struct Application
     
 //private:
     struct GLFWwindow* m_pWindow;
-    class WorldScene* m_pScene;
-    
     class UIManager* m_pUIManager;
     
     void updateInputState();

@@ -20,6 +20,12 @@ class Entity;
 class Component;
 class CollisionComponent;
 
+enum class SceneType
+{
+    Level,    // Обычный игровой уровень (.scene)
+    Prefab    // Префаб в режиме изолированного редактирования исходника (.prefab)
+};
+
 class WorldScene
 {
 public:
@@ -36,6 +42,7 @@ public:
     void selectEntityAtIndex(int index);
     
     void clear();
+    void awake();
     
     void registerComponent(Component* component);
     
@@ -63,6 +70,12 @@ public:
     
     bool m_isSimulationMode = false;
     
+public:
+    SceneType m_type = SceneType::Level; // По умолчанию сцена — это уровень
+    std::string m_filePath = "";         // Путь к файлу на диске
+    
+    bool isPrefabContext() const { return m_type == SceneType::Prefab; }
+    
 private:
     std::vector<Component*> m_globalUpdatables;
     std::vector<Component*> m_allComponents;
@@ -78,4 +91,4 @@ private:
 };
 
 // Временный хак
-inline WorldScene* g_currentScene;
+//inline WorldScene* g_currentScene;

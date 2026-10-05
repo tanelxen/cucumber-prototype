@@ -17,6 +17,8 @@
 #include "ScenePanel.h"
 #include "HierarchyPanel.h"
 #include "Viewport.h"
+
+#include "SceneManager.h"
 #include "World.h"
 
 #include "ScriptEngine.h"
@@ -98,14 +100,9 @@ void UIManager::draw()
     ImGui::SetNextWindowViewport(viewport->ID);
     
     ImGuiWindowFlags flags =
-    ImGuiWindowFlags_NoDocking |
-    ImGuiWindowFlags_NoTitleBar |
-    ImGuiWindowFlags_NoCollapse |
-    ImGuiWindowFlags_NoResize |
-    ImGuiWindowFlags_NoMove |
-    ImGuiWindowFlags_NoBringToFrontOnFocus |
-    ImGuiWindowFlags_NoNavFocus |
-    ImGuiWindowFlags_MenuBar;
+    ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
     
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::Begin("DockSpace", nullptr, flags);
@@ -119,12 +116,13 @@ void UIManager::draw()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-// FIXME: Это жуткий костыль
-void UIManager::setScene(WorldScene *scene)
-{
-    m_pScenePanel->setScene(scene);
-    scene->m_pAttachedViewport = m_pMainView;
-}
+
+//// FIXME: Это жуткий костыль
+//void UIManager::setScene(WorldScene *scene)
+//{
+//    m_pScenePanel->setScene(scene);
+//    scene->m_pAttachedViewport = m_pMainView;
+//}
 
 void UIManager::init(struct GLFWwindow *window)
 {
@@ -142,7 +140,7 @@ void UIManager::init(struct GLFWwindow *window)
 //    io.Fonts->Fonts[2] = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Regular.ttf", 14.0f);
     
     // Rounding
-    ImGui::GetStyle().WindowRounding = 4.0;
+    ImGui::GetStyle().WindowRounding = 0.0;
     ImGui::GetStyle().ChildRounding = 4.0;
     ImGui::GetStyle().FrameRounding = 4.0;
     ImGui::GetStyle().TabRounding = 0.0;
@@ -199,8 +197,8 @@ void UIManager::init(struct GLFWwindow *window)
     colors[ImGuiCol_Tab]                 = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 0.0);
     colors[ImGuiCol_TabHovered]          = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
     colors[ImGuiCol_TabActive]           = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
-    colors[ImGuiCol_TabUnfocused]        = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 0.0);
-    colors[ImGuiCol_TabUnfocusedActive]  = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
+    colors[ImGuiCol_TabDimmed]           = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 0.0);
+    colors[ImGuiCol_TabDimmedSelected]   = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
     
     // Title
     colors[ImGuiCol_TitleBg]             = ImVec4(50.0f/255, 50.0f/255, 58.0f/255, 1.0);
@@ -217,47 +215,26 @@ void UIManager::init(struct GLFWwindow *window)
 }
 
 #include "SceneSerializer.h"
+#include "SceneManager.h"
 
 void UIManager::drawMenuBar()
 {
     if (ImGui::BeginMainMenuBar())
     {
+        auto activeScene = SceneManager::Get().getActiveScene();
+        
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Save Scene"))
-            {
-                char const * filter[2] = { "*.scene", "*.json" };
-                const char* path = tinyfd_saveFileDialog("Save Scene", "./assets/scenes/", 2, filter, NULL);
-                
-                if (path != nullptr)
-                {
-                    SceneSerializer::SaveScene(Application::currentInstance->m_pScene, path);
-                }
+            if (ImGui::MenuItem("Load")) {
+                char const * filter[3] = { "*.json", "*.scene", "*.prefab" };
+                const char* path = tinyfd_openFileDialog("Open Scene or Prefab", "./assets/", 3, filter, NULL, 0);
+                if (path != nullptr) SceneManager::Get().openFile(path);
             }
             
-            if (ImGui::MenuItem("Load Scene"))
-            {
-                char const * filter[2] = { "*.json", "*.scene" };
-                const char* path = tinyfd_openFileDialog("Load Scene", "./assets/scenes/", 2, filter, NULL, 0);
-                
-                if (path != nullptr)
-                {
-                    SceneSerializer::LoadScene(Application::currentInstance->m_pScene, path);
-                }
+            if (ImGui::MenuItem("Save")) {
+                SceneManager::Get().saveCurrent();
             }
             
-            if (ImGui::MenuItem("Clear Scene"))
-            {
-                Application::currentInstance->m_pScene->clear();
-            }
-            
-            ImGui::Separator();
-            
-            if (ImGui::MenuItem("Reload Scripts"))
-            {
-                ScriptEngine::get().HotReloadAllScripts("assets/scripts");
-                
-            }
             ImGui::EndMenu();
         }
         
@@ -282,6 +259,17 @@ void UIManager::drawMenuBar()
                 {
                     panel->isVisible = !panel->isVisible;
                 }
+            }
+            
+            static bool show_demo = false;
+            if (ImGui::MenuItem("Demo", NULL, show_demo))
+            {
+                show_demo = !show_demo;
+            }
+            
+            if (show_demo)
+            {
+                ImGui::ShowDemoWindow();
             }
             
             ImGui::EndMenu();

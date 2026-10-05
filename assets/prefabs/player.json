@@ -31,7 +31,7 @@
                         "className": "Player",
                         "fields": {
                             "headTransform": {
-                                "owner": "uid://oro2ef1gi7si",
+                                "owner": "uid://iywv4r3ccb7m",
                                 "path": "Head",
                                 "type": "TransformComponent"
                             },
@@ -42,7 +42,8 @@
                     "type": "ScriptComponent"
                 }
             ],
-            "name": "Player"
+            "name": "Player",
+            "parent": ""
         },
         {
             "components": [
@@ -67,7 +68,7 @@
                     "type": "TransformComponent"
                 },
                 {
-                    "data": null,
+                    "data": {},
                     "type": "CameraComponent"
                 }
             ],
@@ -117,7 +118,7 @@
                             "boneIndex": 5,
                             "clip": 32,
                             "damage": 10,
-                            "fireInterval": 0.1
+                            "fireInterval": 0.10000000149011612
                         }
                     },
                     "type": "ScriptComponent"
@@ -127,18 +128,6 @@
             "parent": "Head"
         }
     ],
-    "exposed_properties": [
-        {
-            "component_type": "TransformComponent",
-            "display_name": "Position",
-            "property_name": "position",
-            "target_path": "."
-        },
-        {
-            "component_type": "TransformComponent",
-            "display_name": "Rotation",
-            "property_name": "rotation",
-            "target_path": "."
-        }
-    ]
+    "exposed_properties": null,
+    "type": "prefab"
 }

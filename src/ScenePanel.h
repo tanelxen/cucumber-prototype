@@ -17,9 +17,9 @@ public:
     ScenePanel();
     ~ScenePanel() = default;
     
-    void setScene(WorldScene* scene);
+//    void setScene(WorldScene* scene);
     void draw() override;
     
 private:
-    WorldScene* m_scene;
+//    WorldScene* m_scene;
 };

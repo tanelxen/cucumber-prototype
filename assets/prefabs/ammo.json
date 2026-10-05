@@ -60,6 +60,7 @@
             "uid": "uid://flg44ugrswn01"
         }
     ],
+    "type": "prefab",
     "name": "Ammo",
     "root": "uid://flg44ugrswn01"
 }

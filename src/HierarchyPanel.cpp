@@ -6,6 +6,8 @@
 //
 
 #include "HierarchyPanel.h"
+
+#include "SceneManager.h"
 #include "World.h"
 #include "Entity.h"
 
@@ -22,15 +24,23 @@ HierarchyPanel::HierarchyPanel() : EditorPanel("Hierarchy")
 
 void HierarchyPanel::draw()
 {
+    auto activeScene = SceneManager::Get().getActiveScene();
+    
+    if (!activeScene) {
+        ImGui::Begin("Hierarchy"); ImGui::Text("No active scene"); ImGui::End();
+        return;
+    }
+    
     ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_NoCollapse);
     
     if (ImGui::Button("+"))
     {
-        auto count = (int)g_currentScene->m_entities.size();
+        auto count = (int)activeScene->m_entities.size();
         auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
+        entity->scene = activeScene;
         
-        g_currentScene->m_entities.push_back(std::move(entity));
-        g_currentScene->selectEntityAtIndex(count);
+        activeScene->m_entities.push_back(std::move(entity));
+        activeScene->selectEntityAtIndex(count);
 //        selectedIndex = count;
     }
     
@@ -38,7 +48,7 @@ void HierarchyPanel::draw()
     
     rootEntities.clear();
     
-    for (auto& entity : g_currentScene->m_entities)
+    for (auto& entity : activeScene->m_entities)
     {
         if (entity->parent == nullptr) {
             rootEntities.push_back(entity.get());
@@ -60,7 +70,7 @@ void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& sel
 //        flags |= ImGuiTreeNodeFlags_Selected;
 //    }
     
-    if (ImGui::TreeNodeEx(&g_currentScene, flags, "Scene"))
+    if (ImGui::TreeNodeEx(&rootEntities, flags, "Scene"))
     {
         
         // Отрисовываем только корневые сущности (у которых нет родителя)

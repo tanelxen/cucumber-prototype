@@ -31,9 +31,11 @@ public:
     
     void init(struct GLFWwindow* window);
     
-    void setScene(WorldScene* scene);
+//    void setScene(WorldScene* scene);
     void setEntity(Entity* entity);
     void setMaterial(Material* material);
+    
+    Viewport* getMainViewport() { return m_pMainView; }
     
     void startPicking(std::function<void(Entity*)> callback);
     void endPicking();

@@ -58,13 +58,19 @@ static std::unordered_map<std::string, nlohmann::json> g_prefabs;
 
 WorldScene::WorldScene()
 {
-    g_grid.init();
-    g_sky.init();
+    static bool inited = false;
     
-    // Временный хак пока не решу куда вставить bsp-меш и коллизию
-    loadBSP("assets/wolf/maps/escape2.bsp");
+    if (!inited)
+    {
+        g_grid.init();
+        g_sky.init();
+        
+        // Временный хак пока не решу куда вставить bsp-меш и коллизию
+        loadBSP("assets/wolf/maps/escape2.bsp");
+        inited = true;
+    }
     
-    g_currentScene = this;
+//    g_currentScene = this;
 }
 
 WorldScene::~WorldScene() = default;
@@ -320,6 +326,14 @@ void WorldScene::startSimulation(Viewport* viewport)
 void WorldScene::stopSimulation()
 {
     m_isSimulationMode = false;
+}
+
+void WorldScene::awake()
+{
+    for (auto& entity : m_entities)
+    {
+        entity->awake();
+    }
 }
 
 // Временно вручную - потом через Jolt

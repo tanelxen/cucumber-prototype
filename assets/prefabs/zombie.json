@@ -31,16 +31,11 @@
                         "className": "Zombie",
                         "fields": {
                             "animator": {
-                                "owner": "uid://1wijqfin7cyr",
+                                "owner": "uid://b4ajv5an8bpku",
                                 "path": "Mesh",
                                 "type": "AnimatorComponent"
                             },
-                            "health": 40,
-                            "player": {
-                                "path": "Player",
-                                "type": "Entity",
-                                "uid": "uid://favu1um0rhq6e"
-                            }
+                            "health": 60
                         }
                     },
                     "type": "ScriptComponent"
@@ -102,5 +97,6 @@
             "property_name": "rotation",
             "target_path": "."
         }
-    ]
+    ],
+    "type": "prefab"
 }
