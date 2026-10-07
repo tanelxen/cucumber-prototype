@@ -30,7 +30,7 @@ public:
     ~Q3BspMesh();
     
     void initFromBsp(Q3BSPAsset* bsp);
-    void draw();
+    void draw(RenderView& view);
     
 private:
     void initBuffers();

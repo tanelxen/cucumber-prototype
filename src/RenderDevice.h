@@ -14,6 +14,7 @@
 struct RenderCommand;
 class Viewport;
 class Camera;
+class RenderView;
 
 struct VertexLayout;
 
@@ -30,11 +31,21 @@ namespace RenderDevice {
     handle_t getWhiteTexture();
     
     void startFrame();
-    void submit(RenderCommand cmd);
-    void commit(Camera* camera);
+//    void submit(RenderCommand cmd);
+//    void commit(Camera* camera);
+//    void commit(const glm::mat4& view, const glm::mat4& projection);
     void endFrame();
     
+//    void executePasses(const std::vector<RenderView>& passes, bool drawSkybox, bool isSimulationMode);
+    
     inline std::vector<glm::vec3> shCoefficients(9, glm::vec3(0.0f));
+    
+    
+    // Регистрация прохода рендера для камеры
+    void submitView(const RenderView& view);
+    
+    // Финальный вызов, который отсортирует проходы, вызовет draw и очистит списки
+    void flush();
 }
 
 enum class BlendMode
@@ -81,4 +92,33 @@ struct RenderCommand
     
     // Animation
     const std::vector<glm::mat4>* bones;
+};
+
+struct RenderView
+{
+    glm::mat4 viewMatrix;
+    glm::mat4 projectionMatrix;
+    
+    class FrameBuffer* targetFrameBuffer = nullptr;
+    
+    unsigned int cullingMask = 0xFFFFFFFF;
+    bool clearDepthOnly = false;
+    float depth = 0.0f; // Приоритет отрисовки
+    
+    bool drawSkybox = true;
+    bool drawGizmos = false;
+    bool drawGrid = false;
+    
+    // Списки команд теперь принадлежат конкретному проходу!
+    std::vector<RenderCommand> opaquePass;
+    std::vector<RenderCommand> transparentPass;
+    
+    void submit(const RenderCommand& cmd)
+    {
+        if (cmd.blendMode == BlendMode::Transparent || cmd.blendMode == BlendMode::Add) {
+            transparentPass.push_back(cmd);
+        } else {
+            opaquePass.push_back(cmd);
+        }
+    }
 };

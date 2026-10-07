@@ -307,5 +307,9 @@ void SpriteRenderer::Flush(glm::mat4 view, glm::mat4 projection)
     
     glDepthMask(GL_TRUE);
     glBindVertexArray(0);
+}
+
+void SpriteRenderer::Clear()
+{
     s_batches.clear();
 }

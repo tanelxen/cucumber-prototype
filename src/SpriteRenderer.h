@@ -34,6 +34,7 @@ namespace SpriteRenderer {
     void AddAxialBillboard(int textureId, glm::vec3 position, float length, glm::vec3 direction, float width,
                            const glm::vec4& color = glm::vec4(1.0f), BlendMode blendMode = BlendMode::Alpha);
     
-    // Отрисовывает все накопленные батчи и очищает очередь
+    // Отрисовываем все накопленные батчи и очищаем очередь
     void Flush(glm::mat4 view, glm::mat4 projection);
+    void Clear();
 }

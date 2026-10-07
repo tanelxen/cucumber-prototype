@@ -31,7 +31,6 @@ public:
     
     void init(struct GLFWwindow* window);
     
-//    void setScene(WorldScene* scene);
     void setEntity(Entity* entity);
     void setMaterial(Material* material);
     
@@ -41,14 +40,17 @@ public:
     void endPicking();
     
     void update(float dt);
+    void preRender();
     void draw();
     
     bool m_is_picking_mode = false;
     std::function<void(Entity*)> m_active_picking_callback = nullptr;
     
-private:
     ViewportPanel* m_pViewportPanel;
     Viewport* m_pMainView;
+    
+private:
+    
     
     ScenePanel* m_pScenePanel;
     InspectorPanel* m_pInspectorPanel;

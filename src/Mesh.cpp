@@ -18,7 +18,7 @@
 Mesh::Mesh() = default;
 Mesh::~Mesh() = default;
 
-void Mesh::draw(glm::mat4& transform) const
+void Mesh::draw(RenderView& view, glm::mat4& transform) const
 {
     for (const auto& surface : m_surfaces)
     {
@@ -50,11 +50,11 @@ void Mesh::draw(glm::mat4& transform) const
             .transform = transform
         };
         
-        RenderDevice::submit(cmd);
+        view.submit(cmd);
     }
 }
 
-void Mesh::draw(glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const
+void Mesh::draw(RenderView& view, glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const
 {
     for (const auto& surface : m_surfaces)
     {
@@ -87,7 +87,7 @@ void Mesh::draw(glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette
             .bones = &bonesPalette
         };
         
-        RenderDevice::submit(cmd);
+        view.submit(cmd);
     }
 }
 

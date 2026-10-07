@@ -284,6 +284,11 @@ static void RegisterUI()
         auto* comp = static_cast<CollisionComponent*>(c);
         DrawCollisionComponent(comp);
     });
+    
+    inspector.Register<CameraComponent>("Camera", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<CameraComponent*>(c);
+        ImGui::DragFloat("Field of view##Camera", &comp->fov, 10.f, 30.0f, 100.0f, "%.0f");
+    });
 }
 
 void InspectorPanel::draw()

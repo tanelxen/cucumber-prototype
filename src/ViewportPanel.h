@@ -18,6 +18,8 @@ public:
     ViewportPanel(const std::string &name);
 //    ~Viewport();
     
+    void preRender();
+    
     void setViewport(Viewport* viewport);
     void setEntity(Entity* entity);
     

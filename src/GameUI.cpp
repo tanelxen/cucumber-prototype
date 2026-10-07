@@ -496,9 +496,11 @@ namespace GameUI {
         
         glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
-        
+    }
+    
+    void Clear()
+    {
         // Очищаем буферы для следующего кадра
-        
         vertices.clear();
         commands.clear();
     }

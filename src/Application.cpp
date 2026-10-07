@@ -21,6 +21,9 @@
 #include "World.h"
 #include "Input.h"
 
+#include "CameraComponent.h"
+#include "Viewport.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -31,9 +34,7 @@
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
-Application* Application::currentInstance = nullptr;
-
-int kek();
+static Application* s_currentInstance = nullptr;
 
 Application::Application()
 {
@@ -74,7 +75,7 @@ Application::Application()
     // У нас свое ограничение частоты кадров
     glfwSwapInterval(0);
     
-    currentInstance = this;
+    s_currentInstance = this;
 }
 
 Application::~Application()
@@ -125,22 +126,20 @@ void Application::run()
         if (activeScene)
         {
             activeScene->update(elapsedTime);
+            activeScene->prepareRenderViews();
         }
         
         ParticleSystem::Update(elapsedTime);
         DecalManager::Update(elapsedTime);
         
-        if (activeScene)
-        {
-            activeScene->draw();
-        }
+        m_pUIManager->preRender();
+        RenderDevice::flush();
         
         m_pUIManager->draw();
 
         glfwSwapBuffers(m_pWindow);
     }
 }
-
 
 void Application::updateInputState()
 {
@@ -182,17 +181,17 @@ void Application::updateInputState()
 
 void Application::setCursorEnabled(bool state)
 {
-    if(currentInstance == nullptr) return;
+    if(s_currentInstance == nullptr) return;
     
     if (state)
     {
         ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
-        glfwSetInputMode(currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        glfwSetInputMode(s_currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
     else
     {
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
-        glfwSetInputMode(currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetInputMode(s_currentInstance->m_pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 }
 

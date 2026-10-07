@@ -8,7 +8,10 @@
 #include "ViewportPanel.h"
 #include "Viewport.h"
 
+#include "RenderDevice.h"
+
 #include "CameraController.h"
+#include "CameraComponent.h"
 #include "Camera.h"
 
 #include "SceneManager.h"
@@ -46,17 +49,38 @@ void ViewportPanel::setEntity(Entity *entity)
 
 void ViewportPanel::update(float dt)
 {
-//    if (m_isHovered || m_pCameraController->isFlyMode())
-//    {
-//        m_pCameraController->update(dt);
-//    }
-    
     auto activeScene = SceneManager::Get().getActiveScene();
+    if (!activeScene) return;
     
-    if (activeScene && activeScene->m_isSimulationMode == false)
+    // Проверяем, должна ли сейчас двигаться камера редактора
+    // Если идет игра И на сцене есть живая камера игрока — контроллер редактора отключается
+    if (activeScene->isSimulationMode() && activeScene->hasActiveSceneCamera())
     {
-        m_pCameraController->update(dt);
+        // Камера игрока управляется своими игровыми скриптами (MovementComponent и т.д.)
+        return;
     }
+    
+    // В противном случае (мы в редакторе ИЛИ в игре нет камеры) — камера редактора работает!
+    m_pCameraController->update(dt);
+}
+
+void ViewportPanel::preRender()
+{
+    auto activeScene = SceneManager::Get().getActiveScene();
+    if (!activeScene) return;
+    
+    // Умный пропуск: Если сцена в режиме симуляции САМА сгенерировала игровые проходы
+    // в наш FBO (m_viewport), то панели редактора генерировать свой проход НЕ НАДО.
+    if (activeScene->isSimulationMode() && activeScene->hasActiveSceneCamera())
+    {
+        return;
+    }
+    
+    // РЕДАКТОРНЫЙ РЕЖИМ (или фоллбэк, если в игре нет камеры):
+    // Строим обычный кадр от камеры вьюпорта
+    RenderView editorPass = m_viewport->createRenderView();
+    activeScene->collectRenderCommands(editorPass);
+    RenderDevice::submitView(editorPass);
 }
 
 void ViewportPanel::draw()
@@ -67,13 +91,15 @@ void ViewportPanel::draw()
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
     ImGui::Begin(m_name.c_str());
     
-    ImGui::Checkbox("Grid", &activeScene->m_drawGrid);
+    ImGui::Checkbox("Grid", &m_viewport->drawGrid);
     ImGui::SameLine();
-    ImGui::Checkbox("Sky", &activeScene->m_drawSkybox);
+    ImGui::Checkbox("Gizmos", &m_viewport->drawGizmos);
+    ImGui::SameLine();
+    ImGui::Checkbox("Sky", &m_viewport->drawSkybox);
     
     ImGui::SameLine(ImGui::GetWindowWidth() - 48);
     
-    if (activeScene->m_isSimulationMode)
+    if (activeScene->isSimulationMode())
     {
         if (DrawStopButton())
         {
@@ -125,7 +151,7 @@ void ViewportPanel::draw()
         ImGui::SetWindowFocus();
     }
     
-    if (activeScene->m_isSimulationMode == false)
+    if (activeScene->isSimulationMode() == false)
     {
         auto camera = m_viewport->getCamera();
         DrawGizmo(m_entity, camera->view, camera->projection, contentPos, contentSize);

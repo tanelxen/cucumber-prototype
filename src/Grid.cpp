@@ -46,5 +46,5 @@ void Grid::draw() const
         .blendMode = BlendMode::Transparent,
     };
     
-    RenderDevice::submit(cmd);
+//    RenderDevice::submit(cmd);
 }

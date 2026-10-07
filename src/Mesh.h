@@ -63,8 +63,8 @@ public:
     void setIndices(const std::vector<uint32_t>& indices);
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
-    void draw(glm::mat4& transform) const;
-    void draw(glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const;
+    void draw(RenderView& view, glm::mat4& transform) const;
+    void draw(RenderView& view, glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const;
     
     std::string m_name;
     std::vector<Surface> m_surfaces;

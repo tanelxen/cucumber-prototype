@@ -16,13 +16,11 @@ struct Application
     
     static void setCursorEnabled(bool state);
     
-//private:
+private:
     struct GLFWwindow* m_pWindow;
     class UIManager* m_pUIManager;
     
     void updateInputState();
-    
-    static Application* currentInstance;
     
 private:
     void initSubSystems();

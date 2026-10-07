@@ -11,16 +11,34 @@
 #include "ShaderVariant.h"
 #include "Camera.h"
 
+#include "Sky.h"
+#include "Grid.h"
+#include "SpriteRenderer.h"
+#include "DecalManager.h"
+#include "GizmoRender.h"
+#include "GameUI.h"
+
+#include "Viewport.h"
+#include "FrameBuffer.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
 #include <vector>
 
+static Sky g_sky;
+
+// Вообще отрисовку сетки надо перенести в GizmoRenderer, но пока что тут
+static Grid g_grid;
+
 namespace RenderDevice {
     
-    std::vector<RenderCommand> opaquePass;
-    std::vector<RenderCommand> transparentPass;
+//    std::vector<RenderCommand> opaquePass;
+//    std::vector<RenderCommand> transparentPass;
+    
+    // Хранилище проходов для текущего кадра
+    static std::vector<RenderView> registeredViews;
     
     static Shader generic;
     static ShaderVariant flat_shader;
@@ -56,7 +74,8 @@ namespace RenderDevice {
             normalTextureId = makeTexture(1, 1, true, true, pixels);
         }
         
-        
+        g_sky.init();
+        g_grid.init();
         
 //        shCoefficients[0] = glm::vec3(0.43233, 0.219065, 0.161589);
 //        shCoefficients[1] = glm::vec3(0.250797, 0.106321, 0.0464793);
@@ -128,19 +147,7 @@ namespace RenderDevice {
         return id;
     }
     
-    void submit(RenderCommand cmd)
-    {
-        if (cmd.blendMode == BlendMode::Transparent || cmd.blendMode == BlendMode::Add)
-        {
-            transparentPass.push_back(cmd);
-        }
-        else
-        {
-            opaquePass.push_back(cmd);
-        }
-    }
-    
-    void draw(glm::mat4& viewProj, std::vector<RenderCommand>& commands)
+    void draw(glm::mat4& viewProj, const std::vector<RenderCommand>& commands)
     {
         handle_t lastVAO = -1;
         handle_t lastIBO = -1;
@@ -253,33 +260,95 @@ namespace RenderDevice {
         }
     }
     
-    void startFrame()
+    void submitView(const RenderView& view)
     {
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
-        
-        glClearColor(0.01, 0.01, 0.01, 1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        registeredViews.push_back(view);
     }
     
-    void commit(Camera* camera)
+    void flush()
     {
-        if (camera == nullptr) return;
+        if (registeredViews.empty()) return;
         
-        glm::mat4x4 viewProj = camera->projection * camera->view;
+        // 1. Сортируем зарегистрированные проходы по их depth
+        std::sort(registeredViews.begin(), registeredViews.end(), [](const RenderView& a, const RenderView& b) {
+            return a.depth < b.depth;
+        });
         
-        glDepthMask(GL_TRUE);
-        draw(viewProj, opaquePass);
+        // 2. Прогоняем каждый проход рендера
+        for (const auto& view : registeredViews)
+        {
+            if (view.targetFrameBuffer)
+            {
+                view.targetFrameBuffer->bind();
+            }
+            else
+            {
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            }
+            
+            // Настройка очистки буферов
+            if (view.clearDepthOnly)
+            {
+                glEnable(GL_DEPTH_TEST);
+                glClear(GL_DEPTH_BUFFER_BIT);
+            }
+            else
+            {
+                glEnable(GL_DEPTH_TEST);
+                glDepthFunc(GL_LESS);
+                glClearColor(0.01, 0.01, 0.01, 1);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            
+            if (view.drawSkybox && !view.clearDepthOnly)
+            {
+                g_sky.draw(view.viewMatrix, view.projectionMatrix);
+            }
+            
+            if (view.drawGrid)
+            {
+                g_grid.draw();
+            }
+            
+            glm::mat4x4 viewProj = view.projectionMatrix * view.viewMatrix;
+            
+            // Отрисовываем накопленную геометрию сцены
+            glDepthMask(GL_TRUE);
+            draw(viewProj, view.opaquePass);
+            
+            glDepthMask(GL_FALSE);
+            draw(viewProj, view.transparentPass);
+            glDepthMask(GL_TRUE);
+            
+            // Отрисовка сопутствующих систем
+            SpriteRenderer::Flush(view.viewMatrix, view.projectionMatrix);
+            DecalManager::Flush(view.viewMatrix, view.projectionMatrix);
+            
+            if (view.drawGizmos)
+            {
+                GizmoRender::Get().Flush(view.viewMatrix, view.projectionMatrix);
+            }
+            
+            // FIXME: Resize должен быть не тут
+            {
+                int width = view.targetFrameBuffer->getWidth();
+                int height = view.targetFrameBuffer->getHeight();
+                GameUI::Resize(width, height);
+                GameUI::Flush();
+            }
+            
+            if (view.targetFrameBuffer)
+            {
+                view.targetFrameBuffer->unbind();
+            }
+        }
         
-        glDepthMask(GL_FALSE);
-        draw(viewProj, transparentPass);
+        // Возвращаем дефолтный буфер и очищаем команды
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        registeredViews.clear();
         
-        glDepthMask(GL_TRUE);
-    }
-    
-    void endFrame()
-    {
-        opaquePass.clear();
-        transparentPass.clear();
+        GizmoRender::Get().Clear();
+        SpriteRenderer::Clear();
+        GameUI::Clear();
     }
 }

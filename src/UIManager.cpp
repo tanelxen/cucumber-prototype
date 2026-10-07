@@ -84,6 +84,11 @@ void UIManager::update(float dt)
     }
 }
 
+void UIManager::preRender()
+{
+    m_pViewportPanel->preRender();
+}
+
 void UIManager::draw()
 {
     glEnable(GL_FRAMEBUFFER_SRGB);
@@ -115,14 +120,6 @@ void UIManager::draw()
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
-
-
-//// FIXME: Это жуткий костыль
-//void UIManager::setScene(WorldScene *scene)
-//{
-//    m_pScenePanel->setScene(scene);
-//    scene->m_pAttachedViewport = m_pMainView;
-//}
 
 void UIManager::init(struct GLFWwindow *window)
 {
@@ -227,7 +224,7 @@ void UIManager::drawMenuBar()
         {
             if (ImGui::MenuItem("Load")) {
                 char const * filter[3] = { "*.json", "*.scene", "*.prefab" };
-                const char* path = tinyfd_openFileDialog("Open Scene or Prefab", "./assets/", 3, filter, NULL, 0);
+                const char* path = tinyfd_openFileDialog("Open Scene or Prefab", "./assets/scenes/", 3, filter, NULL, 0);
                 if (path != nullptr) SceneManager::Get().openFile(path);
             }
             

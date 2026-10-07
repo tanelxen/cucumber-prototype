@@ -564,7 +564,7 @@ bool SceneSerializer::LoadSceneFromMemory(WorldScene* scene, const nlohmann::jso
         else
         {
             std::string name = entityJson.value("name", "Unnamed_Entity");
-            std::cout << "Load " << name << std::endl;
+//            std::cout << "Load " << name << std::endl;
             
             auto entity = std::make_unique<Entity>(name);
             entity->uid = entityJson.at("uid").get<UID>();

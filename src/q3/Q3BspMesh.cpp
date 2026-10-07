@@ -206,7 +206,7 @@ void Q3BspMesh::initBuffers()
     m_vao->setIndexBuffer(m_indexBuffer.get());
 }
 
-void Q3BspMesh::draw()
+void Q3BspMesh::draw(RenderView& view)
 {
     for (auto surface : m_lightmapped)
     {
@@ -234,7 +234,7 @@ void Q3BspMesh::draw()
             .reverseWinding = true,
         };
         
-        RenderDevice::submit(cmd);
+        view.submit(cmd);
     }
     
     for (auto surface : m_vertexlit)
@@ -260,7 +260,7 @@ void Q3BspMesh::draw()
             .reverseWinding = true,
         };
         
-        RenderDevice::submit(cmd);
+        view.submit(cmd);
     }
 }
 

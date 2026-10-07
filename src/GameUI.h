@@ -59,6 +59,7 @@ namespace GameUI {
     
     // Отрисовка всего накопленного и очистка буферов (вызывать в конце кадра)
     void Flush();
+    void Clear();
 }
 
 namespace GameUI {

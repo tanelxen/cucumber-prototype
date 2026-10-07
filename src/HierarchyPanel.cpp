@@ -6,16 +6,20 @@
 //
 
 #include "HierarchyPanel.h"
+#include "UIManager.h"
 
 #include "SceneManager.h"
+#include "SceneSerializer.h"
 #include "World.h"
 #include "Entity.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 
-std::vector<Entity*> rootEntities {};
-Entity* selectedEntity;
+#include "../vendor/tinyfiledialogs.h"
+
+static std::vector<Entity*> rootEntities {};
+static Entity* selectedEntity;
 
 HierarchyPanel::HierarchyPanel() : EditorPanel("Hierarchy")
 {
@@ -26,7 +30,8 @@ void HierarchyPanel::draw()
 {
     auto activeScene = SceneManager::Get().getActiveScene();
     
-    if (!activeScene) {
+    if (!activeScene)
+    {
         ImGui::Begin("Hierarchy"); ImGui::Text("No active scene"); ImGui::End();
         return;
     }
@@ -39,9 +44,34 @@ void HierarchyPanel::draw()
         auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
         entity->scene = activeScene;
         
+        selectedEntity = entity.get();
+        g_UIManager->setEntity(selectedEntity);
+        
         activeScene->m_entities.push_back(std::move(entity));
-        activeScene->selectEntityAtIndex(count);
-//        selectedIndex = count;
+    }
+    
+    ImGui::SameLine();
+    
+    if (ImGui::Button("Add Prefab"))
+    {
+        char const * filter[2] = { "*.json", "*.prefab" };
+        const char* path = tinyfd_openFileDialog("Load Prefab", "./assets/prefabs/", 2, filter, NULL, 0);
+        
+        if (path != nullptr)
+        {
+            auto count = (int)activeScene->m_entities.size();
+            
+            std::filesystem::path project_root = std::filesystem::current_path();
+            auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
+            
+            auto entity = SceneSerializer::InstantiatePrefab(activeScene, rel_path);
+            
+            if (entity)
+            {
+                selectedEntity = entity;
+                g_UIManager->setEntity(selectedEntity);
+            }
+        }
     }
     
     ImGui::Separator();
@@ -66,12 +96,16 @@ void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& sel
     
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
     
-//    if (selectedIndex == -1) {
-//        flags |= ImGuiTreeNodeFlags_Selected;
-//    }
+    if (selectedEntity == nullptr) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
     
     if (ImGui::TreeNodeEx(&rootEntities, flags, "Scene"))
     {
+        if (ImGui::IsItemClicked()) {
+            selectedEntity = nullptr;
+            g_UIManager->setEntity(selectedEntity);
+        }
         
         // Отрисовываем только корневые сущности (у которых нет родителя)
         for (Entity* entity : rootEntities) {
@@ -107,11 +141,17 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     if (entity->children.empty())  flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
     
     // Отрисовываем узел дерева
-    bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, "%s", entity->m_name.c_str());
+    bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, entity->isPrefabRoot ? "[P] %s" : "%s", entity->m_name.c_str());
     
-    // Клик — выделение объекта
-    if (ImGui::IsItemClicked()) {
+//    // Клик — выделение объекта
+//    if (ImGui::IsItemClicked()) {
+//        selectedEntity = entity;
+//    }
+    
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
+    {
         selectedEntity = entity;
+        g_UIManager->setEntity(selectedEntity);
     }
     
     // --- 1. DRAG-N-DROP: ИСТОЧНИК (Тащим этот объект) ---
@@ -133,6 +173,40 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
             }
         }
         ImGui::EndDragDropTarget();
+    }
+    
+    if (ImGui::BeginPopupContextItem())
+    {
+        if (ImGui::MenuItem("Удалить объект"))
+        {
+            selectedEntity->destroy();
+            selectedEntity = nullptr;
+            g_UIManager->setEntity(selectedEntity);
+        }
+        
+        // Если этот объект на сцене пришел из префаба — даем возможность его открыть!
+        if (selectedEntity && !selectedEntity->prefabAssetPath.empty() && ImGui::MenuItem("Редактировать префаб"))
+        {
+            // Открываем префаб, сцена уровня автоматически скрывается в бэкграунд!
+            SceneManager::Get().enterPrefabEditMode(selectedEntity->prefabAssetPath);
+        }
+        
+        if (ImGui::MenuItem("Сохранить как префаб"))
+        {
+            char const * filter[2] = { "*.prefab", "*.json" };
+            const char* path = tinyfd_saveFileDialog("Save Prefab", "./assets/prefabs/", 2, filter, NULL);
+            
+            if (path != nullptr)
+            {
+                std::filesystem::path project_root = std::filesystem::current_path();
+                auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
+                
+                auto activeScene = SceneManager::Get().getActiveScene();
+                SceneSerializer::CreatePrefabFromEntity(activeScene, selectedEntity, rel_path);
+            }
+        }
+        
+        ImGui::EndPopup();
     }
     
     // Рекурсивный вызов для отрисовки детей, если папка раскрыта

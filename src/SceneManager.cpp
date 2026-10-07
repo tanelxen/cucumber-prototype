@@ -28,7 +28,6 @@ void SceneManager::createNewScene(const std::string& name)
     m_activeScene = std::make_unique<WorldScene>();
     m_activeScene->m_type = SceneType::Level;
     m_activeScene->m_filePath = name;
-    m_activeScene->m_pAttachedViewport = g_UIManager->getMainViewport();
 }
 
 void SceneManager::openFile(const std::string& filePath)
@@ -38,7 +37,6 @@ void SceneManager::openFile(const std::string& filePath)
     if (SceneSerializer::LoadFile(newScene.get(), filePath))
     {
         m_activeScene = std::move(newScene);
-        m_activeScene->m_pAttachedViewport = g_UIManager->getMainViewport();
     }
 }
 
@@ -81,7 +79,6 @@ void SceneManager::enterPrefabEditMode(const std::string& prefabPath)
     
     // 2. Загружаем префаб как изолированную сцену
     auto prefabScene = std::make_unique<WorldScene>();
-    prefabScene->m_pAttachedViewport = g_UIManager->getMainViewport();
     
     if (SceneSerializer::LoadFile(prefabScene.get(), prefabPath))
     {
@@ -104,7 +101,6 @@ void SceneManager::exitPrefabEditMode()
     if (SceneSerializer::LoadSceneFromMemory(m_savedLevelScene.get(), s_levelSnapshot))
     {
         m_activeScene = std::move(m_savedLevelScene);
-        m_activeScene->m_pAttachedViewport = g_UIManager->getMainViewport();
     }
     
     s_levelSnapshot.clear();
@@ -117,7 +113,7 @@ void SceneManager::exitPrefabEditMode()
 // =================================================================
 void SceneManager::startSimulation(class Viewport* viewport)
 {
-    if (!m_activeScene || m_activeScene->m_isSimulationMode) return;
+    if (!m_activeScene || m_activeScene->isSimulationMode()) return;
     
     std::cout << "[SceneManager] Создание снапшота сцены и запуск симуляции..." << std::endl;
     
@@ -131,7 +127,7 @@ void SceneManager::startSimulation(class Viewport* viewport)
 
 void SceneManager::stopSimulation()
 {
-    if (!m_activeScene || !m_activeScene->m_isSimulationMode) return;
+    if (!m_activeScene || !m_activeScene->isSimulationMode()) return;
     
     std::cout << "[SceneManager] Остановка симуляции и восстановление сцены..." << std::endl;
     
@@ -142,8 +138,7 @@ void SceneManager::stopSimulation()
     if (SceneSerializer::LoadSceneFromMemory(restoredScene.get(), s_levelSnapshot))
     {
         m_activeScene = std::move(restoredScene);
-        m_activeScene->m_pAttachedViewport = g_UIManager->getMainViewport();
-        m_activeScene->m_isSimulationMode = false; // Возвращаем режим редактора
+        m_activeScene->stopSimulation(); // Возвращаем режим редактора
     }
     
     s_levelSnapshot.clear();

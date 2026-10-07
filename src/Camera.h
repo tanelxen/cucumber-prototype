@@ -5,18 +5,6 @@
 #pragma once
 #include <glm/glm.hpp>
 
-//struct Ray
-//{
-//    glm::vec3 origin;
-//    glm::vec3 dir;
-//};
-//
-//struct Plane
-//{
-//    glm::vec3 normal;
-//    float distance;
-//};
-
 class Camera
 {
 public:
@@ -26,12 +14,13 @@ public:
     void setAspectRatio(float aspectRatio);
     
     glm::vec3 getPosition() const;
-//    Ray getMousePosInWorld() const;
     
     glm::vec3 getForward() const { return m_forward; }
 
     glm::mat4x4 projection;
     glm::mat4x4 view;
+    
+    float fov = 55.0f;
 
 private:
     glm::vec3 m_position;

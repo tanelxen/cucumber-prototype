@@ -7,40 +7,52 @@
 
 #pragma once
 #include <memory>
+#include <glm/glm.hpp>
 
 class Camera;
 class FrameBuffer;
+class RenderView;
 
 class Viewport
 {
 public:
-    Viewport();
+    // По умолчанию рендерим в FBO
+    Viewport(bool isRenderTarget = true);
     ~Viewport() = default;
     
     void init();
-    void setCamera(Camera* camera);
+    
     void resize(int width, int height);
-//    void updateBounds(float minX, float minY, float maxX, float maxY);
     
     void bind();
     void unbind();
     
-    int getWidth() { return m_width; }
-    int getHeight() { return m_height; }
-    int getTexture();
+    // Генерирует готовый RenderView для рендеринга сцены
+    RenderView createRenderView();
     
-    Camera* getCamera() { return m_camera; }
+    // Математическая задача: Вычисление луча из пикселя мыши в 3D мир
+    void screenPointToRay(const glm::vec2& mousePos, glm::vec3& outStart, glm::vec3& outDir) const;
     
-//    glm::vec2 getMousePosition();
+    // Геттеры
+    int getWidth() const { return m_width; }
+    int getHeight() const { return m_height; }
+    float getAspectRatio() const { return (float)m_width / (float)m_height; }
+    int getTexture() const;
+    
+    void setCamera(Camera* camera);
+    Camera* getCamera() { return m_pCurrentCamera; }
+    FrameBuffer* getFrameBuffer() { return m_frameBuffer.get(); }
+    
+    bool drawSkybox = true;
+    bool drawGizmos = false;
+    bool drawGrid = false;
     
 private:
     std::unique_ptr<FrameBuffer> m_frameBuffer;
+    Camera* m_pCurrentCamera = nullptr;
     
-    int m_width = 1;
-    int m_height = 1;
-    
-//    glm::vec2 minBounds;
-//    glm::vec2 maxBounds;
-    
-    Camera* m_camera;
+    bool m_isRenderTarget = false;
+    int m_width = 1280;
+    int m_height = 720;
 };
+
