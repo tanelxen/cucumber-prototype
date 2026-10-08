@@ -106,7 +106,6 @@ void FrameBuffer::bind()
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
     glViewport(0, 0, static_cast<int>(m_width * m_scale), static_cast<int>(m_height * m_scale));
     
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_FRAMEBUFFER_SRGB);
 }
 

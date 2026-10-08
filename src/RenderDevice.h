@@ -71,6 +71,17 @@ namespace ShaderFeature
     constexpr FeatureMask HasLightMap     = 1 << 5;
 }
 
+namespace Layers
+{
+    const uint32_t Default    = 1 << 0; // 1  (Обычные объекты мира)
+    const uint32_t Static     = 1 << 1; // 2  (BSP геометрия, стены)
+    const uint32_t Weapon     = 1 << 2; // 4  (Оружие в руках игрока)
+    const uint32_t Transparent= 1 << 3; // 8  (Стекла, частицы)
+    const uint32_t UI         = 1 << 4; // 16 (Внутриигровой интерфейс)
+    
+    const uint32_t Everything = 0xFFFFFFFF;
+}
+
 struct RenderCommand
 {
     // Mesh

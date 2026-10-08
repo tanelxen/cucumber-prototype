@@ -25,17 +25,41 @@ struct CameraComponent : public Component
     
     float fov = 55.0f;
     
-    bool isOverlay = false;
-    
     const std::string getTypeName() const override { return "CameraComponent"; }
     
     void save(nlohmann::json& j) const override
     {
+        j["current"] = m_isCurrent;
+        
+        j["clearDepthOnly"] = clearDepthOnly;
+        j["cullingMask"] = cullingMask;
+        j["depth"] = depth;
+        
         j["fov"] = fov;
     }
     
     void load(const nlohmann::json& j) override
     {
+        if(j.contains("current"))
+        {
+            m_isCurrent = j.at("current");
+        }
+        
+        if(j.contains("clearDepthOnly"))
+        {
+            clearDepthOnly = j.at("clearDepthOnly");
+        }
+        
+        if(j.contains("cullingMask"))
+        {
+            cullingMask = j.at("cullingMask");
+        }
+        
+        if(j.contains("depth"))
+        {
+            depth = j.at("depth");
+        }
+        
         if(j.contains("fov"))
         {
             fov = j.value("fov", 55.f);

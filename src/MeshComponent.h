@@ -8,6 +8,7 @@
 #pragma once
 
 #include "Component.h"
+#include "RenderDevice.h"
 #include "Mesh.h"
 
 struct MeshComponent : public Component
@@ -17,15 +18,26 @@ struct MeshComponent : public Component
     std::shared_ptr<Mesh> mesh;
     std::vector<std::shared_ptr<Material>> materials;
     
+    uint32_t layer = Layers::Default;
+    
     const std::string getTypeName() const override { return "MeshComponent"; }
     
     void save(nlohmann::json& j) const override
     {
-        j = nlohmann::json{ {"source_glb", path} };
+        j["source_glb"] = path;
+        j["layer"] = layer;
     }
     
     void load(const nlohmann::json& j) override
     {
-        path = j.at("source_glb");
+        if(j.contains("source_glb"))
+        {
+            path = j.at("source_glb");
+        }
+        
+        if(j.contains("layer"))
+        {
+            layer = j.at("layer");
+        }
     }
 };

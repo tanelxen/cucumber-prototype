@@ -40,6 +40,8 @@
 
 std::vector<std::string> GetAvailableScriptClasses();
 
+static void DrawCollisionBits(const char* label, uint32_t& bitmask);
+
 class ComponentInspector
 {
 public:
@@ -163,6 +165,7 @@ static void RegisterUI()
         
         if (comp->mesh) {
             ImGui::Checkbox("Skybox ambient", &comp->mesh->m_useAmbientLight);
+            DrawCollisionBits("Layer", comp->layer);
         }
         
         if (comp->mesh && !comp->mesh->m_surfaces.empty())
@@ -288,6 +291,9 @@ static void RegisterUI()
     inspector.Register<CameraComponent>("Camera", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<CameraComponent*>(c);
         ImGui::DragFloat("Field of view##Camera", &comp->fov, 10.f, 30.0f, 100.0f, "%.0f");
+        DrawCollisionBits("Culling Mask", comp->cullingMask);
+        ImGui::Checkbox("Clear Depth Only", &comp->clearDepthOnly);
+        ImGui::DragFloat("Depth##Camera", &comp->depth, 1.f, 0.0f, 100.0f, "%.0f");
     });
 }
 

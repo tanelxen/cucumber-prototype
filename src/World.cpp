@@ -170,17 +170,19 @@ void WorldScene::prepareRenderViews()
         // Прогоняем стек игровых камер
         for (auto* cameraComp : activeCameras)
         {
+            // Принудительно синхронизируем аспект камеры с размером вьюпорта,
+            // в который она сейчас будет рисовать
+            if (m_pGameplayViewport)
+            {
+                cameraComp->m_camera.setAspectRatio(m_pGameplayViewport->getAspectRatio());
+            }
+            
             RenderView gameView;
             gameView.viewMatrix = cameraComp->m_camera.view;
             gameView.projectionMatrix = cameraComp->m_camera.projection;
             gameView.clearDepthOnly = cameraComp->clearDepthOnly;
             gameView.cullingMask = cameraComp->cullingMask;
             gameView.depth = cameraComp->depth;
-            
-            if (cameraComp->isOverlay) {
-                gameView.clearDepthOnly = true;
-                gameView.cullingMask = 1 << 0;
-            }
             
             // Направляем вывод игровой камеры в FBO панели редактора
             if (m_pGameplayViewport)
@@ -204,20 +206,25 @@ void WorldScene::prepareRenderViews()
 
 void WorldScene::collectRenderCommands(RenderView& view)
 {
-    g_mesh.draw(view);
+    if (Layers::Static & view.cullingMask)
+    {
+        g_mesh.draw(view);
+    }
     
     for (auto& entity : m_entities)
     {
         if (!entity->m_isActive) continue;
         
-        // ПРОВЕРКА МАСКИ ВИДИМОСТИ (Culling)
-        // Предположим, у Entity есть поле layer. Если камера его не видит — пропускаем весь сбор.
-        // if ((entity->layer & view.cullingMask) == 0) continue;
-        
         auto meshComp = entity->getComponent<MeshComponent>();
         
         if (meshComp && meshComp->mesh)
         {
+            // Проверяем слой конкретного МЕША
+            if ((meshComp->layer & view.cullingMask) == 0)
+            {
+                continue; // Этот меш текущая камера не видит, пропускаем
+            }
+            
             auto worldMatrix = entity->getTransform().getWorldMatrix();
             
             auto animator = entity->getComponent<AnimatorComponent>();
