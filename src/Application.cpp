@@ -21,9 +21,6 @@
 #include "World.h"
 #include "Input.h"
 
-#include "CameraComponent.h"
-#include "Viewport.h"
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -143,46 +140,15 @@ void Application::run()
 
 void Application::updateInputState()
 {
-    static bool isFirstFrame = true;
-    
-    for (int i = 32; i < 256; ++i)
-    {
-        Input::getInstance().prev_keys[i] = Input::getInstance().keys[i];
-        Input::getInstance().keys[i] = glfwGetKey(m_pWindow, i) > GLFW_RELEASE;
-    }
-    
-    Input::getInstance().m_prevLeftMouseButtonState = Input::getInstance().m_currLeftMouseButtonState;
-    Input::getInstance().m_prevRightMouseButtonState = Input::getInstance().m_currRightMouseButtonState;
-    
-    Input::getInstance().m_currLeftMouseButtonState = glfwGetMouseButton(m_pWindow, GLFW_MOUSE_BUTTON_LEFT) > GLFW_RELEASE;
-    Input::getInstance().m_currRightMouseButtonState = glfwGetMouseButton(m_pWindow, GLFW_MOUSE_BUTTON_RIGHT) > GLFW_RELEASE;
-    
-    
-    
-    double mouseX, mouseY;
-    glfwGetCursorPos(m_pWindow, &mouseX, &mouseY);
-    
-    if (isFirstFrame)
-    {
-        Input::getInstance().m_mouseOffsetX = 0;
-        Input::getInstance().m_mouseOffsetY = 0;
-    }
-    else
-    {
-        Input::getInstance().m_mouseOffsetX = mouseX - Input::getInstance().m_mouseX;
-        Input::getInstance().m_mouseOffsetY = mouseY - Input::getInstance().m_mouseY;
-    }
-    
-    Input::getInstance().m_mouseX = mouseX;
-    Input::getInstance().m_mouseY = mouseY;
-    
-    isFirstFrame = false;
+    Input::update(m_pWindow);
 }
 
 void Application::setCursorEnabled(bool state)
 {
     if(s_currentInstance == nullptr) return;
-    
+
+    s_currentInstance->m_cursorEnabled = state;
+
     if (state)
     {
         ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;

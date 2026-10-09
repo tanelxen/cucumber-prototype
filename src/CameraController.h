@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <memory>
 #include <glm/glm.hpp>
+#include "Input.h"
 
 class Camera;
 
@@ -17,7 +17,7 @@ class CameraController
 public:
     CameraController(Camera* camera);
     
-    void update(float dt);
+    void update(float dt, const Input::State& input);
     
     glm::vec3 position = {0, 0, 0};
     

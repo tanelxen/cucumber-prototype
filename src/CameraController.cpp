@@ -10,7 +10,6 @@
 #include "CameraController.h"
 
 #include "Input.h"
-#include "Application.h"
 #include "Camera.h"
 
 #include "AudioSystem.h"
@@ -22,20 +21,20 @@ CameraController::CameraController(Camera *camera) : m_pCamera(camera)
     
 }
 
-void CameraController::update(float dt)
+void CameraController::update(float dt, const Input::State& input)
 {
-    if (Input::isRightMouseButtonPressed())
+    if (input.isRightMouseButtonPressed())
     {
-        Application::setCursorEnabled(false);
+        Input::setCursorEnabled(false);
         
-        yaw -= Input::getMouseOffsetX() * kMouseSense * dt;
-        pitch -= Input::getMouseOffsetY() * kMouseSense * dt;
+        yaw -= input.getMouseOffsetX() * kMouseSense * dt;
+        pitch -= input.getMouseOffsetY() * kMouseSense * dt;
         
         m_isFlyMode = true;
     }
     else
     {
-        Application::setCursorEnabled(true);
+        Input::setCursorEnabled(true);
         m_isFlyMode = false;
     }
     
@@ -63,32 +62,32 @@ void CameraController::update(float dt)
     
     if (m_isFlyMode)
     {
-        if (Input::isKeyPressed(KEY_W))
+        if (input.isKeyPressed(KEY_W))
         {
             forwardmove += 1;
         }
         
-        if (Input::isKeyPressed(KEY_S))
+        if (input.isKeyPressed(KEY_S))
         {
             forwardmove -= 1;
         }
         
-        if (Input::isKeyPressed(KEY_D))
+        if (input.isKeyPressed(KEY_D))
         {
             rightmove += 1;
         }
         
-        if (Input::isKeyPressed(KEY_A))
+        if (input.isKeyPressed(KEY_A))
         {
             rightmove -= 1;
         }
         
-        if (Input::isKeyPressed(KEY_SPACE))
+        if (input.isKeyPressed(KEY_SPACE))
         {
             upmove += 1;
         }
         
-        if (Input::isKeyPressed(GLFW_KEY_C))
+        if (input.isKeyPressed(GLFW_KEY_C))
         {
             upmove -= 1;
         }

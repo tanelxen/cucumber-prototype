@@ -19,6 +19,7 @@ struct Application
 private:
     struct GLFWwindow* m_pWindow;
     class UIManager* m_pUIManager;
+    bool m_cursorEnabled = true;
     
     void updateInputState();
     

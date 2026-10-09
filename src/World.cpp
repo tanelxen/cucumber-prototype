@@ -6,6 +6,7 @@
 //
 
 #include "World.h"
+#include "Input.h"
 
 #include "Application.h"
 #include "UIManager.h"
@@ -115,6 +116,7 @@ void WorldScene::startSimulation(Viewport* viewport)
 {
     m_pGameplayViewport = viewport;
     m_isSimulationMode = true;
+    Input::setGameInputRoutingEnabled(true);
     
     // 1. Ищем дефолтную камеру игрока
     for (auto* component : m_allComponents)
@@ -144,6 +146,7 @@ void WorldScene::startSimulation(Viewport* viewport)
 void WorldScene::stopSimulation()
 {
     m_isSimulationMode = false;
+    Input::setGameInputRoutingEnabled(false);
     m_pActiveCameraComponent = nullptr;
     m_pGameplayViewport = nullptr;
 }

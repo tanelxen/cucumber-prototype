@@ -7,7 +7,6 @@
 
 #include "UIManager.h"
 
-#include "Application.h"
 #include "RenderDevice.h"
 
 #include "ViewportPanel.h"
@@ -20,7 +19,6 @@
 
 #include "SceneManager.h"
 #include "World.h"
-
 #include "ScriptEngine.h"
 
 #include <imgui.h>

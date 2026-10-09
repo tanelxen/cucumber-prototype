@@ -11,12 +11,12 @@
 #include "RenderDevice.h"
 
 #include "CameraController.h"
-#include "CameraComponent.h"
 #include "Camera.h"
 
 #include "SceneManager.h"
 #include "World.h"
 #include "Entity.h"
+#include "Input.h"
 
 #include <glad/glad.h>
 #include <imgui.h>
@@ -49,19 +49,56 @@ void ViewportPanel::setEntity(Entity *entity)
 
 void ViewportPanel::update(float dt)
 {
-    auto activeScene = SceneManager::Get().getActiveScene();
-    if (!activeScene) return;
-    
-    // Проверяем, должна ли сейчас двигаться камера редактора
-    // Если идет игра И на сцене есть живая камера игрока — контроллер редактора отключается
-    if (activeScene->isSimulationMode() && activeScene->hasActiveSceneCamera())
+    if (!isVisible)
     {
-        // Камера игрока управляется своими игровыми скриптами (MovementComponent и т.д.)
+        m_hasImageBounds = false;
+        if (m_isGameplayInputSource) Input::setGameInputState({});
+        if (m_pCameraController->isFlyMode())
+        {
+            m_pCameraController->update(dt, {});
+        }
+        return;
+    }
+
+    const Input::State physicalInput = Input::getState();
+    const ImVec2 mousePosition = ImGui::GetIO().MousePos;
+    
+    const bool mouseInImage = m_hasImageBounds &&
+    mousePosition.x >= m_imageLeft && mousePosition.x < m_imageRight &&
+    mousePosition.y >= m_imageTop && mousePosition.y < m_imageBottom;
+    
+    const bool gameCursorCaptured = m_isGameplayInputSource && !Input::isCursorEnabled();
+    const bool cameraInputAvailable = mouseInImage || m_pCameraController->isFlyMode();
+    const Input::State panelInput = (cameraInputAvailable || gameCursorCaptured) ? physicalInput : Input::State{};
+
+    if (m_isGameplayInputSource)
+    {
+        Input::setGameInputState(panelInput);
+    }
+
+    auto activeScene = SceneManager::Get().getActiveScene();
+    if (!activeScene)
+    {
+        if (m_isGameplayInputSource) Input::setGameInputState({});
+        return;
+    }
+
+    if (m_isGameplayInputSource && !activeScene->isSimulationMode())
+    {
+        m_isGameplayInputSource = false;
+    }
+    
+    if (m_isGameplayInputSource &&
+        activeScene->isSimulationMode() &&
+        activeScene->hasActiveSceneCamera())
+    {
         return;
     }
     
-    // В противном случае (мы в редакторе ИЛИ в игре нет камеры) — камера редактора работает!
-    m_pCameraController->update(dt);
+    if (cameraInputAvailable)
+    {
+        m_pCameraController->update(dt, panelInput);
+    }
 }
 
 void ViewportPanel::preRender()
@@ -103,6 +140,8 @@ void ViewportPanel::draw()
     {
         if (DrawStopButton())
         {
+            m_isGameplayInputSource = false;
+            Input::setGameInputState({});
             SceneManager::Get().stopSimulation();
             m_viewport->setCamera(m_pCamera);
         }
@@ -111,6 +150,7 @@ void ViewportPanel::draw()
     {
         if (DrawPlayButton())
         {
+            m_isGameplayInputSource = true;
             SceneManager::Get().startSimulation(m_viewport);
         }
     }
@@ -144,7 +184,14 @@ void ViewportPanel::draw()
                  ImVec2(1, 0)
                  );
     
+    const ImVec2 viewportMin = ImGui::GetItemRectMin();
+    const ImVec2 viewportMax = ImGui::GetItemRectMax();
     m_isHovered = ImGui::IsItemHovered();
+    m_imageLeft = viewportMin.x;
+    m_imageTop = viewportMin.y;
+    m_imageRight = viewportMax.x;
+    m_imageBottom = viewportMax.y;
+    m_hasImageBounds = viewportMax.x > viewportMin.x && viewportMax.y > viewportMin.y;
     
     if (m_pCameraController->isFlyMode())
     {

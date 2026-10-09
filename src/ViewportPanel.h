@@ -36,7 +36,13 @@ private:
     class Camera* m_pCamera;
     class CameraController* m_pCameraController;
     
-    bool m_isHovered;
+    bool m_isHovered = false;
+    bool m_isGameplayInputSource = false;
+    bool m_hasImageBounds = false;
+    float m_imageLeft = 0;
+    float m_imageTop = 0;
+    float m_imageRight = 0;
+    float m_imageBottom = 0;
     
     float m_pendingWidth = 0;
     float m_pendingHeight = 0;

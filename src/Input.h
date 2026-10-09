@@ -13,8 +13,39 @@
 #define KEY_A 65
 #define KEY_D 68
 
+struct GLFWwindow;
+
 struct Input
 {
+    struct State
+    {
+        bool keys[256] = {};
+        bool previousKeys[256] = {};
+        bool leftMouseButtonPressed = false;
+        bool previousLeftMouseButtonPressed = false;
+        bool rightMouseButtonPressed = false;
+        bool previousRightMouseButtonPressed = false;
+        float mouseX = 0;
+        float mouseY = 0;
+        float mouseOffsetX = 0;
+        float mouseOffsetY = 0;
+
+        bool isKeyPressed(int keyNum) const;
+        bool isKeyClicked(int keyNum) const;
+        bool isLeftMouseButtonPressed() const;
+        bool isRightMouseButtonPressed() const;
+        bool isLeftMouseButtonClicked() const;
+        bool isRightMouseButtonClicked() const;
+        float getMouseOffsetX() const { return mouseOffsetX; }
+        float getMouseOffsetY() const { return mouseOffsetY; }
+        float getMousePositionX() const { return mouseX; }
+        float getMousePositionY() const { return mouseY; }
+    };
+
+    static State getState();
+    static void setGameInputState(const State& state);
+    static void setGameInputRoutingEnabled(bool enabled);
+
     static bool isKeyPressed(int keyNum);
     static bool isKeyClicked(int keyNum);
     
@@ -29,9 +60,10 @@ struct Input
     
     static float getMousePositionX();
     static float getMousePositionY();
-    
+
     static void setCursorEnabled(bool state);
-    
+    static bool isCursorEnabled();
+
 private:
     static Input& getInstance()
     {
@@ -39,20 +71,13 @@ private:
         return instance;
     }
     
-    // Only Application allows to update
+    static const State& getCurrentState();
+    static void update(GLFWwindow* defaultWindow);
+
     friend struct Application;
     
-    bool keys[256];
-    bool prev_keys[256];
-    
-    float m_mouseX = 0;
-    float m_mouseY = 0;
-    float m_mouseOffsetX = 0;
-    float m_mouseOffsetY = 0;
-    
-    bool m_prevLeftMouseButtonState;
-    bool m_currLeftMouseButtonState;
-    
-    bool m_prevRightMouseButtonState;
-    bool m_currRightMouseButtonState;
+    State m_physicalState;
+    State m_gameState;
+    bool m_gameInputRoutingEnabled = false;
+    bool m_cursorEnabled = true;
 };
