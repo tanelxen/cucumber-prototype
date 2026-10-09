@@ -222,7 +222,7 @@ void UIManager::drawMenuBar()
         
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Load")) {
+            if (ImGui::MenuItem("Load Scene or Prefab")) {
                 char const * filter[3] = { "*.json", "*.scene", "*.prefab" };
                 const char* path = tinyfd_openFileDialog("Open Scene or Prefab", "./assets/scenes/", 3, filter, NULL, 0);
                 if (path != nullptr) SceneManager::Get().openFile(path);
@@ -230,6 +230,17 @@ void UIManager::drawMenuBar()
             
             if (ImGui::MenuItem("Save")) {
                 SceneManager::Get().saveCurrent();
+            }
+            
+            if (ImGui::MenuItem("Save As..."))
+            {
+                char const * filter[3] = { "*.json", "*.scene", "*.prefab" };
+                const char* path = tinyfd_saveFileDialog("Save Prefab", "./assets/scenes/", 3, filter, NULL);
+                
+                if (path != nullptr)
+                {
+                    SceneManager::Get().saveCurrentAs(path);
+                }
             }
             
             ImGui::EndMenu();

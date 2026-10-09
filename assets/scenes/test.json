@@ -62,7 +62,6 @@
                 }
             ],
             "name": "Player",
-            "parent": "uid://<invalid>",
             "uid": "uid://favu1um0rhq6e"
         },
         {
@@ -88,7 +87,23 @@
                     "type": "TransformComponent"
                 },
                 {
-                    "data": null,
+                    "data": {
+                        "clearDepthOnly": false,
+                        "cullingMask": 4294967275,
+                        "current": true,
+                        "depth": 0.0,
+                        "fov": 60.0
+                    },
+                    "type": "CameraComponent"
+                },
+                {
+                    "data": {
+                        "clearDepthOnly": true,
+                        "cullingMask": 4294901780,
+                        "current": true,
+                        "depth": 1.0,
+                        "fov": 55.0
+                    },
                     "type": "CameraComponent"
                 }
             ],
@@ -120,6 +135,7 @@
                 },
                 {
                     "data": {
+                        "layer": 4,
                         "source_glb": "meshes/gltf/v_mp40.glb"
                     },
                     "type": "MeshComponent"
@@ -214,7 +230,6 @@
                 }
             ],
             "name": "Zombie",
-            "parent": "uid://<invalid>",
             "uid": "uid://htan0lx8hfj1x"
         },
         {
@@ -241,6 +256,7 @@
                 },
                 {
                     "data": {
+                        "layer": 1,
                         "source_glb": "meshes/gltf/hl_zombie.glb"
                     },
                     "type": "MeshComponent"
@@ -281,6 +297,7 @@
                 },
                 {
                     "data": {
+                        "layer": 1,
                         "source_glb": "meshes/gltf/health_l.glb"
                     },
                     "type": "MeshComponent"
@@ -314,7 +331,6 @@
                 }
             ],
             "name": "Medkit",
-            "parent": "uid://<invalid>",
             "uid": "uid://cjybsb6j18skk"
         },
         {
@@ -341,6 +357,7 @@
                 },
                 {
                     "data": {
+                        "layer": 1,
                         "source_glb": "meshes/gltf/am_9mm_m.glb"
                     },
                     "type": "MeshComponent"
@@ -374,10 +391,8 @@
                 }
             ],
             "name": "Ammo",
-            "parent": "uid://<invalid>",
             "uid": "uid://flg44ugrswn01"
         }
     ],
-    "type": "scene",
-    "name": "test"
+    "type": "scene"
 }

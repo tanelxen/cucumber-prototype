@@ -40,6 +40,30 @@ void SceneManager::openFile(const std::string& filePath)
     }
 }
 
+void SceneManager::saveCurrentAs(const std::string& filename)
+{
+    if (!m_activeScene) return;
+    
+    if (m_activeScene->isPrefabContext())
+    {
+        Entity* rootEntity = nullptr;
+        
+        for (const auto& ent : m_activeScene->m_entities)
+        {
+            if (!ent->getParent()) { rootEntity = ent.get(); break; }
+        }
+        
+        if (rootEntity)
+        {
+            SceneSerializer::CreatePrefabFromEntity(m_activeScene.get(), rootEntity, filename);
+        }
+    }
+    else
+    {
+        SceneSerializer::SaveScene(m_activeScene.get(), filename);
+    }
+}
+
 void SceneManager::saveCurrent()
 {
     if (!m_activeScene || m_activeScene->m_filePath.empty()) return;

@@ -111,6 +111,43 @@ Camera* WorldScene::getEffectiveCamera(Viewport* panelViewport)
     return nullptr;
 }
 
+void WorldScene::startSimulation(Viewport* viewport)
+{
+    m_pGameplayViewport = viewport;
+    m_isSimulationMode = true;
+    
+    // 1. Ищем дефолтную камеру игрока
+    for (auto* component : m_allComponents)
+    {
+        if (auto* cameraComp = dynamic_cast<CameraComponent*>(component))
+        {
+            if (cameraComp->m_isCurrent)
+            {
+                m_pActiveCameraComponent = cameraComp;
+                
+                if (m_pGameplayViewport) {
+                    m_pGameplayViewport->setCamera(&cameraComp->m_camera);
+                }
+                
+                break;
+            }
+        }
+    }
+    
+    // 2. Запускаем старт всех скриптов
+    for (auto* component : m_allComponents)
+    {
+        component->start();
+    }
+}
+
+void WorldScene::stopSimulation()
+{
+    m_isSimulationMode = false;
+    m_pActiveCameraComponent = nullptr;
+    m_pGameplayViewport = nullptr;
+}
+
 void WorldScene::prepareRenderViews()
 {
     if (!m_isSimulationMode || !m_pGameplayViewport) return;
@@ -148,9 +185,8 @@ void WorldScene::prepareRenderViews()
     if (m_isSimulationMode)
     {
         std::vector<CameraComponent*> sceneCameras = getCameraComponents();
-        
-        // Фильтруем только активные в данный момент камеры
         std::vector<CameraComponent*> activeCameras;
+        
         for(auto* cam : sceneCameras) {
             if (cam->m_isCurrent) activeCameras.push_back(cam);
         }
@@ -167,36 +203,37 @@ void WorldScene::prepareRenderViews()
             return a->depth < b->depth;
         });
         
-        // Прогоняем стек игровых камер
+        // Создаем проход для каждой камеры
         for (auto* cameraComp : activeCameras)
         {
-            // Принудительно синхронизируем аспект камеры с размером вьюпорта,
-            // в который она сейчас будет рисовать
-            if (m_pGameplayViewport)
-            {
-                cameraComp->m_camera.setAspectRatio(m_pGameplayViewport->getAspectRatio());
-            }
+            // 1. ОПРЕДЕЛЯЕМ ЦЕЛЕВОЙ ВЬЮПОРТ ДЛЯ ЭТОЙ КАМЕРЫ
+            // Если у камеры есть свой кастомный вьюпорт (например, для Render-to-Texture монитора),
+            // она использует его. Иначе — падает на главный игровой вьюпорт.
+            Viewport* targetViewport = cameraComp->m_customViewport ? cameraComp->m_customViewport : m_pGameplayViewport;
+            
+            // Защита на случай, если вообще никакой вьюпорт не доступен
+            if (!targetViewport) continue;
+            
+            // 2. СИНХРОНИЗАЦИЯ: Камера настраивает свой аспект строго под тот вьюпорт, в который рисует!
+            cameraComp->m_camera.setAspectRatio(targetViewport->getAspectRatio());
             
             RenderView gameView;
-            gameView.viewMatrix = cameraComp->m_camera.view;
+            
+            // 3. Копируем матрицы и параметры из компонента
+            gameView.viewMatrix       = cameraComp->m_camera.view;
             gameView.projectionMatrix = cameraComp->m_camera.projection;
-            gameView.clearDepthOnly = cameraComp->clearDepthOnly;
-            gameView.cullingMask = cameraComp->cullingMask;
-            gameView.depth = cameraComp->depth;
+            gameView.clearDepthOnly   = cameraComp->clearDepthOnly;
+            gameView.cullingMask     = cameraComp->cullingMask;
+            gameView.depth           = cameraComp->depth;
             
-            // Направляем вывод игровой камеры в FBO панели редактора
-            if (m_pGameplayViewport)
-            {
-                gameView.targetFrameBuffer = m_pGameplayViewport->getFrameBuffer();
-                gameView.drawSkybox = m_pGameplayViewport->drawSkybox;
-                gameView.drawGrid = false;
-                gameView.drawGizmos = false;
-            }
-            else
-            {
-                gameView.targetFrameBuffer = nullptr; // В финальной сборке игры — на экран
-            }
+            // 4. Настройки вывода берем ИМЕННО из целевого вьюпорта
+            gameView.targetFrameBuffer = targetViewport->getFrameBuffer();
+            gameView.drawSkybox        = targetViewport->drawSkybox;
             
+            gameView.drawGrid          = false;
+            gameView.drawGizmos        = false;
+            
+            // 5. Собираем команды сцены
             collectRenderCommands(gameView);
             RenderDevice::submitView(gameView);
         }
@@ -355,43 +392,6 @@ void WorldScene::cleanupDeadEntities()
                          m_entities.end()
                          );
     }
-}
-
-void WorldScene::startSimulation(Viewport* viewport)
-{
-    m_pGameplayViewport = viewport;
-    m_isSimulationMode = true;
-    
-    // 1. Ищем дефолтную камеру игрока
-    for (auto* component : m_allComponents)
-    {
-        if (auto* cameraComp = dynamic_cast<CameraComponent*>(component))
-        {
-            if (cameraComp->m_isCurrent)
-            {
-                m_pActiveCameraComponent = cameraComp;
-                
-                if (m_pGameplayViewport) {
-                    m_pGameplayViewport->setCamera(&cameraComp->m_camera);
-                }
-                
-                break;
-            }
-        }
-    }
-    
-    // 2. Запускаем старт всех скриптов
-    for (auto* component : m_allComponents)
-    {
-        component->start();
-    }
-}
-
-void WorldScene::stopSimulation()
-{
-    m_isSimulationMode = false;
-    m_pActiveCameraComponent = nullptr;
-    m_pGameplayViewport = nullptr;
 }
 
 void WorldScene::awake()

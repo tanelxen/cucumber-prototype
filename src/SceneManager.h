@@ -24,6 +24,7 @@ public:
     
     void createNewScene(const std::string& name = "Untitled");
     void openFile(const std::string& filePath);
+    void saveCurrentAs(const std::string& filename);
     void saveCurrent();
     
     // Переключение режимов (вызывается из UI редактора)

@@ -360,7 +360,7 @@ void ScriptComponent::drawProperties()
 
 void ScriptComponent::getStateSnapshot(nlohmann::json& snapshot) const
 {
-    if (!m_ScriptObject) return snapshot;
+    if (!m_ScriptObject) return;
     
     asITypeInfo* type = m_ScriptObject->GetObjectType();
     

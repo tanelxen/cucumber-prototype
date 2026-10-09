@@ -330,6 +330,7 @@ namespace RenderDevice {
             }
             
             // FIXME: Resize должен быть не тут
+            if (view.cullingMask & Layers::UI)
             {
                 int width = view.targetFrameBuffer->getWidth();
                 int height = view.targetFrameBuffer->getHeight();

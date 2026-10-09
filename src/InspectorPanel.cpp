@@ -111,7 +111,6 @@ void InspectorPanel::setEntity(Entity *entity)
 
 void DrawTransformComponent(TransformComponent* transform);
 void DrawAudioComponentInspector(AudioComponent* component);
-void DrawScriptProperties(asITypeInfo* type);
 static void DrawCollisionComponent(CollisionComponent* comp);
 
 static void RegisterUI()
@@ -545,7 +544,7 @@ static void DrawCollisionBits(const char* label, uint32_t& bitmask)
             // Если бит активен — подсвечиваем кнопку
             if (isSet)
             {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.08f, 0.25f, 0.14f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.2f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.33f, 0.18f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.18f, 0.10f, 1.0f));
             }

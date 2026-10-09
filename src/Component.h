@@ -36,7 +36,7 @@ public:
     virtual void load(const nlohmann::json& inData) = 0;
     
     // Необходимо для связи с префабом
-    virtual nlohmann::json getExposedValue(const std::string& propName) { };
+    virtual nlohmann::json getExposedValue(const std::string& propName) { return {}; }
     virtual void setExposedValue(const std::string& propName, const nlohmann::json& value) { };
     
     virtual const std::string getTypeName() const = 0;

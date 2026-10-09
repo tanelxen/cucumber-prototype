@@ -461,6 +461,7 @@ namespace GameUI {
         
         glDepthMask(GL_FALSE);      // Отключаем запись в буфер глубины
         glDisable(GL_DEPTH_TEST);   // Отключаем чтение буфера глубины
+        glDisable(GL_CULL_FACE);
         
         // 1. Загружаем ОДИН РАЗ все вершины кадра на GPU
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -496,6 +497,9 @@ namespace GameUI {
         
         glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        
+        glDisable(GL_BLEND);
     }
     
     void Clear()

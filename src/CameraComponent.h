@@ -19,6 +19,8 @@ struct CameraComponent : public Component
     Camera m_camera;
     bool m_isCurrent = true;
     
+    Viewport* m_customViewport = nullptr;
+    
     bool clearDepthOnly = false;        // Нужно для оверлей-камер (оружие)
     uint32_t cullingMask = 0xFFFFFFFF;  // Какие слои рендерить
     float depth = 0.0f;                 // Очередь отрисовки (чем больше, тем позже рисуется)

@@ -234,7 +234,7 @@ void ScriptEngine::HotReloadAllScripts(const std::string& scriptsFolder)
     std::cout << "Starting Hot Reload..." << std::endl;
     
     auto activeScene = SceneManager::Get().getActiveScene();
-    if (!activeScene) return nullptr;
+    if (!activeScene) return;
     
     // 1. ШАГ: Сохраняем состояние ВСЕХ скриптов на сцене
     for (auto& entity : activeScene->m_entities)

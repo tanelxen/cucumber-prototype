@@ -78,7 +78,7 @@ UID::UID(const std::string& text)
         
         const uint8_t* slot = std::find(std::begin(UUID_BASE34_CHARACTERS), std::end(UUID_BASE34_CHARACTERS), c);
         if (slot == std::end(UUID_BASE34_CHARACTERS)) {
-            return UID::Invalid(); // Найден невалидный символ в строке
+            return; // Найден невалидный символ в строке
         }
         
         uint32_t index = std::distance(std::begin(UUID_BASE34_CHARACTERS), slot);
