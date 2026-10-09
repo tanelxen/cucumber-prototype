@@ -31,8 +31,10 @@ struct Input
         float mouseOffsetY = 0;
 
         bool isKeyPressed(int keyNum) const;
+        bool isKeyJustPressed(int keyNum) const;
         bool isKeyClicked(int keyNum) const;
         bool isLeftMouseButtonPressed() const;
+        bool isLeftMouseButtonJustPressed() const;
         bool isRightMouseButtonPressed() const;
         bool isLeftMouseButtonClicked() const;
         bool isRightMouseButtonClicked() const;
@@ -47,9 +49,11 @@ struct Input
     static void setGameInputRoutingEnabled(bool enabled);
 
     static bool isKeyPressed(int keyNum);
+    static bool isKeyJustPressed(int keyNum);
     static bool isKeyClicked(int keyNum);
     
     static bool isLeftMouseButtonPressed();
+    static bool isLeftMouseButtonJustPressed();
     static bool isRightMouseButtonPressed();
     
     static bool isLeftMouseButtonClicked();

@@ -16,6 +16,12 @@ bool Input::State::isKeyPressed(int keyNum) const
     return keys[keyNum];
 }
 
+bool Input::State::isKeyJustPressed(int keyNum) const
+{
+    if (keyNum < 0 || keyNum >= 256) return false;
+    return keys[keyNum] && !previousKeys[keyNum];
+}
+
 bool Input::State::isKeyClicked(int keyNum) const
 {
     if (keyNum < 0 || keyNum >= 256) return false;
@@ -25,6 +31,11 @@ bool Input::State::isKeyClicked(int keyNum) const
 bool Input::State::isLeftMouseButtonPressed() const
 {
     return leftMouseButtonPressed;
+}
+
+bool Input::State::isLeftMouseButtonJustPressed() const
+{
+    return leftMouseButtonPressed && !previousLeftMouseButtonPressed;
 }
 
 bool Input::State::isRightMouseButtonPressed() const
@@ -105,6 +116,11 @@ bool Input::isKeyPressed(int keyNum)
     return getCurrentState().isKeyPressed(keyNum);
 }
 
+bool Input::isKeyJustPressed(int keyNum)
+{
+    return getCurrentState().isKeyJustPressed(keyNum);
+}
+
 bool Input::isKeyClicked(int keyNum)
 {
     return getCurrentState().isKeyClicked(keyNum);
@@ -113,6 +129,11 @@ bool Input::isKeyClicked(int keyNum)
 bool Input::isLeftMouseButtonPressed()
 {
     return getCurrentState().isLeftMouseButtonPressed();
+}
+
+bool Input::isLeftMouseButtonJustPressed()
+{
+    return getCurrentState().isLeftMouseButtonJustPressed();
 }
 
 bool Input::isRightMouseButtonPressed()

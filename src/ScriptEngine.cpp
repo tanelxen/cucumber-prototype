@@ -632,6 +632,7 @@ void RegisterInputSystem(asIScriptEngine* engine)
     
     // Регистрируем глобальные функции внутри этого пространства имен
     r = engine->RegisterGlobalFunction("bool GetKey(KeyCode key)", asFUNCTION(Input::isKeyPressed), asCALL_CDECL); assert(r >= 0);
+    r = engine->RegisterGlobalFunction("bool GetKeyJustPressed(KeyCode key)", asFUNCTION(Input::isKeyJustPressed), asCALL_CDECL); assert(r >= 0);
     r = engine->RegisterGlobalFunction("bool GetKeyDown(KeyCode key)", asFUNCTION(Input::isKeyClicked), asCALL_CDECL); assert(r >= 0);
     
     // Регистрация позиции мыши (возвращает Vector3 по значению)
@@ -639,6 +640,7 @@ void RegisterInputSystem(asIScriptEngine* engine)
     r = engine->RegisterGlobalFunction("float GetMouseOffsetY()", asFUNCTION(Input::getMouseOffsetY), asCALL_CDECL); assert(r >= 0);
     
     r = engine->RegisterGlobalFunction("bool GetLeftMouseButtonPressed()", asFUNCTION(Input::isLeftMouseButtonPressed), asCALL_CDECL); assert(r >= 0);
+    r = engine->RegisterGlobalFunction("bool GetLeftMouseButtonJustPressed()", asFUNCTION(Input::isLeftMouseButtonJustPressed), asCALL_CDECL); assert(r >= 0);
     r = engine->RegisterGlobalFunction("bool GetLeftMouseButtonClicked()", asFUNCTION(Input::isLeftMouseButtonClicked), asCALL_CDECL); assert(r >= 0);
     
     r = engine->RegisterGlobalFunction("bool GetRightMouseButton()", asFUNCTION(Input::isRightMouseButtonPressed), asCALL_CDECL); assert(r >= 0);
