@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <vector>
 
-static Sky g_sky;
+//static Sky g_sky;
 
 // Вообще отрисовку сетки надо перенести в GizmoRenderer, но пока что тут
 static Grid g_grid;
@@ -74,18 +74,8 @@ namespace RenderDevice {
             normalTextureId = makeTexture(1, 1, true, true, pixels);
         }
         
-        g_sky.init();
+//        g_sky.init();
         g_grid.init();
-        
-//        shCoefficients[0] = glm::vec3(0.43233, 0.219065, 0.161589);
-//        shCoefficients[1] = glm::vec3(0.250797, 0.106321, 0.0464793);
-//        shCoefficients[2] = glm::vec3(0.30481, 0.187916, 0.128884);
-//        shCoefficients[3] = glm::vec3(-0.0314883, -0.0288192, -0.0495037);
-//        shCoefficients[4] = glm::vec3(-0.0538252, -0.0303336, -0.0321333);
-//        shCoefficients[5] = glm::vec3(0.156495, 0.0838068, 0.0351124);
-//        shCoefficients[6] = glm::vec3(0.193687, 0.110605, 0.065372);
-//        shCoefficients[7] = glm::vec3(-0.000409677, 0.012437, 0.0138015);
-//        shCoefficients[8] = glm::vec3(0.0474989, 0.0719414, 0.0850631);
     }
     
     handle_t getWhiteTexture() { return whiteTextureId; }
@@ -302,13 +292,13 @@ namespace RenderDevice {
             
             if (view.drawSkybox && !view.clearDepthOnly)
             {
-                g_sky.draw(view.viewMatrix, view.projectionMatrix);
+//                g_sky.draw(view.viewMatrix, view.projectionMatrix);
             }
             
-            if (view.drawGrid)
-            {
-                g_grid.draw();
-            }
+//            if (view.drawGrid)
+//            {
+//                g_grid.draw();
+//            }
             
             glm::mat4x4 viewProj = view.projectionMatrix * view.viewMatrix;
             

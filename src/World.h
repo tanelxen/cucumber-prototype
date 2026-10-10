@@ -78,7 +78,6 @@ public:
     bool isPrefabContext() const { return m_type == SceneType::Prefab; }
     
 public:
-    Camera* getEffectiveCamera(Viewport* panelViewport);
     void switchCamera(CameraComponent* newCameraComponent);
     
     bool hasActiveSceneCamera() const {

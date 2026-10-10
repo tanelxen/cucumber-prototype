@@ -8,20 +8,13 @@
 #include "World.h"
 #include "Input.h"
 
-#include "Application.h"
 #include "UIManager.h"
 
-#include "ModelLoader.h"
-
 #include "Entity.h"
-#include "ExposedProperty.h"
-#include "TransformComponent.h"
+
 #include "CollisionComponent.h"
-#include "MovementComponent.h"
-#include "AnimatorComponent.h"
-#include "ScriptComponent.h"
 #include "CameraComponent.h"
-#include "AudioComponent.h"
+#include "AnimatorComponent.h"
 #include "MeshComponent.h"
 
 #include "RenderDevice.h"
@@ -32,10 +25,6 @@
 
 #include "PhysicsCommon.h"
 
-#include "GameUI.h"
-
-#include "../vendor/json.hpp"
-
 #include <iostream>
 #include <fstream>
 
@@ -44,8 +33,6 @@
 // Скорее всего переедет в отдельную Entity
 static Q3BspMesh g_mesh;
 static Q3BspCollision g_collision;
-
-static std::unordered_map<std::string, nlohmann::json> g_prefabs;
 
 WorldScene::WorldScene()
 {
@@ -57,8 +44,18 @@ WorldScene::WorldScene()
         loadBSP("assets/wolf/maps/escape2.bsp");
         inited = true;
     }
+}
+
+void WorldScene::loadBSP(const std::string &filename)
+{
+    Q3BSPAsset bsp;
     
-//    g_currentScene = this;
+    if (!bsp.initFromFile(filename.c_str())) {
+        return;
+    }
+    
+    g_mesh.initFromBsp(&bsp);
+    g_collision.initFromBsp(&bsp);
 }
 
 WorldScene::~WorldScene() = default;
@@ -71,6 +68,14 @@ void WorldScene::clear()
     }
     
     g_UIManager->setEntity(nullptr);
+}
+
+void WorldScene::awake()
+{
+    for (auto& entity : m_entities)
+    {
+        entity->awake();
+    }
 }
 
 void WorldScene::update(float dt)
@@ -92,24 +97,6 @@ void WorldScene::update(float dt)
     
     cleanupDeadComponents();
     cleanupDeadEntities();
-}
-
-// Добавляем вспомогательный метод в WorldScene для симуляции дефолтной камеры
-Camera* WorldScene::getEffectiveCamera(Viewport* panelViewport)
-{
-    // Если мы в игре и у нас есть активная цепочка камер
-    if (m_isSimulationMode && m_pActiveCameraComponent)
-    {
-        return &m_pActiveCameraComponent->m_camera;
-    }
-    
-    // Если камера не найдена или мы в режиме редактирования — отдаем камеру редактора из панели
-    if (panelViewport)
-    {
-        return panelViewport->getCamera();
-    }
-    
-    return nullptr;
 }
 
 void WorldScene::startSimulation(Viewport* viewport)
@@ -310,18 +297,6 @@ Entity* WorldScene::findEntityByUID(const UID& uid)
     return (it != m_entities.end()) ? it->get() : nullptr;
 }
 
-void WorldScene::loadBSP(const std::string &filename)
-{
-    Q3BSPAsset bsp;
-    
-    if (!bsp.initFromFile(filename.c_str())) {
-        return;
-    }
-    
-    g_mesh.initFromBsp(&bsp);
-    g_collision.initFromBsp(&bsp);
-}
-
 void WorldScene::queueComponentDestruction(Component* component) {
     m_componentsToDestroy.push_back(component);
 }
@@ -397,12 +372,18 @@ void WorldScene::cleanupDeadEntities()
     }
 }
 
-void WorldScene::awake()
+std::vector<CameraComponent*> WorldScene::getCameraComponents()
 {
+    std::vector<CameraComponent*> cameraComponents;
+    
     for (auto& entity : m_entities)
     {
-        entity->awake();
+        if (!entity->m_isActive) continue;
+        
+        entity->getComponents(cameraComponents);
     }
+    
+    return cameraComponents;
 }
 
 void WorldScene::switchCamera(CameraComponent* newCameraComponent)
@@ -506,18 +487,4 @@ void WorldScene::trace(HitResult &result,
         result.startsolid = (closestFraction == 0.0f);
         result.allsolid = false; // Для динамических объектов рассчитывается индивидуально
     }
-}
-
-std::vector<CameraComponent*> WorldScene::getCameraComponents()
-{
-    std::vector<CameraComponent*> cameraComponents;
-    
-    for (auto& entity : m_entities)
-    {
-        if (!entity->m_isActive) continue;
-        
-        entity->getComponents(cameraComponents);
-    }
-    
-    return cameraComponents;
 }

@@ -143,11 +143,7 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     // Отрисовываем узел дерева
     bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, entity->isPrefabRoot ? "[P] %s" : "%s", entity->m_name.c_str());
     
-//    // Клик — выделение объекта
-//    if (ImGui::IsItemClicked()) {
-//        selectedEntity = entity;
-//    }
-    
+    // Умное выделение объекта с учетом, что это может быть просто drag-n-drop
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
     {
         selectedEntity = entity;
@@ -155,23 +151,28 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     }
     
     // --- 1. DRAG-N-DROP: ИСТОЧНИК (Тащим этот объект) ---
-    if (ImGui::BeginDragDropSource()) {
+    if (ImGui::BeginDragDropSource())
+    {
         ImGui::SetDragDropPayload("HIERARCHY_ENTITY", &entity, sizeof(Entity*));
         ImGui::Text("Move: %s", entity->m_name.c_str());
         ImGui::EndDragDropSource();
     }
     
     // --- 2. DRAG-N-DROP: ПРИЕМНИК (Бросаем ДРУГОЙ объект на этот) ---
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY")) {
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY"))
+        {
             Entity* draggedEntity = *static_cast<Entity**>(payload->Data);
             
             // Защита: объект не может стать родителем самого себя
             // И не может стать ребенком своего собственного ребенка (цикл)
-            if (draggedEntity && draggedEntity != entity && !IsChildOf(entity, draggedEntity)) {
+            if (draggedEntity && draggedEntity != entity && !IsChildOf(entity, draggedEntity))
+            {
                 draggedEntity->setParent(entity, true);
             }
         }
+        
         ImGui::EndDragDropTarget();
     }
     

@@ -78,6 +78,11 @@ void Entity::destroy()
         destroyComponent(component.get());
     }
     
+    for (auto& child : children)
+    {
+        child->setParent(nullptr, true);
+    }
+    
     // Ставим саму сущность в очередь Сцены на удаление в конце кадра
     scene->queueEntityDestruction(this);
 }
