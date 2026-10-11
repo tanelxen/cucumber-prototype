@@ -6,217 +6,665 @@
 //
 
 #include "AssetsPanel.h"
-#include "RenderDevice.h"
 
+#include <algorithm>
+#include <fstream>
+#include <cstring>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include "../vendor/stb_image.h"
+#include "../vendor/IconsMaterialDesignIcons.h"
 
-#include <filesystem>
-#include <set>
-
-//namespace fs = std::filesystem;
-//using Path = std::filesystem::path;
-//using std::filesystem::exists;
-
-const std::filesystem::path rootDir = ".";
-std::filesystem::path currentDir = "assets";
-std::set<std::filesystem::path> selected;
-
-static inline ImTextureID IconFolder;
-static inline ImTextureID IconFile;
-
-void ChangeDir(std::filesystem::path path)
+AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(ICON_MDI_FOLDER_STAR " Assets###Assets"), m_rootPath(std::filesystem::absolute(rootPath))
 {
-    currentDir = path;
-    selected.clear();
-}
-
-namespace GUI
-{
-    bool MenuBarButton(std::string_view title)
-    {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_MenuBarBg));
-        bool clicked = ImGui::Button(title.data());
-        ImGui::PopStyleColor();
-        return clicked;
-    }
+    std::memset(m_searchBuffer, 0, sizeof(m_searchBuffer));
+    std::memset(m_renameBuffer, 0, sizeof(m_renameBuffer));
     
-    bool Thumbnail(const char* name, ImTextureID icon, bool selected)
-    {
-        bool clicked = false;
-        ImVec2 itemSize = {80, 80};
-        float iconSize = 48;
-        float iconPadding = (itemSize.x - iconSize) * 0.5;
-        float textSize = ImGui::CalcTextSize(name).x;
-        float textPadding = (itemSize.x - textSize) * 0.5;
-        
-        ImGui::BeginGroup();
-        if (ImGui::Selectable((std::string("##") + name).c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick, itemSize)) {
-            clicked = true;
-        }
-        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - itemSize.y);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + iconPadding);
-        
-        if (icon != 0)
-            ImGui::Image(icon, {iconSize, iconSize});
-        
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + textPadding);
-        ImGui::TextUnformatted(name);
-        ImGui::EndGroup();
-        
-        return clicked;
-    }
+    m_extensionMap[".png"]  = AssetType::Texture;
+    m_extensionMap[".jpg"]  = AssetType::Texture;
+    m_extensionMap[".tga"]  = AssetType::Texture;
+    m_extensionMap[".glb"]  = AssetType::Mesh;
+    m_extensionMap[".gltf"] = AssetType::Mesh;
+    m_extensionMap[".wav"]  = AssetType::Audio;
+    m_extensionMap[".mp3"]  = AssetType::Audio;
+    m_extensionMap[".scene"] = AssetType::Scene;
+    m_extensionMap[".json"]  = AssetType::Scene;
+    m_extensionMap[".as"]   = AssetType::Script;
+    m_extensionMap[".glsl"]  = AssetType::Script;
+    
+    m_icons[AssetType::Folder]  = loadTextureFromFile("assets/icons/folder.png");
+    m_icons[AssetType::Unknown] = loadTextureFromFile("assets/icons/file_unknown.png");
+    m_icons[AssetType::Texture] = loadTextureFromFile("assets/icons/file_texture.png");
+    m_icons[AssetType::Mesh]    = loadTextureFromFile("assets/icons/file_mesh.png");
+    m_icons[AssetType::Audio]   = loadTextureFromFile("assets/icons/file_audio.png");
+    m_icons[AssetType::Scene]   = loadTextureFromFile("assets/icons/file_scene.png");
+    m_icons[AssetType::Script]  = loadTextureFromFile("assets/icons/file_script.png");
+    
+    refresh();
 }
 
-void DrawFiles()
+RenderDevice::handle_t AssetsPanel::loadTextureFromFile(const std::filesystem::path& path)
 {
-    // TODO: Cache directory file list
-//    for (auto file : std::filesystem::directory_iterator(currentDir))
-//    {
-//        auto path = file.path();
-//        bool dir = file.is_directory();
-//        
-//        if (GUI::Thumbnail(path.filename().string().c_str(), dir ? IconFolder : IconFile, selected.contains(path)))
-//        {
-//            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-//            {
-//                if (dir) {
-//                    ChangeDir(path);
-//                }
-//            }
-//            else
-//            {
-//                if (ImGui::GetIO().KeyCtrl) // Multi-select / deselect
-//                {
-//                    if (selected.contains(path))
-//                        selected.erase(path);
-//                    else
-//                        selected.insert(path);
-//                }
-//                else // Single selection
-//                {
-//                    selected.clear();
-//                    selected.insert(path);
-//                }
-//            }
-//        }
-//        ImGui::SameLine();
+    if (!std::filesystem::exists(path)) return 0;
+    
+    int width, height, channels;
+    unsigned char* data = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+    
+    if (!data) return 0;
+    
+    // Вне зависимости от каналов, запрашиваем 4 (RGBA) через stb_image, поэтому hasAlpha = true
+    RenderDevice::handle_t texture = RenderDevice::makeTexture(width, height, true, true, data);
+    
+    stbi_image_free(data);
+    return texture;
+}
+
+AssetsPanel::AssetType AssetsPanel::getAssetTypeFromExtension(const std::string& extension) const {
+    std::string extLower = extension;
+    std::transform(extLower.begin(), extLower.end(), extLower.begin(), ::tolower);
+    if (m_extensionMap.contains(extLower)) {
+        return m_extensionMap.at(extLower);
+    }
+    return AssetType::Unknown;
+}
+
+//void AssetsPanel::registerExtensionIcon(const std::string& extension, const std::filesystem::path& iconPath)
+//{
+//    RenderDevice::handle_t tex = loadTextureFromFile(iconPath);
+//    if (tex != 0) {
+//        m_assetIconMap[extension] = tex;
 //    }
+//}
+
+void AssetsPanel::draw() {
+    if (!isVisible) return;
     
-    int _cellSize = 80;
+    m_isHovered = false;
+    m_isFocused = false;
     
-    if (ImGui::BeginChild("##gallery", ImVec2(0, 0), false))
-    {
-        float panelWidth = ImGui::GetContentRegionAvail().x;
-        float cellWidth = _cellSize + 8.f;
-        int columns = std::max(1, (int)(panelWidth / cellWidth));
+    ImGui::SetNextWindowSize(ImVec2(900, 500), ImGuiCond_FirstUseEver);
+    
+    if (!ImGui::Begin(m_name.c_str(), &isVisible, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar)) {
+        ImGui::End();
+        return;
+    }
+    
+    m_isHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
+    m_isFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+    
+    handleShortcuts();
+    
+    if (ImGui::BeginTable("AssetPanelTable", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV)) {
+        ImGui::TableSetupColumn("Outliner", ImGuiTableColumnFlags_WidthFixed, 250.0f);
+        ImGui::TableSetupColumn("DirectoryContent", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableNextRow();
         
-        int i = 0;
+        // 1. Левая панель: Иерархия папок
+        ImGui::TableSetColumnIndex(0);
+        ImGui::BeginChild("##folders_hierarchy");
+        if (m_baseDirectory) {
+            renderDirectoryHierarchy(m_baseDirectory);
+        }
+        ImGui::EndChild();
         
-        for (auto file : std::filesystem::directory_iterator(currentDir))
-        {
-            auto path = file.path();
-            bool dir = file.is_directory();
-            
-            int col = i % columns;
-            if (col != 0) ImGui::SameLine();
-            
-            ImGui::BeginGroup();
-            
-            auto icon = dir ? IconFolder : IconFile;
-            
-            ImGui::PushID(i);
-            ImGui::ImageButton("##img", (ImTextureID)(intptr_t)icon, ImVec2(_cellSize, _cellSize));
-            
-            if (ImGui::IsItemHovered())
-            {
-                if (ImGui::IsMouseDoubleClicked(0))
-                {
-                    //                    if (node.isDirectory) {
-                    //                        nodeToChange = &*it;
-                    //                        changeNode = true;
-                    //                    }
-                    //                    else {
-                    //                        openFile(node.fullPath, node.fileType);
-                    //                    }
-                }
-            }
-            
-            ImGui::PopID();
-            
-            // Nombre truncado debajo
-            std::string name = path.filename().string();
-            
-            if (name.size() > 20) name = name.substr(0, 16) + "...";
-            ImGui::TextUnformatted(name.c_str());
-            
-            //            // Tooltip con nombre completo
-            //            if (ImGui::IsItemHovered())
-            //                ImGui::SetTooltip("%s", node.name.c_str());
-            
-            ImGui::EndGroup();
-            
-            i++;
+        // 2. Правая панель: Панель навигации и Контент
+        ImGui::TableSetColumnIndex(1);
+        
+        float topBarHeight = 26.0f;
+        float bottomBarHeight = 22.0f;
+        float contentHeight = ImGui::GetWindowHeight() - topBarHeight - bottomBarHeight - ImGui::GetStyle().WindowPadding.y * 2.0f;
+        
+        renderTopBar(topBarHeight);
+        ImGui::Separator();
+        
+        ImGui::BeginChild("ScrollingFilesRegion", ImVec2(0, contentHeight));
+        renderGridItems();
+        ImGui::EndChild();
+        
+        renderBottomBar(bottomBarHeight);
+        
+        ImGui::EndTable();
+    }
+    
+    ImGui::End();
+}
+
+void AssetsPanel::refresh() {
+    m_baseDirectory = std::make_shared<DirectoryInfo>();
+    m_baseDirectory->filePath = "";
+    
+    processDirectory(m_rootPath, m_baseDirectory);
+    
+    if (m_currentDirectory) {
+        auto found = findDirectoryByPath(m_baseDirectory, m_currentDirectory->filePath);
+        m_currentDirectory = found ? found : m_baseDirectory;
+    } else {
+        m_currentDirectory = m_baseDirectory;
+    }
+    
+    changeDirectory(m_currentDirectory);
+}
+
+// Если вы поддерживаете Windows и хотите фильтровать нативные скрытые файлы Windows:
+#if defined(_WIN32)
+##include <windows.h>
+#endif
+
+void AssetsPanel::processDirectory(const std::filesystem::path& absolutePath, std::shared_ptr<DirectoryInfo>& info) {
+    if (!std::filesystem::exists(absolutePath)) return;
+    
+    for (const auto& entry : std::filesystem::directory_iterator(absolutePath)) {
+        const auto& path = entry.path();
+        std::string filename = path.filename().string();
+        
+        // 1. Универсальная проверка для macOS/Linux (и файлов вроде .git / .DS_Store на Windows)
+        if (filename.empty() || filename[0] == '.') {
+            continue; // Пропускаем скрытый элемент
         }
         
-        //        if (changeNode) {
-        //            _selectedNode = nodeToChange;
-        //        }
+        // 2. Специфическая проверка для скрытых файлов Windows (атрибут hidden)
+#if defined(_WIN32)
+        DWORD attributes = GetFileAttributesW(path.wstring().c_str());
+        if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_HIDDEN)) {
+            continue; // Пропускаем скрытый файл Windows
+        }
+#endif
+        
+        // Если файл/папка прошли проверки, добавляем их в структуру
+        if (entry.is_directory()) {
+            auto subDir = std::make_shared<DirectoryInfo>();
+            subDir->filePath = std::filesystem::relative(path, m_rootPath);
+            subDir->parent = info;
+            
+            processDirectory(path, subDir);
+            info->subDirectories.push_back(subDir);
+        } else {
+            info->files.push_back(std::filesystem::relative(path, m_rootPath));
+        }
     }
+    
+    // Сортировка по алфавиту
+    std::sort(info->subDirectories.begin(), info->subDirectories.end(), [](const auto& a, const auto& b) {
+        return a->filePath.filename().string() < b->filePath.filename().string();
+    });
+    std::sort(info->files.begin(), info->files.end());
+}
+
+void AssetsPanel::changeDirectory(std::shared_ptr<DirectoryInfo>& directory) {
+    if (!directory) return;
+    m_currentItems.clear();
+    
+    if (std::strlen(m_searchBuffer) == 0) {
+        for (auto& subdir : directory->subDirectories) {
+            m_currentItems.push_back({
+                BrowserItem::Type::Directory,
+                m_rootPath / subdir->filePath,
+                subdir->filePath.filename().string(),
+                AssetType::Folder
+            });
+        }
+        for (auto& file : directory->files) {
+            // ИСПРАВЛЕНО: Для файлов берем только имя БЕЗ РАСШИРЕНИЯ (stem) [1]
+            m_currentItems.push_back({
+                BrowserItem::Type::File,
+                m_rootPath / file,
+                file.stem().string(),
+                getAssetTypeFromExtension(file.extension().string())
+            });
+        }
+    } else {
+        searchRecursive(m_searchBuffer, directory, m_currentItems);
+    }
+    
+    std::sort(m_currentItems.begin(), m_currentItems.end(), [](const BrowserItem& a, const BrowserItem& b) {
+        if (a.type != b.type) return a.type == BrowserItem::Type::Directory;
+        return a.name < b.name;
+    });
+    
+    m_previousDirectory = directory->parent;
+    m_currentDirectory = directory;
+    m_selectedPaths.clear();
+}
+
+void AssetsPanel::searchRecursive(const std::string& query, const std::shared_ptr<DirectoryInfo>& dir, std::vector<BrowserItem>& results) {
+    std::string qLower = query;
+    std::transform(qLower.begin(), qLower.end(), qLower.begin(), ::tolower);
+    
+    for (auto& subdir : dir->subDirectories) {
+        std::string name = subdir->filePath.filename().string();
+        std::string nameLower = name;
+        std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
+        
+        if (nameLower.find(qLower) != std::string::npos) {
+            results.push_back({ BrowserItem::Type::Directory, m_rootPath / subdir->filePath, name });
+        }
+        searchRecursive(query, subdir, results);
+    }
+    
+    for (auto& file : dir->files) {
+        std::string name = file.filename().string();
+        std::string nameLower = name;
+        std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
+        
+        if (nameLower.find(qLower) != std::string::npos) {
+            results.push_back({ BrowserItem::Type::File, m_rootPath / file, name });
+        }
+    }
+}
+
+void AssetsPanel::renderDirectoryHierarchy(std::shared_ptr<DirectoryInfo>& directory) {
+    std::string name = directory->filePath == "" ? "Assets" : directory->filePath.filename().string();
+    
+    ImGui::PushID(name.c_str());
+    
+    bool isCurrent = (directory == m_currentDirectory);
+    
+    // Храним состояние открытости папки в локальном хранилище ImGui ID
+    ImGuiStorage* storage = ImGui::GetStateStorage();
+    ImGuiID openID = ImGui::GetID("##is_open");
+    bool isOpen = storage->GetBool(openID, directory->filePath == ""); // Корень открыт по умолчанию
+    
+    // Запоминаем начальную позицию курсора на строке
+    ImVec2 startCursorPos = ImGui::GetCursorPos();
+    
+    // 1. Создаем невидимый Selectable на всю ширину строки.
+    // Он отвечает за состояния Hovered, Selected и за кликабельность всей строки.
+    ImGuiSelectableFlags selectableFlags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap;
+    if (ImGui::Selectable("##row_selectable", isCurrent, selectableFlags, ImVec2(0, ImGui::GetFrameHeight()))) {
+        m_nextDirectory = m_currentDirectory;
+        changeDirectory(directory);
+    }
+    
+    // Прием Drag-n-Drop на всю область строки папки
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM")) {
+            std::filesystem::path src((const char*)payload->Data);
+            std::filesystem::rename(src, m_rootPath / directory->filePath / src.filename());
+            refresh();
+        }
+        ImGui::EndDragDropTarget();
+    }
+    
+    // 2. Возвращаем курсор в начало строки, чтобы нарисовать стрелочку и иконку ПОВЕРХ Selectable
+    ImGui::SetCursorPos(startCursorPos);
+    
+    // Включаем режим перекрытия элементов, чтобы клики проходили сквозь текст к Selectable
+    ImGui::SetNextItemAllowOverlap();
+    
+    // 3. Отрисовка стрелочки (только если есть подпапки)
+    if (!directory->subDirectories.empty()) {
+        ImGuiDir arrowDir = isOpen ? ImGuiDir_Down : ImGuiDir_Right;
+        
+        // Убираем фоновые цвета у кнопки-стрелочки, чтобы она была прозрачной
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+        
+        if (ImGui::ArrowButton("##arrow", arrowDir)) {
+            isOpen = !isOpen;
+            storage->SetBool(openID, isOpen);
+        }
+        
+        ImGui::PopStyleColor(3); // Обязательно возвращаем стили назад
+    }
+    else {
+        // Смещаем курсор вправо на ширину стрелочки для пустых папок
+        ImGui::Dummy(ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight()));
+    }
+    
+    ImGui::SameLine();
+    ImGui::SetNextItemAllowOverlap();
+    
+    // 4. Иконка FontAwesome (светло-голубая в стиле macOS)
+    const char* iconStr = isOpen ? ICON_MDI_FOLDER_OPEN : ICON_MDI_FOLDER;
+    ImVec4 macOsBlue = ImVec4(0.32f, 0.68f, 0.89f, 1.0f);
+    ImGui::TextColored(macOsBlue, "%s", iconStr);
+    
+    ImGui::SameLine();
+    ImGui::SetNextItemAllowOverlap();
+    
+    // 5. Просто выводим текст названия папки
+    ImGui::TextUnformatted(name.c_str());
+    
+    // Переходим к рекурсивному рендеру подпапок, если папка раскрыта стрелочкой
+    if (isOpen && !directory->subDirectories.empty()) {
+        ImGui::Indent(ImGui::GetFrameHeight()); // Сдвигаем вправо дочернее дерево
+        for (auto& child : directory->subDirectories) {
+            renderDirectoryHierarchy(child);
+        }
+        ImGui::Unindent(ImGui::GetFrameHeight());
+    }
+    
+    ImGui::PopID();
+}
+
+
+void AssetsPanel::renderTopBar(float height) {
+    ImGui::BeginChild("##top_bar", ImVec2(0, height));
+    
+    ImGui::BeginDisabled(!m_previousDirectory);
+    if (ImGui::Button("<")) {
+        m_nextDirectory = m_currentDirectory;
+        changeDirectory(m_previousDirectory);
+    }
+    ImGui::EndDisabled();
+    
+    ImGui::SameLine();
+    
+    ImGui::BeginDisabled(!m_nextDirectory || m_nextDirectory == m_currentDirectory);
+    if (ImGui::Button(">")) {
+        changeDirectory(m_nextDirectory);
+    }
+    ImGui::EndDisabled();
+    
+    ImGui::SameLine();
+    
+    ImGui::SetNextItemWidth(180.0f);
+    if (ImGui::InputTextWithHint("##Search", "Search...", m_searchBuffer, sizeof(m_searchBuffer))) {
+        changeDirectory(m_currentDirectory);
+    }
+    
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    
+    std::vector<std::shared_ptr<DirectoryInfo>> crumbs;
+    auto curr = m_currentDirectory;
+    while (curr) {
+        crumbs.push_back(curr);
+        curr = curr->parent;
+    }
+    std::reverse(crumbs.begin(), crumbs.end());
+    
+    for (size_t i = 0; i < crumbs.size(); ++i) {
+        std::string name = crumbs[i]->filePath == "" ? "Assets" : crumbs[i]->filePath.filename().string();
+        
+        if (ImGui::Selectable(name.c_str(), false, 0, ImVec2(ImGui::CalcTextSize(name.c_str()).x, 0))) {
+            changeDirectory(crumbs[i]);
+        }
+        
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM")) {
+                std::filesystem::path src((const char*)payload->Data);
+                std::filesystem::rename(src, m_rootPath / crumbs[i]->filePath / src.filename());
+                refresh();
+            }
+            ImGui::EndDragDropTarget();
+        }
+        
+        if (i < crumbs.size() - 1) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("/");
+            ImGui::SameLine();
+        }
+    }
+    
+    // Выравнивание кнопок размеров по правому краю тулбара
+    // 4 кнопки по ~30px каждая + отступы между ними = ~130px свободного места справа
+    ImGui::SameLine(ImGui::GetWindowWidth() - 135.0f);
+    
+    // Массив настроек: { Название, Размер в пикселях }
+    struct SizePreset { const char* label; float pixels; ThumbnailSize sizeEnum; };
+    const SizePreset presets[] = {
+        { "XS", 32.0f,  ThumbnailSize::XS },
+        { "S",  48.0f,  ThumbnailSize::S  },
+        { "M",  64.0f,  ThumbnailSize::M  },
+        { "L",  96.0f,  ThumbnailSize::L  }
+    };
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0)); // Делаем кнопки плотнее друг к другу
+    for (const auto& preset : presets) {
+        bool isActive = (m_currentSizeSetting == preset.sizeEnum);
+        
+        // Если кнопка активна, подсвечиваем её цветом выделения (как в macOS/Unity)
+        if (isActive) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+        } else {
+            // Обычные кнопки слегка приглушаем
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_Button]);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered]);
+        }
+        
+        if (ImGui::Button(preset.label, ImVec2(28.0f, 0.0f))) {
+            m_currentSizeSetting = preset.sizeEnum;
+            m_thumbnailSize = preset.pixels;
+        }
+        
+        ImGui::PopStyleColor(2);
+        
+        // Для всех кнопок кроме последней держим их на одной линии
+        if (&preset != &presets[3]) {
+            ImGui::SameLine();
+        }
+    }
+    ImGui::PopStyleVar();
     
     ImGui::EndChild();
 }
 
-AssetsPanel::AssetsPanel() : EditorPanel("Assets")
-{
-    {
-        int width, height;
-        int num_channels = 3;
-        
-        unsigned char* image = stbi_load("assets/icons/folder.png", &width, &height, &num_channels, 3);
-        IconFolder = RenderDevice::makeTexture(width, height, false, true, image);
-        stbi_image_free(image);
+void AssetsPanel::renderGridItems() {
+    float padding = 12.0f;
+    float cellSize = m_thumbnailSize + padding;
+    float panelWidth = ImGui::GetContentRegionAvail().x;
+    int columnCount = (int)(panelWidth / cellSize);
+    if (columnCount < 1) columnCount = 1;
+    
+    ImGui::Columns(columnCount, nullptr, false);
+    
+    bool openDeleteModal = false;
+    
+    if (ImGui::BeginPopupContextWindow("GridEmptyContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
+        if (ImGui::BeginMenu("New")) {
+            if (ImGui::MenuItem("Folder")) {
+                std::filesystem::create_directory(m_rootPath / m_currentDirectory->filePath / "New Folder");
+                refresh();
+            }
+            if (ImGui::MenuItem("Text File")) {
+                std::ofstream(m_rootPath / m_currentDirectory->filePath / "NewFile.txt");
+                refresh();
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::MenuItem("Refresh")) refresh();
+        ImGui::EndPopup();
     }
     
-    {
-        int width, height;
-        int num_channels = 3;
+    for (auto& item : m_currentItems) {
+        ImGui::PushID(item.fullPath.string().c_str());
         
-        unsigned char* image = stbi_load("assets/icons/file.png", &width, &height, &num_channels, 3);
-        IconFile = RenderDevice::makeTexture(width, height, false, true, image);
-        stbi_image_free(image);
+        RenderDevice::handle_t icon = m_icons.contains(item.assetType) ? m_icons[item.assetType] : m_icons[AssetType::Unknown];
+        
+        bool isSelected = std::find(m_selectedPaths.begin(), m_selectedPaths.end(), item.fullPath) != m_selectedPaths.end();
+        if (isSelected) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        }
+        
+        // Рисуем иконку (Кнопку)
+        if (icon != 0) {
+            ImVec4 tintColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+            if (item.type == BrowserItem::Type::Directory) {
+                tintColor = ImVec4(0.32f, 0.68f, 0.89f, 1.0f);
+            }
+            ImGui::ImageButton("##btn", (ImTextureID)(uintptr_t)icon, ImVec2(m_thumbnailSize, m_thumbnailSize), ImVec2(0,0), ImVec2(1,1), ImVec4(0,0,0,0), tintColor);
+        } else {
+            ImGui::Button(item.type == BrowserItem::Type::Directory ? "[DIR]" : "[FILE]", ImVec2(m_thumbnailSize, m_thumbnailSize));
+        }
+        ImGui::PopStyleColor();
+        
+        // ЛОГИКА 1: Клик по самой ИКОНКЕ (Выделение / Вход в папку)
+        if (ImGui::IsItemHovered()) {
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                if (item.type == BrowserItem::Type::Directory) {
+                    auto found = findDirectoryByPath(m_baseDirectory, std::filesystem::relative(item.fullPath, m_rootPath));
+                    if (found) changeDirectory(found);
+                }
+            }
+            else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                if (ImGui::GetIO().KeyCtrl) {
+                    if (isSelected) m_selectedPaths.erase(std::remove(m_selectedPaths.begin(), m_selectedPaths.end(), item.fullPath), m_selectedPaths.end());
+                    else m_selectedPaths.push_back(item.fullPath);
+                } else {
+                    m_selectedPaths = { item.fullPath };
+                }
+                m_lastClickedPath = item.fullPath;
+            }
+        }
+        
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+            std::string pathStr = item.fullPath.string();
+            ImGui::SetDragDropPayload("ASSET_ITEM", pathStr.c_str(), pathStr.size() + 1);
+            ImGui::Text("%s", item.name.c_str());
+            ImGui::EndDragDropSource();
+        }
+        
+        if (ImGui::BeginPopupContextItem("ItemContext")) {
+            if (!isSelected) m_selectedPaths = { item.fullPath };
+            if (ImGui::MenuItem("Rename")) {
+                m_pathToRename = item.fullPath;
+                // При начале переименования в буфер пишем ТОЛЬКО имя, без расширения
+                std::snprintf(m_renameBuffer, sizeof(m_renameBuffer), "%s", item.name.c_str());
+                m_focusRenameInput = true;
+            }
+            if (ImGui::MenuItem("Открыть в Finder")) openInExplorer(item.fullPath);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete")) openDeleteModal = true;
+            ImGui::EndPopup();
+        }
+        
+        // --- Переходим к отрисовке названия (уменьшаем шрифт) ---
+        ImGui::SetWindowFontScale(0.85f);
+        
+        if (m_pathToRename == item.fullPath) {
+            ImGui::SetNextItemWidth(m_thumbnailSize + padding);
+            if (m_focusRenameInput) { ImGui::SetKeyboardFocusHere(); m_focusRenameInput = false; }
+            
+            bool shouldRename = false;
+            if (ImGui::InputText("##rename", m_renameBuffer, sizeof(m_renameBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                shouldRename = true;
+            }
+            if (!ImGui::IsItemActive() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                shouldRename = true;
+            }
+            
+            if (shouldRename) {
+                if (std::strlen(m_renameBuffer) > 0 && item.name != m_renameBuffer) {
+                    // ИСПРАВЛЕНО: Безопасное сохранение расширения на диске при переименовании [1]
+                    std::filesystem::path newPath = item.fullPath.parent_path() / m_renameBuffer;
+                    if (item.type == BrowserItem::Type::File) {
+                        newPath.replace_extension(item.fullPath.extension()); // Пристыковываем старое расширение обратно
+                    }
+                    std::filesystem::rename(item.fullPath, newPath);
+                }
+                m_pathToRename.clear();
+                refresh();
+            }
+        } else {
+            // Вывод отцентрированного текста без расширения
+            std::string text = item.name;
+            float textWidth = ImGui::CalcTextSize(text.c_str()).x;
+            float columnWidth = ImGui::GetColumnWidth();
+            if (textWidth < columnWidth) {
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (columnWidth - textWidth) * 0.5f - ImGui::GetStyle().ItemSpacing.x);
+            }
+            ImGui::TextWrapped("%s", text.c_str());
+            
+            // Одиночный клик по тексту для активации Finder-Style переименования
+            if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                if (isSelected && m_lastClickedPath == item.fullPath) {
+                    m_pathToRename = item.fullPath;
+                    std::snprintf(m_renameBuffer, sizeof(m_renameBuffer), "%s", item.name.c_str());
+                    m_focusRenameInput = true;
+                } else {
+                    m_selectedPaths = { item.fullPath };
+                    m_lastClickedPath = item.fullPath;
+                }
+            }
+        }
+        
+        ImGui::SetWindowFontScale(1.0f);
+        
+        ImGui::NextColumn();
+        ImGui::PopID();
+    }
+    
+    ImGui::Columns(1);
+    
+    if (openDeleteModal) {
+        ImGui::OpenPopup("Delete Items?");
+    }
+    renderDeleteDialog();
+}
+
+
+void AssetsPanel::renderDeleteDialog() {
+    if (ImGui::BeginPopupModal("Delete Items?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Are you sure you want to delete %d selected items?", (int)m_selectedPaths.size());
+        if (ImGui::Button("Yes", ImVec2(120, 0))) {
+            for (const auto& path : m_selectedPaths) {
+                std::filesystem::remove_all(path);
+            }
+            m_selectedPaths.clear();
+            refresh();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("No", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+void AssetsPanel::renderBottomBar(float height) {
+//    ImGui::BeginChild("##bottom_bar", ImVec2(0, height));
+//    if (m_selectedPaths.size() == 1) {
+////        std::filesystem::rel
+//        std::string relativeStr = "Assets/" + std::filesystem::relative(m_selectedPaths, m_rootPath).string();
+//        std::replace(relativeStr.begin(), relativeStr.end(), '\', '/');
+//                     ImGui::TextUnformatted(relativeStr.c_str());
+//    } else if (m_selectedPaths.size() > 1) {
+//        ImGui::Text("%d items selected", (int)m_selectedPaths.size());
+//    } else {
+//        std::string currentStr = "Assets/" + m_currentDirectory->filePath.string();
+//        std::replace(currentStr.begin(), currentStr.end(), '\', '/');
+//                     ImGui::TextDisabled("%s", currentStr.c_str());
+//    }
+//    ImGui::EndChild();
+}
+
+void AssetsPanel::handleShortcuts() {
+    if (!m_isFocused) return;
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_selectedPaths.empty() && m_pathToRename.empty()) {
+        ImGui::OpenPopup("Delete Items?");
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        m_selectedPaths.clear();
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_F5)) {
+        refresh();
     }
 }
 
-void AssetsPanel::draw()
+std::shared_ptr<AssetsPanel::DirectoryInfo> AssetsPanel::findDirectoryByPath(const std::shared_ptr<DirectoryInfo>& root, const std::filesystem::path& path)
 {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-    ImGui::Begin("Assets", nullptr/*, ImGuiWindowFlags_MenuBar*/);
-    
-//    if (ImGui::BeginMenuBar())
-//    {
-//        ImGui::TextUnformatted("Files");
-//        
-//        std::filesystem::path path = rootDir;
-//        
-//        for (auto dir : std::filesystem::relative(currentDir, rootDir))
-//        {
-//            path = path / dir;
-//            
-//            ImGui::TextUnformatted(">");
-//            
-//            if (GUI::MenuBarButton(dir.string()))
-//            {
-//                ChangeDir(path);
-//            }
-//        }
-//        
-//        ImGui::EndMenuBar();
-//    }
-//    
-//    DrawFiles();
-    
-    ImGui::End();
-    ImGui::PopStyleVar();
+    if (root->filePath == path) return root;
+    for (auto& subdir : root->subDirectories) {
+        auto found = findDirectoryByPath(subdir, path);
+        if (found) return found;
+    }
+    return nullptr;
+}
+
+void AssetsPanel::openInExplorer(const std::filesystem::path& path)
+{
+#if defined(__APPLE__)
+    std::string command = "open \"" + path.string() + "\"";
+    std::system(command.c_str());
+#elif defined(_WIN32)
+    std::string command = "explorer /select,\"" + path.string() + "\"";
+    std::system(command.c_str());
+#endif
 }

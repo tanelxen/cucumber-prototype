@@ -17,11 +17,12 @@
 #include <imgui_internal.h>
 
 #include "../vendor/tinyfiledialogs.h"
+#include "../vendor/IconsMaterialDesignIcons.h"
 
 static std::vector<Entity*> rootEntities {};
 static Entity* selectedEntity;
 
-HierarchyPanel::HierarchyPanel() : EditorPanel("Hierarchy")
+HierarchyPanel::HierarchyPanel() : EditorPanel(ICON_MDI_FILE_TREE " Hierarchy###Hierarchy")
 {
     
 }
@@ -32,11 +33,11 @@ void HierarchyPanel::draw()
     
     if (!activeScene)
     {
-        ImGui::Begin("Hierarchy"); ImGui::Text("No active scene"); ImGui::End();
+        ImGui::Begin(m_name.c_str()); ImGui::Text("No active scene"); ImGui::End();
         return;
     }
     
-    ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin(m_name.c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
     
     if (ImGui::Button("+"))
     {
@@ -92,7 +93,7 @@ void HierarchyPanel::draw()
 
 void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& selectedEntity)
 {
-    ImGui::Begin("Hierarchy");
+//    ImGui::Begin(ICON_FA_TREE " Hierarchy");
     
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
     
@@ -130,7 +131,7 @@ void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& sel
         ImGui::EndDragDropTarget();
     }
     
-    ImGui::End();
+//    ImGui::End();
 }
 
 void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
@@ -141,7 +142,7 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     if (entity->children.empty())  flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
     
     // Отрисовываем узел дерева
-    bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, entity->isPrefabRoot ? "[P] %s" : "%s", entity->m_name.c_str());
+    bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, entity->isPrefabRoot ? "[P] %s" : ICON_MDI_CUBE " %s", entity->m_name.c_str());
     
     // Умное выделение объекта с учетом, что это может быть просто drag-n-drop
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))

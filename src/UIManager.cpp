@@ -26,6 +26,7 @@
 #include <imgui_impl_opengl3.h>
 
 #include "../vendor/tinyfiledialogs.h"
+#include "../vendor/IconsMaterialDesignIcons.h"
 
 void DrawScriptConsoleWindow();
 
@@ -119,6 +120,35 @@ void UIManager::draw()
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+static void InitFonts(ImGuiIO& io)
+{
+    // 1. Настраиваем общую конфигурацию для FontAwesome
+    ImFontConfig config;
+    config.MergeMode = true;        // КРИТИЧЕСКИ ВАЖНО: сливает FA с предыдущим добавленным шрифтом
+    config.PixelSnapH = true;       // Четкое выравнивание пикселей для иконок
+    config.GlyphMinAdvanceX = 17.0f; // Выравниваем шаг под размер вашего шрифта (17.0f)
+    
+    static const ImWchar icon_ranges[] = { ICON_MIN_MDI, ICON_MAX_MDI, 0 };
+    
+    // ----------------------------------------------------
+    // СЕКЦИЯ 1: Загрузка Medium шрифта + FontAwesome к нему
+    // ----------------------------------------------------
+    // Загружаем основной Medium (он автоматически станет Fonts[0])
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f);
+    
+    io.Fonts->AddFontFromFileTTF("assets/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
+    
+    
+    // ----------------------------------------------------
+    // СЕКЦИЯ 2: Загрузка Bold шрифта + FontAwesome к нему
+    // ----------------------------------------------------
+    // Загружаем основной Bold (он станет Fonts[1])
+    io.Fonts->Fonts[1] = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Bold.ttf", 17.0f);
+    
+    // Сливаем FontAwesome с Bold
+    io.Fonts->AddFontFromFileTTF("assets/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
+}
+
 void UIManager::init(struct GLFWwindow *window)
 {
     IMGUI_CHECKVERSION();
@@ -127,12 +157,12 @@ void UIManager::init(struct GLFWwindow *window)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     
+    io.IniFilename = "assets/imgui.ini";
+    
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
     
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f);
-    io.Fonts->Fonts[1] = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Bold.ttf", 17.0f);
-//    io.Fonts->Fonts[2] = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Regular.ttf", 14.0f);
+    InitFonts(io);
     
     // Rounding
     ImGui::GetStyle().WindowRounding = 0.0;
@@ -338,7 +368,7 @@ void UIManager::endPicking()
 
 void DrawScriptConsoleWindow()
 {
-    ImGui::Begin("Script Console");
+    ImGui::Begin(ICON_MDI_CONSOLE " Script Console###Script Console");
     
     // Кнопка очистки консоли
     if (ImGui::Button("Clear")) {

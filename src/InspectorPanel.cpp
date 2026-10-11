@@ -38,6 +38,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb_image.h"
 
+#include "../vendor/IconsMaterialDesignIcons.h"
+
 std::vector<std::string> GetAvailableScriptClasses();
 
 static void DrawCollisionBits(const char* label, uint32_t& bitmask);
@@ -298,7 +300,7 @@ static void RegisterUI()
 
 void InspectorPanel::draw()
 {
-    ImGui::Begin("Inspector");
+    ImGui::Begin(m_name.c_str());
     
     if (!m_entity)
     {
@@ -311,7 +313,7 @@ void InspectorPanel::draw()
     ImGui::End();
 }
 
-InspectorPanel::InspectorPanel() : EditorPanel("Inspector")
+InspectorPanel::InspectorPanel() : EditorPanel(ICON_MDI_INFORMATION " Properties###Inspector")
 {
     
 }
