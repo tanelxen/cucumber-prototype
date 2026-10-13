@@ -11,6 +11,8 @@
 #include "RenderDevice.h"
 #include "Mesh.h"
 
+#include <filesystem>
+
 struct MeshComponent : public Component
 {
     std::string path = "<no mesh>";
@@ -22,6 +24,9 @@ struct MeshComponent : public Component
     
     const std::string getTypeName() const override { return "MeshComponent"; }
     
+    static bool IsModelFile(const std::filesystem::path& filepath);
+    bool loadModel(const std::filesystem::path& filepath);
+
     void save(nlohmann::json& j) const override
     {
         j["source_glb"] = path;

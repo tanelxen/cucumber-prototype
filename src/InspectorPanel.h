@@ -10,6 +10,7 @@
 #include "EditorPanel.h"
 
 class Entity;
+struct ImVec2;
 
 class InspectorPanel: public EditorPanel
 {
@@ -26,4 +27,6 @@ private:
     void DrawInspector(Entity* selectedEntity);
     void DrawNormalEntityComponents(Entity* entity);
     void DrawPrefabInstanceInspector(Entity* prefabRoot);
+    
+    bool RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY);
 };

@@ -43,6 +43,11 @@ public:
         AssetType assetType;
     };
     
+    struct DragDropAssetInfo {
+        AssetType type;
+        char path[256];
+    };
+    
     AssetsPanel(const std::filesystem::path& rootPath = "assets");
     virtual ~AssetsPanel() = default;
     

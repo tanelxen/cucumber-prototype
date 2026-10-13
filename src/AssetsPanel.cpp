@@ -277,12 +277,17 @@ void AssetsPanel::renderDirectoryHierarchy(std::shared_ptr<DirectoryInfo>& direc
     }
     
     // Прием Drag-n-Drop на всю область строки папки
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM")) {
-            std::filesystem::path src((const char*)payload->Data);
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM"))
+        {
+            DragDropAssetInfo* info = (DragDropAssetInfo*)payload->Data;
+            
+            std::filesystem::path src = info->path;
             std::filesystem::rename(src, m_rootPath / directory->filePath / src.filename());
             refresh();
         }
+        
         ImGui::EndDragDropTarget();
     }
     
@@ -382,15 +387,6 @@ void AssetsPanel::renderTopBar(float height) {
         
         if (ImGui::Selectable(name.c_str(), false, 0, ImVec2(ImGui::CalcTextSize(name.c_str()).x, 0))) {
             changeDirectory(crumbs[i]);
-        }
-        
-        if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM")) {
-                std::filesystem::path src((const char*)payload->Data);
-                std::filesystem::rename(src, m_rootPath / crumbs[i]->filePath / src.filename());
-                refresh();
-            }
-            ImGui::EndDragDropTarget();
         }
         
         if (i < crumbs.size() - 1) {
@@ -514,9 +510,14 @@ void AssetsPanel::renderGridItems() {
             }
         }
         
-        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
-            std::string pathStr = item.fullPath.string();
-            ImGui::SetDragDropPayload("ASSET_ITEM", pathStr.c_str(), pathStr.size() + 1);
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+        {
+            DragDropAssetInfo info;
+            info.type = item.assetType;
+            strncpy(info.path, item.fullPath.c_str(), sizeof(info.path));
+            
+            ImGui::SetDragDropPayload("ASSET_ITEM", &info, sizeof(DragDropAssetInfo));
+            
             ImGui::Text("%s", item.name.c_str());
             ImGui::EndDragDropSource();
         }

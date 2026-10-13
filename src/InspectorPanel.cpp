@@ -7,13 +7,12 @@
 
 #include "InspectorPanel.h"
 #include "ComponentInspector.h"
+#include "AssetsPanel.h"
 #include "UIManager.h"
 
 #include "Entity.h"
-#include "TransformComponent.h"
 #include "CollisionComponent.h"
 #include "MovementComponent.h"
-#include "AnimatorComponent.h"
 #include "CameraComponent.h"
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
@@ -24,9 +23,13 @@
 #include <imgui.h>
 
 #include "../vendor/IconsMaterialDesignIcons.h"
+#include "imgui_internal.h"
 
 #include <fstream>
 #include <iostream>
+#include <filesystem>
+
+static bool s_isHovered;
 
 InspectorPanel::InspectorPanel() : EditorPanel(ICON_MDI_INFORMATION " Properties###Inspector")
 {
@@ -41,6 +44,8 @@ void InspectorPanel::setEntity(Entity *entity)
 void InspectorPanel::draw()
 {
     ImGui::Begin(m_name.c_str());
+    
+    s_isHovered = ImGui::IsItemHovered();
     
     if (!m_entity)
     {
@@ -88,6 +93,60 @@ std::vector<std::string> GetAvailableScriptClasses()
     return scriptClasses;
 }
 
+bool InspectorPanel::RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY)
+{
+    // 1. Создаем невидимую область
+    ImGui::InvisibleButton(str_id, size);
+    
+    bool isHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    bool isDragging = ImGui::GetDragDropPayload() != nullptr;
+    bool accepted = false;
+    
+    // 2. Отключаем встроенную желтую рамку ImGuiCol_DragDropTarget
+    ImGui::PushStyleColor(ImGuiCol_DragDropTarget, IM_COL32(0, 0, 0, 0));
+    ImGui::PushStyleColor(ImGuiCol_NavHighlight,   IM_COL32(0, 0, 0, 0));
+    
+    // 3. Обрабатываем Drag & Drop
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET_ITEM", ImGuiDragDropFlags_AcceptBeforeDelivery))
+        {
+            AssetsPanel::DragDropAssetInfo* info = static_cast<AssetsPanel::DragDropAssetInfo*>(payload->Data);
+            const bool isModel = info->type == AssetsPanel::AssetType::Mesh;
+            
+            if (payload->IsDelivery() && isModel)
+            {
+                auto *meshComponent = m_entity->addComponent<MeshComponent>();
+                meshComponent->loadModel(info->path);
+            }
+            
+            accepted = true;
+        }
+        ImGui::EndDragDropTarget();
+    }
+    
+    ImGui::PopStyleColor(2); // Возвращаем оригинальные цвета стиля обратно
+    
+    // 4. Отрисовываем кастомную синюю линию, если мышь над этой зоной
+    if (isDragging && isHovered)
+    {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        
+        // Линия во всю ширину контентной области окна
+        float startX = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMin().x;
+        float endX   = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+        
+        ImVec2 lineStart = ImVec2(startX, targetLineY);
+        ImVec2 lineEnd   = ImVec2(endX, targetLineY + 4.0f); // 4 пикселя толщина полоски
+        
+        // Рисуем синий маркер дропа
+        drawList->AddRectFilled(lineStart, lineEnd, IM_COL32(66, 150, 250, 255));
+    }
+    
+    return accepted;
+}
+
+
 void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
 {
     ImGui::Checkbox("##active", &m_entity->m_isActive);
@@ -110,33 +169,51 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
     ComponentInspector::Get().Render(&m_entity->getTransform(), this);
     ImGui::Spacing();
     
-    for (auto& component : m_entity->getComponents())
+    std::vector<Component*> components;
+    components.reserve(m_entity->getComponents().size());
+    for (const auto& component : m_entity->getComponents())
     {
-        ComponentInspector::Get().Render(component.get(), this);
+        components.push_back(component.get());
+    }
+
+    for (Component* component : components)
+    {
+        ComponentInspector::Get().Render(component, this);
         ImGui::Spacing();
     }
     
+    // ЗОНА 1: Между последним компонентом и кнопкой "Add Component"
+    float targetLineY = ImGui::GetCursorScreenPos().y;
+    RenderAssetDropZone("##drop_zone_before_button", ImVec2(-1, 6.0f), targetLineY);
+
     ImGui::Separator();
     ImGui::Spacing();
     
-    if (ImGui::Button("Add Component")) {
+    if (ImGui::Button("Add Component"))
+    {
         ImGui::OpenPopup("AddComponentPopup");
     }
     
+    // ЗОНА 2: Пустое пространство в самом низу панели
+    ImVec2 remainingSpace = ImGui::GetContentRegionAvail();
+    float bottomZoneHeight = std::max(remainingSpace.y, 20.0f);
+    RenderAssetDropZone("##drop_zone_bottom_empty", ImVec2(-1, bottomZoneHeight), targetLineY);
+    
     if (ImGui::BeginPopup("AddComponentPopup"))
     {
-        //        if (ImGui::MenuItem("Transform"))   { m_entity->addComponent<TransformComponent>(); }
         if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
         if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
         if (ImGui::MenuItem("Camera"))      { m_entity->addComponent<CameraComponent>(); }
         if (ImGui::MenuItem("Movement"))    { m_entity->addComponent<MovementComponent>(); }
         if (ImGui::MenuItem("Collision"))    { m_entity->addComponent<CollisionComponent>(); }
         
-        if (ImGui::BeginMenu("Scripts")) {
+        if (ImGui::BeginMenu("Scripts"))
+        {
             // Получаем актуальный список классов из AngelScript
             auto availableScripts = GetAvailableScriptClasses();
             
-            if (availableScripts.empty()) {
+            if (availableScripts.empty())
+            {
                 ImGui::TextDisabled("No scripts found");
             }
             
@@ -150,6 +227,7 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
                     ImGui::CloseCurrentPopup();
                 }
             }
+            
             ImGui::EndMenu();
         }
         

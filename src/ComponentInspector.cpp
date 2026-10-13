@@ -8,9 +8,9 @@
 #include "ComponentInspector.h"
 
 #include "InspectorPanel.h"
+#include "AssetsPanel.h"
 #include "UIManager.h"
 
-#include "Entity.h"
 #include "TransformComponent.h"
 #include "CollisionComponent.h"
 #include "MovementComponent.h"
@@ -21,8 +21,6 @@
 #include "MeshComponent.h"
 
 #include "Mesh.h"
-#include "ModelLoader.h"
-
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -57,8 +55,6 @@ std::string ComponentInspector::GetName(std::type_index id) {
     auto it = registry.find(id);
     return (it != registry.end()) ? it->second.displayName : id.name();
 }
-
-//std::vector<std::string> GetAvailableScriptClasses();
 
 static bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
 {
@@ -247,44 +243,38 @@ static void DrawCollisionBits(const char* label, uint32_t& bitmask)
 
 static void DrawMeshComponent(MeshComponent* comp)
 {
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
-    
-    ImGui::InputText("##Path", buffer, 256, ImGuiInputTextFlags_ReadOnly);
+//    ImGui::SetCursorPosY(10);
+    ImGui::TextUnformatted("Mesh ");
     ImGui::SameLine();
-    if (ImGui::Button("..."))
+    
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(24, 24, 24, 255));
+    char pathBuffer[256];
+    std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", comp->path.c_str());
+    ImGui::InputText("##Path", pathBuffer, sizeof(pathBuffer), ImGuiInputTextFlags_ReadOnly);
+    ImGui::PopStyleColor();
+    
+    ImGui::PushStyleColor(ImGuiCol_DragDropTarget, IM_COL32(0, 0, 0, 0));
+    if (ImGui::BeginDragDropTarget())
     {
-        char const *filter[2] = {"*.gltf", "*.glb"};
-        const char *path = tinyfd_openFileDialog(NULL, "./assets/meshes/gltf/", 2,
-                                                 filter, NULL, 0);
-        
-        if (path != nullptr)
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM", ImGuiDragDropFlags_AcceptBeforeDelivery))
         {
-            auto resource = ModelLoader::LoadModel(path);
+            AssetsPanel::DragDropAssetInfo* info = static_cast<AssetsPanel::DragDropAssetInfo*>(payload->Data);
             
-            comp->mesh = resource.mesh;
-            comp->materials = resource.embeddedMaterials;
+            const bool isModel = info->type == AssetsPanel::AssetType::Mesh;
             
-            std::filesystem::path base_path("./assets");
-            auto rel_path = std::filesystem::relative(path, base_path);
-            comp->path = rel_path;
-            
-            if (resource.hasSkeleton())
+            const ImVec2 fieldMin = ImGui::GetItemRectMin();
+            const ImVec2 fieldMax = ImGui::GetItemRectMax();
+            const ImU32 color = isModel ? IM_COL32(80, 190, 110, 230) : IM_COL32(220, 100, 70, 230);
+            ImGui::GetWindowDrawList()->AddRect(fieldMin, fieldMax, color, 0.0f, 0, 1.0f);
+
+            if (payload->IsDelivery() && isModel)
             {
-                auto animator = comp->owner->getComponent<AnimatorComponent>();
-                
-                if (animator == nullptr)
-                {
-                    animator = comp->owner->addComponent<AnimatorComponent>();
-                }
-                
-                animator->setSkeleton(resource.skeleton);
-                animator->m_clips = resource.animations;
-                animator->m_currentClipIndex = -1;
-                animator->path = rel_path;
+                comp->loadModel(info->path);
             }
         }
+        ImGui::EndDragDropTarget();
     }
+    ImGui::PopStyleColor();
     
     if (comp->mesh) {
         ImGui::Checkbox("Skybox ambient", &comp->mesh->m_useAmbientLight);
