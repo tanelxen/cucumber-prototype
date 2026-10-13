@@ -6,10 +6,8 @@
 //
 
 #include "InspectorPanel.h"
+#include "ComponentInspector.h"
 #include "UIManager.h"
-
-#include "Mesh.h"
-#include "ModelLoader.h"
 
 #include "Entity.h"
 #include "TransformComponent.h"
@@ -24,278 +22,20 @@
 #include "ScriptEngine.h"
 
 #include <imgui.h>
-#include <imgui_internal.h>
-
-#include <stdio.h>
-#include <filesystem>
-
-#include <unordered_map>
-#include <typeindex>
-#include <functional>
-
-#include "../vendor/tinyfiledialogs.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "../vendor/stb_image.h"
 
 #include "../vendor/IconsMaterialDesignIcons.h"
 
-std::vector<std::string> GetAvailableScriptClasses();
+#include <fstream>
+#include <iostream>
 
-static void DrawCollisionBits(const char* label, uint32_t& bitmask);
-
-class ComponentInspector
+InspectorPanel::InspectorPanel() : EditorPanel(ICON_MDI_INFORMATION " Properties###Inspector")
 {
-public:
-    // Сигнатура функции отрисовки: принимает чистый указатель на компонент
-    using RenderFunc = std::function<void(Component*, InspectorPanel* p)>;
-    
-    static ComponentInspector& Get() {
-        static ComponentInspector instance;
-        return instance;
-    }
-    
-    // Регистрация нового UI для компонента
-    template<typename T>
-    void Register(const std::string& displayName, RenderFunc func) {
-        std::type_index id = std::type_index(typeid(T));
-        registry[id] = { displayName, func };
-    }
-    
-    // Отрисовка компонента по его динамическому типу
-    void Render(Component* component, InspectorPanel* panel)
-    {
-        if (!component) return;
-        
-        std::type_index id = component->GetTypeIndex();
-        auto it = registry.find(id);
-        
-        ImGui::PushID(component);
-        
-        if (it != registry.end()) {
-            const auto& info = it->second;
-            
-            // Отрисовываем красивый заголовок в ImGui
-            if (ImGui::CollapsingHeader(info.displayName.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-                // Вызываем кастомную функцию отрисовки
-                info.renderFunc(component, panel);
-            }
-        } else {
-            // Фолбэк, если UI для компонента забыли зарегистрировать
-            ImGui::CollapsingHeader(typeid(*component).name());
-        }
-        
-        ImGui::PopID();
-    }
-    
-    // Дополнительный метод для получения красивого имени (для меню добавления)
-    std::string GetName(std::type_index id) {
-        auto it = registry.find(id);
-        return (it != registry.end()) ? it->second.displayName : id.name();
-    }
-    
-private:
-    struct InspectorInfo {
-        std::string displayName;
-        RenderFunc renderFunc;
-    };
-    
-    std::unordered_map<std::type_index, InspectorInfo> registry;
-};
-
-static void RegisterUI();
+    RegisterComponentsUI();
+}
 
 void InspectorPanel::setEntity(Entity *entity)
 {
     m_entity = entity;
-    RegisterUI();
-}
-
-void DrawTransformComponent(TransformComponent* transform);
-void DrawAudioComponentInspector(AudioComponent* component);
-static void DrawCollisionComponent(CollisionComponent* comp);
-
-static void RegisterUI()
-{
-    auto& inspector = ComponentInspector::Get();
-    
-    inspector.Register<TransformComponent>("Transform", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<TransformComponent*>(c);
-        DrawTransformComponent(comp);
-    });
-    
-    inspector.Register<MeshComponent>("Mesh", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<MeshComponent*>(c);
-        
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
-        
-        ImGui::InputText("##Path", buffer, 256, ImGuiInputTextFlags_ReadOnly);
-        ImGui::SameLine();
-        if (ImGui::Button("..."))
-        {
-            char const * filter[2] = { "*.gltf", "*.glb" };
-            const char* path = tinyfd_openFileDialog(NULL, "./assets/meshes/gltf/", 2, filter, NULL, 0);
-            
-            if (path != nullptr)
-            {
-                auto resource = ModelLoader::LoadModel(path);
-                
-                comp->mesh = resource.mesh;
-                comp->materials = resource.embeddedMaterials;
-                
-                std::filesystem::path base_path("./assets");
-                auto rel_path = std::filesystem::relative(path, base_path);
-                comp->path = rel_path;
-                
-                if (resource.hasSkeleton())
-                {
-                    auto animator = comp->owner->getComponent<AnimatorComponent>();
-                    
-                    if (animator == nullptr) {
-                        animator = comp->owner->addComponent<AnimatorComponent>();
-                    }
-                    
-                    animator->setSkeleton(resource.skeleton);
-                    animator->m_clips = resource.animations;
-                    animator->m_currentClipIndex = -1;
-                    animator->path = rel_path;
-                }
-            }
-        }
-        
-        if (comp->mesh) {
-            ImGui::Checkbox("Skybox ambient", &comp->mesh->m_useAmbientLight);
-            DrawCollisionBits("Layer", comp->layer);
-        }
-        
-        if (comp->mesh && !comp->mesh->m_surfaces.empty())
-        {
-            if (ImGui::TreeNode("Surfaces"))
-            {
-                for (int i = 0; i < comp->mesh->m_surfaces.size(); i++)
-                {
-                    if (ImGui::TreeNode((void*)(intptr_t)i, "Surface %i", i))
-                    {
-                        auto& surface = comp->mesh->m_surfaces[i];
-                        ImGui::Text("%s: %i tris, %i material", surface.m_name.c_str(), surface.count / 3, surface.materialSlot);
-                        
-                        auto& material = comp->mesh->m_materials[surface.materialSlot];
-                        
-                        if (ImGui::Button("Edit material"))
-                        {
-                            p->m_manager->setMaterial(&material);
-                        }
-                        
-                        ImGui::TreePop();
-                    }
-                }
-                
-                ImGui::TreePop();
-            }
-        }
-    });
-    
-    inspector.Register<AnimatorComponent>("Animator", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<AnimatorComponent*>(c);
-        if (!comp->m_clips.empty())
-        {
-            auto& clips = comp->m_clips;
-            
-            const char* title = comp->m_currentClipIndex == -1 ? "<no selected>" : clips[comp->m_currentClipIndex]->name.c_str();
-            
-            if (ImGui::BeginCombo("##sequence combo", title, ImGuiComboFlags_None))
-            {
-                for (int i = 0; i < clips.size(); ++i)
-                {
-                    bool is_selected = (comp->m_currentClipIndex == i);
-                    
-                    if (ImGui::Selectable(clips[i]->name.c_str(), is_selected))
-                    {
-                        comp->play(i);
-                    }
-                    
-                    if (is_selected) ImGui::SetItemDefaultFocus();
-                }
-                
-                ImGui::EndCombo();
-            }
-        }
-    });
-    
-    inspector.Register<AudioComponent>("Sound", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<AudioComponent*>(c);
-
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), "%s", comp->path.c_str());
-        
-        ImGui::InputText("##Path", buffer, 256, ImGuiInputTextFlags_ReadOnly);
-        ImGui::SameLine();
-        if (ImGui::Button("..."))
-        {
-            char const * filter[2] = { "*.mp3", "*.wav" };
-            const char* path = tinyfd_openFileDialog(NULL, "./assets/sounds/", 2, filter, NULL, 0);
-            
-            if (path != nullptr)
-            {
-                comp->init(path);
-                
-                std::filesystem::path base_path("./assets");
-                auto rel_path = std::filesystem::relative(path, base_path);
-                comp->path = rel_path;
-            }
-        }
-        
-        if (comp->m_isInitialized)
-        {
-            DrawAudioComponentInspector(comp);
-        }
-    });
-    
-    inspector.Register<ScriptComponent>("Script", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<ScriptComponent*>(c);
-        
-        ImGui::TextDisabled("%s", comp->scriptPath.c_str());
-        
-        if (comp->m_isInitialized)
-        {
-            if (ImGui::Button("Edit")) {
-                
-#if defined(_WIN32)
-                // Для Windows: открывает файл в программе по умолчанию (обычно Блокнот)
-                std::string command = "start \"" + comp->scriptPath + "\"";
-#elif defined(__APPLE__)
-                // Для macOS
-                std::string command = "open \"" + comp->scriptPath + "\"";
-#else
-                // Для Linux
-                std::string command = "xdg-open \"" + comp->scriptPath + "\"";
-#endif
-                
-                std::system(command.c_str());
-            }
-            
-            comp->drawProperties();
-        }
-    });
-    
-    inspector.Register<MovementComponent>("Movement", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<MovementComponent*>(c);
-        ImGui::DragFloat("Walk Speed##Movement", &comp->m_forwardspeed, 10.f, 0.0f, 1000.0f, "%.0f");
-    });
-    
-    inspector.Register<CollisionComponent>("Collision", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<CollisionComponent*>(c);
-        DrawCollisionComponent(comp);
-    });
-    
-    inspector.Register<CameraComponent>("Camera", [](Component* c, InspectorPanel* p) {
-        auto* comp = static_cast<CameraComponent*>(c);
-        ImGui::DragFloat("Field of view##Camera", &comp->fov, 10.f, 30.0f, 100.0f, "%.0f");
-        DrawCollisionBits("Culling Mask", comp->cullingMask);
-        ImGui::Checkbox("Clear Depth Only", &comp->clearDepthOnly);
-        ImGui::DragFloat("Depth##Camera", &comp->depth, 1.f, 0.0f, 100.0f, "%.0f");
-    });
 }
 
 void InspectorPanel::draw()
@@ -311,178 +51,6 @@ void InspectorPanel::draw()
     DrawInspector(m_entity);
     
     ImGui::End();
-}
-
-InspectorPanel::InspectorPanel() : EditorPanel(ICON_MDI_INFORMATION " Properties###Inspector")
-{
-    
-}
-
-bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    auto boldFont = io.Fonts->Fonts[0];
-    
-    ImGui::PushID(label.c_str());
-    
-    ImGui::Columns(2);
-    ImGui::SetColumnWidth(0, columnWidth);
-    ImGui::Text("%s", label.c_str());
-    ImGui::NextColumn();
-    
-    ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 0, 0 });
-    
-    float lineHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
-    ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
-    
-    bool isChangedX = false;
-    bool isChangedY = false;
-    bool isChangedZ = false;
-    
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.20f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-    
-    ImGui::PushFont(boldFont);
-    if (ImGui::Button("X", buttonSize)) {
-        values.x = resetValue;
-        isChangedX = true;
-    }
-    ImGui::PopFont();
-    
-    ImGui::PopStyleColor(3);
-    
-    ImGui::SameLine();
-    if (ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f")) {
-        isChangedX = true;
-    }
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-    
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.3f, 0.8f, 0.3f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-    
-    ImGui::PushFont(boldFont);
-    if (ImGui::Button("Y", buttonSize)) {
-        values.y = resetValue;
-        isChangedY = true;
-    }
-    ImGui::PopFont();
-    
-    ImGui::PopStyleColor(3);
-    
-    ImGui::SameLine();
-    if (ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f")) {
-        isChangedY = true;
-    }
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-    
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.2f, 0.35f, 0.9f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-    
-    ImGui::PushFont(boldFont);
-    if (ImGui::Button("Z", buttonSize)) {
-        values.z = resetValue;
-        isChangedZ = true;
-    }
-    ImGui::PopFont();
-    
-    ImGui::PopStyleColor(3);
-    
-    ImGui::SameLine();
-    if (ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f")) {
-        isChangedZ = true;
-    }
-    
-    ImGui::PopItemWidth();
-    
-    ImGui::PopStyleVar();
-    
-    ImGui::Columns(1);
-    
-    ImGui::PopID();
-    
-    return isChangedX || isChangedY || isChangedZ;
-}
-
-void DrawTransformComponent(TransformComponent* transform)
-{
-    // 1. ПОЗИЦИЯ
-    glm::vec3 pos = transform->getPosition();
-    // Передаем копию. Если пользователь покрутил ползунок, функция вернет true
-    if (DrawVec3Control("Position", pos, 0.0f, 100.0f)) {
-        transform->setPosition(pos); // Срабатывает сеттер и инвалидация!
-    }
-    
-    // 2. ПОВОРОТ (Скрываем кватернион, показываем углы Эйлера)
-    // Извлекаем углы из трансформера (или используем сохраненный m_eulerDegrees, как обсуждали ранее)
-    glm::vec3 eulerAngles = transform->getRotation();
-    
-    if (DrawVec3Control("Rotation", eulerAngles, 0.0f, 100.0f)) {
-        transform->setRotation(eulerAngles); // Сеттер переведет в кватернион и сбросит кэш
-    }
-    
-    // 3. МАСШТАБ
-    glm::vec3 scale = transform->getScale();
-    if (DrawVec3Control("Scale", scale, 1.0f, 100.0f)) {
-        transform->setScale(scale);
-    }
-}
-
-void DrawAudioComponentInspector(AudioComponent* component)
-{
-    // 1. Управление воспроизведением (Кнопки Play / Pause / Stop в один ряд)
-    if (component->IsPlaying()) {
-        // Если играет, показываем кнопку Pause (в miniaudio это просто Stop)
-        if (ImGui::Button("Pause##SoundPause")) {
-            component->stop();
-        }
-    } else {
-        if (ImGui::Button("Play##SoundPlay")) {
-            component->play();
-        }
-    }
-    
-    ImGui::SameLine();
-    if (ImGui::Button("Stop##SoundStop")) {
-        component->stop();
-        component->SetCurrentTime(0.0f); // Сбрасываем в начало
-    }
-    
-    ImGui::SameLine();
-    bool isLooping = component->IsLooping();
-    if (ImGui::Checkbox("Looping##SoundLooping", &isLooping)) {
-        component->setLooping(isLooping);
-    }
-    
-//    // 2. Прогресс-бар воспроизведения
-    float currentTime = component->GetCurrentTime();
-    float totalTime = component->m_length;
-    float progress = (totalTime > 0.0f) ? (currentTime / totalTime) : 0.0f;
-    
-    // Форматируем текст времени: "01:23 / 03:45"
-    char timeBuffer[64];
-    snprintf(timeBuffer, sizeof(timeBuffer), "%.1fs / %.1fs", currentTime, totalTime);
-    
-    // Отрисовка прогресс-бара
-    ImGui::ProgressBar(progress, ImVec2(-1.0f, 0.0f), timeBuffer);
-    
-//    // Интерактивная перемотка (Slider), если хочется кликать по таймлайну
-//    float seekTime = currentTime;
-//    if (ImGui::SliderFloat("Seek", &seekTime, 0.0f, totalTime, " ")) {
-//        component->SetCurrentTime(seekTime);
-//    }
-//    
-//    // 3. Основные настройки звука
-//    // Настройки громкости
-//    float volume = component->GetVolume();
-//    if (ImGui::SliderFloat("Volume", &volume, 0.0f, 2.0f, "%.2f")) {
-//        component->setVolume(volume);
-//    }
 }
 
 // Функция возвращает имена всех скриптовых классов, наследующих MonoBehaviour
@@ -518,303 +86,6 @@ std::vector<std::string> GetAvailableScriptClasses()
     }
     
     return scriptClasses;
-}
-
-
-static void DrawCollisionBits(const char* label, uint32_t& bitmask)
-{
-    ImGui::Text("%s", label);
-    ImGui::PushID(label);
-    
-    // Сетка 4х4 для 16 слоев (если нужно 32, сделайте 8х4 или 4х8)
-    const int numRows = 2;
-    const int numCols = 8;
-    
-    // Делаем кнопки маленькими и квадратными
-    ImVec2 buttonSize = ImVec2(25, 25);
-    
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
-    
-    for (int row = 0; row < numRows; ++row)
-    {
-        for (int col = 0; col < numCols; ++col)
-        {
-            int bitIndex = row * numCols + col;
-            uint32_t bitValue = (1 << bitIndex);
-            bool isSet = (bitmask & bitValue) != 0;
-            
-            // Если бит активен — подсвечиваем кнопку
-            if (isSet)
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.2f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.33f, 0.18f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.18f, 0.10f, 1.0f));
-            }
-            else
-            {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.15f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
-            }
-            
-            // Название кнопки — просто индекс бита (от 1 до 16 для удобства человека)
-            char buf[4];
-            snprintf(buf, sizeof(buf), "%d", bitIndex);
-            
-            ImGui::PushID(bitIndex);
-            if (ImGui::Button(buf, buttonSize))
-            {
-                if (isSet) {
-                    bitmask &= ~bitValue; // Выключаем бит
-                } else {
-                    bitmask |= bitValue;  // Включаем бит
-                }
-            }
-            
-            // Всплывающая подсказка при наведении на бит
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Bit %d (Value: %u)", bitIndex, bitValue);
-            }
-            ImGui::PopID();
-            
-            ImGui::PopStyleColor(3);
-            
-            // Если это не последняя колонка — рисуем на той же строке
-            if (col < numCols - 1) {
-                ImGui::SameLine();
-            }
-        }
-    }
-    
-    ImGui::PopStyleVar();
-    ImGui::PopID();
-    ImGui::Spacing();
-}
-
-static void DrawCollisionComponent(CollisionComponent* comp)
-{
-//    ImGui::DragFloat3("Mins", &comp->m_mins.x, 1.f);
-//    ImGui::DragFloat3("Maxs", &comp->m_maxs.x, 1.f);
-    
-    DrawVec3Control("Min Bounds", comp->m_mins, -16.0f, 100.0f);
-    DrawVec3Control("Max Bounds", comp->m_maxs,  16.0f, 100.0f);
-    
-    ImGui::Separator();
-    
-    DrawCollisionBits("Layer", comp->layer);
-//    DrawCollisionBits("Mask (С чем сталкивается)", comp->collisionMask);
-    
-    ImGui::Separator();
-    
-    ImGui::Checkbox("Trigger", &comp->isTrigger);
-}
-
-// Универсальный метод отрисовки поля ввода в зависимости от содержимого JSON
-static bool DrawExposedWidget(const std::string& label, nlohmann::json& ioValue)
-{
-    bool changed = false;
-    
-    // 1. Если это число с плавающей точкой (float)
-    if (ioValue.is_number_float())
-    {
-        float val = ioValue.get<float>();
-        if (ImGui::DragFloat(label.c_str(), &val, 0.1f)) {
-            ioValue = val;
-            changed = true;
-        }
-    }
-    // 2. Если это целое число (int)
-    else if (ioValue.is_number_integer())
-    {
-        int val = ioValue.get<int>();
-        if (ImGui::DragInt(label.c_str(), &val, 1)) {
-            ioValue = val;
-            changed = true;
-        }
-    }
-    // 3. Если это логический тип (bool / галочка)
-    else if (ioValue.is_boolean())
-    {
-        bool val = ioValue.get<bool>();
-        if (ImGui::Checkbox(label.c_str(), &val)) {
-            ioValue = val;
-            changed = true;
-        }
-    }
-    // 4. Если это строка (std::string / ввод текста)
-    else if (ioValue.is_string())
-    {
-        std::string val = ioValue.get<std::string>();
-        char buf[256];
-        strncpy(buf, val.c_str(), sizeof(buf));
-        if (ImGui::InputText(label.c_str(), buf, sizeof(buf))) {
-            ioValue = std::string(buf);
-            changed = true;
-        }
-    }
-    // 5. Если это массив из 3-х чисел (например, glm::vec3 для Position/Rotation)
-    else if (ioValue.is_array() && ioValue.size() == 3 && ioValue[0].is_number())
-    {
-        float vec[3] = { ioValue[0].get<float>(), ioValue[1].get<float>(), ioValue[2].get<float>() };
-        if (ImGui::DragFloat3(label.c_str(), vec, 0.1f)) {
-            ioValue = { vec[0], vec[1], vec[2] };
-            changed = true;
-        }
-    }
-    
-    return changed;
-}
-
-static void saveCurrentPrefabInterface(Entity* prefabRoot);
-
-static Entity* m_editingPrefabRoot = nullptr;
-
-static bool isInPrefabEditMode() { return m_editingPrefabRoot != nullptr; }
-static Entity* getEditingPrefabRoot() { return m_editingPrefabRoot; }
-
-static void togglePrefabEditMode(Entity* entity)
-{
-    if (m_editingPrefabRoot == entity) m_editingPrefabRoot = nullptr; // Выйти
-    else if (entity->isPrefabRoot) m_editingPrefabRoot = entity;      // Войти
-}
-
-static void DrawPrefabInterfaceEditor(Entity* prefabRoot)
-{
-    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "--- PREFAB EDIT MODE ---");
-    if (ImGui::Button("Save Changes to .prefab File")) {
-        // Логика функции Apply Changes (перезапись исходного .prefab)
-        saveCurrentPrefabInterface(prefabRoot);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Exit Edit Mode")) {
-        togglePrefabEditMode(prefabRoot);
-        return;
-    }
-    ImGui::Separator();
-    
-    // Таблица для удобного редактирования строк
-    if (ImGui::BeginTable("InterfaceTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-    {
-        ImGui::TableSetupColumn("Name");
-        ImGui::TableSetupColumn("Source");
-        ImGui::TableSetupColumn("Link");
-        ImGui::TableSetupColumn("Actions");
-        ImGui::TableHeadersRow();
-        
-        int propIdx = 0;
-        // Работаем НАПРЯМУЮ с кэшем/вектором структуры инстанса
-        for (auto it = prefabRoot->m_exposedInterfaceCache.begin(); it != prefabRoot->m_exposedInterfaceCache.end(); )
-        {
-            ImGui::TableNextRow();
-            
-            // 1. Колонка: Редактирование Внешнего Имени (Display Name)
-            ImGui::TableSetColumnIndex(0);
-            char nameBuf[64];
-            strncpy(nameBuf, it->displayName.c_str(), sizeof(nameBuf));
-            ImGui::PushID(propIdx);
-            if (ImGui::InputText("##dispName", nameBuf, sizeof(nameBuf))) {
-                it->displayName = std::string(nameBuf);
-            }
-            
-            // 2. Колонка: Визуальное отображение куда ведет связь
-            ImGui::TableSetColumnIndex(1);
-            if (it->targetComponent) {
-                std::string path = it->targetComponent->owner->getPathRelativeTo(prefabRoot);
-                ImGui::Text("%s -> %s::%s", path.c_str(), it->targetComponent->getTypeName().c_str(), it->propertyName.c_str());
-                //if (!it->subProperty.empty()) ImGui::SameLine(); ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), " (%s)", it->subProperty.c_str());
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Unlinked!");
-            }
-            
-            // 3. Колонка: Кнопка связывания (Link Menu)
-            ImGui::TableSetColumnIndex(2);
-            if (ImGui::Button("Link...")) {
-                ImGui::OpenPopup("LinkBindingPopup");
-            }
-            
-            // РЕКУРСИВНОЕ КОНТЕНСТНОЕ МЕНЮ СВЯЗЫВАНИЯ
-            if (ImGui::BeginPopup("LinkBindingPopup"))
-            {
-                ImGui::Text("Select Target Component Property:");
-                ImGui::Separator();
-                
-                // Лямбда для обхода дерева префаба и генерации вложенных подменю ImGui
-                std::function<void(Entity*)> drawEntityMenu = [&](Entity* ent) {
-                    std::string entLabel = ent->getName();
-                    if (ent == prefabRoot) entLabel += " (Root)";
-                    
-                    if (ImGui::BeginMenu(entLabel.c_str()))
-                    {
-                        // Сначала выводим компоненты этой сущности
-                        
-                        if (ImGui::BeginMenu("Transform"))
-                        {
-                            auto& comp = ent->getTransform();
-                            
-                            if (ImGui::MenuItem("Position")) {
-                                it->targetComponent = &comp;
-                                it->propertyName = "position";
-                            }
-                            if (ImGui::MenuItem("Rotation")) {
-                                it->targetComponent = &comp;
-                                it->propertyName = "rotation";
-                            }
-                            if (ImGui::MenuItem("Scale")) {
-                                it->targetComponent = &comp;
-                                it->propertyName = "scale";
-                            }
-                            
-                            ImGui::EndMenu();
-                        }
-                        
-                        /*
-                        for (auto& comp : ent->getComponents())
-                        {
-                            if (ImGui::BeginMenu(comp->getTypeName().c_str()))
-                            {
-                                if (comp->getTypeName() == "TransformComponent")
-                                {
-
-                                }
-                                
-                                ImGui::EndMenu();
-                            }
-                        }
-                         */
-                        
-                        // Затем рекурсивно спускаемся к дочерним сущностям в подменю
-                        for (auto* child : ent->getChildren()) {
-                            drawEntityMenu(child);
-                        }
-                        
-                        ImGui::EndMenu();
-                    }
-                };
-                
-                drawEntityMenu(prefabRoot); // Запуск меню от корня префаба
-                ImGui::EndPopup();
-            }
-            
-            // 4. Колонка: Удаление свойства из интерфейса
-            ImGui::TableSetColumnIndex(3);
-            if (ImGui::Button("Delete")) {
-                it = prefabRoot->m_exposedInterfaceCache.erase(it); // Удаляем свойство из таблицы
-            } else {
-                ++it;
-            }
-            
-            ImGui::PopID();
-            propIdx++;
-        }
-        ImGui::EndTable();
-    }
-    
-    if (ImGui::Button("Add New Exposed Property"))
-    {
-        CachedExposedProperty newProp;
-        newProp.displayName = "New Property";
-        prefabRoot->m_exposedInterfaceCache.push_back(newProp);
-    }
 }
 
 void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
@@ -884,6 +155,62 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
         
         ImGui::EndPopup();
     }
+}
+
+// Универсальный метод отрисовки поля ввода в зависимости от содержимого JSON
+static bool DrawExposedWidget(const std::string& label, nlohmann::json& ioValue)
+{
+    bool changed = false;
+    
+    // 1. Если это число с плавающей точкой (float)
+    if (ioValue.is_number_float())
+    {
+        float val = ioValue.get<float>();
+        if (ImGui::DragFloat(label.c_str(), &val, 0.1f)) {
+            ioValue = val;
+            changed = true;
+        }
+    }
+    // 2. Если это целое число (int)
+    else if (ioValue.is_number_integer())
+    {
+        int val = ioValue.get<int>();
+        if (ImGui::DragInt(label.c_str(), &val, 1)) {
+            ioValue = val;
+            changed = true;
+        }
+    }
+    // 3. Если это логический тип (bool / галочка)
+    else if (ioValue.is_boolean())
+    {
+        bool val = ioValue.get<bool>();
+        if (ImGui::Checkbox(label.c_str(), &val)) {
+            ioValue = val;
+            changed = true;
+        }
+    }
+    // 4. Если это строка (std::string / ввод текста)
+    else if (ioValue.is_string())
+    {
+        std::string val = ioValue.get<std::string>();
+        char buf[256];
+        strncpy(buf, val.c_str(), sizeof(buf));
+        if (ImGui::InputText(label.c_str(), buf, sizeof(buf))) {
+            ioValue = std::string(buf);
+            changed = true;
+        }
+    }
+    // 5. Если это массив из 3-х чисел (например, glm::vec3 для Position/Rotation)
+    else if (ioValue.is_array() && ioValue.size() == 3 && ioValue[0].is_number())
+    {
+        float vec[3] = { ioValue[0].get<float>(), ioValue[1].get<float>(), ioValue[2].get<float>() };
+        if (ImGui::DragFloat3(label.c_str(), vec, 0.1f)) {
+            ioValue = { vec[0], vec[1], vec[2] };
+            changed = true;
+        }
+    }
+    
+    return changed;
 }
 
 void InspectorPanel::DrawPrefabInstanceInspector(Entity* prefabRoot)
@@ -1004,40 +331,6 @@ void InspectorPanel::DrawPrefabInstanceInspector(Entity* prefabRoot)
     }
 }
 
-void InspectorPanel::DrawInspector(Entity* selectedEntity)
-{
-    if (!selectedEntity) return;
-    
-    // Если это префаб, даем кнопку переключения режима
-    if (selectedEntity->isPrefabRoot && !isInPrefabEditMode())
-    {
-        if (ImGui::Button("Edit Prefab Interface")) {
-            togglePrefabEditMode(selectedEntity);
-        }
-        ImGui::Separator();
-    }
-    
-    // Отрисовка в зависимости от режима
-    if (selectedEntity->isPrefabRoot && m_editingPrefabRoot == selectedEntity)
-    {
-        // РЕЖИМ 1: Настройка внешнего интерфейса (экспорта) префаба
-        DrawPrefabInterfaceEditor(selectedEntity);
-    }
-    else if (selectedEntity->isPrefabRoot)
-    {
-        // РЕЖИМ 2: Дизайнер крутит готовые ползунки на сцене (наш прошлый шаг)
-        DrawPrefabInstanceInspector(selectedEntity);
-    }
-    else
-    {
-        // РЕЖИМ 3: Обычный инспектор компонентов для уникального объекта сцены
-        DrawNormalEntityComponents(selectedEntity);
-    }
-}
-
-#include <fstream>
-#include <iostream>
-
 static void saveCurrentPrefabInterface(Entity* prefabRoot)
 {
     if (!prefabRoot || !prefabRoot->isPrefabRoot || prefabRoot->prefabAssetPath.empty()) {
@@ -1132,23 +425,203 @@ static void saveCurrentPrefabInterface(Entity* prefabRoot)
     fileOut.close();
     
     /*
-    // 5. Актуализируем рантайм-состояние: так как мы переписали дефолты префаба,
-    // текущие значения на сцене теперь являются эталоном. Сбрасываем флаги оверрайдов сцены!
-    for (auto& cachedProp : prefabRoot->m_exposedInterfaceCache)
-    {
-        if (cachedProp.targetComponent) {
-            // Для всех свойств внутри компонентов нужно обновить m_prefabValue = m_value.
-            // Простейший способ — сымитировать setFromPrefab текущим значением.
-            nlohmann::json currentVal = cachedProp.targetComponent->getExposedValue(cachedProp.propertyName);
-            cachedProp.targetComponent->setExposedValue(cachedProp.propertyName, currentVal);
-            
-            // Также принудительно сообщаем компоненту сбросить оверрайд свойства, если это необходимо,
-            // но в нашей текущей архитектуре достаточно очистить флаг сцены:
-            prefabRoot->markInterfaceOverrideDirty(cachedProp.displayName, false);
-        }
-    }
+     // 5. Актуализируем рантайм-состояние: так как мы переписали дефолты префаба,
+     // текущие значения на сцене теперь являются эталоном. Сбрасываем флаги оверрайдов сцены!
+     for (auto& cachedProp : prefabRoot->m_exposedInterfaceCache)
+     {
+     if (cachedProp.targetComponent) {
+     // Для всех свойств внутри компонентов нужно обновить m_prefabValue = m_value.
+     // Простейший способ — сымитировать setFromPrefab текущим значением.
+     nlohmann::json currentVal = cachedProp.targetComponent->getExposedValue(cachedProp.propertyName);
+     cachedProp.targetComponent->setExposedValue(cachedProp.propertyName, currentVal);
+     
+     // Также принудительно сообщаем компоненту сбросить оверрайд свойства, если это необходимо,
+     // но в нашей текущей архитектуре достаточно очистить флаг сцены:
+     prefabRoot->markInterfaceOverrideDirty(cachedProp.displayName, false);
+     }
+     }
      */
     
     std::cout << "[Engine Editor] Интерфейс и дефолты префаба успешно сохранены: "
     << prefabRoot->prefabAssetPath << std::endl;
+}
+
+static Entity* m_editingPrefabRoot = nullptr;
+
+static void togglePrefabEditMode(Entity* entity)
+{
+    if (m_editingPrefabRoot == entity) m_editingPrefabRoot = nullptr; // Выйти
+    else if (entity->isPrefabRoot) m_editingPrefabRoot = entity;      // Войти
+}
+
+static void DrawPrefabInterfaceEditor(Entity* prefabRoot)
+{
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "--- PREFAB EDIT MODE ---");
+    if (ImGui::Button("Save Changes to .prefab File")) {
+        // Логика функции Apply Changes (перезапись исходного .prefab)
+        saveCurrentPrefabInterface(prefabRoot);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Exit Edit Mode")) {
+        togglePrefabEditMode(prefabRoot);
+        return;
+    }
+    ImGui::Separator();
+    
+    // Таблица для удобного редактирования строк
+    if (ImGui::BeginTable("InterfaceTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+    {
+        ImGui::TableSetupColumn("Name");
+        ImGui::TableSetupColumn("Source");
+        ImGui::TableSetupColumn("Link");
+        ImGui::TableSetupColumn("Actions");
+        ImGui::TableHeadersRow();
+        
+        int propIdx = 0;
+        // Работаем НАПРЯМУЮ с кэшем/вектором структуры инстанса
+        for (auto it = prefabRoot->m_exposedInterfaceCache.begin(); it != prefabRoot->m_exposedInterfaceCache.end(); )
+        {
+            ImGui::TableNextRow();
+            
+            // 1. Колонка: Редактирование Внешнего Имени (Display Name)
+            ImGui::TableSetColumnIndex(0);
+            char nameBuf[64];
+            strncpy(nameBuf, it->displayName.c_str(), sizeof(nameBuf));
+            ImGui::PushID(propIdx);
+            if (ImGui::InputText("##dispName", nameBuf, sizeof(nameBuf))) {
+                it->displayName = std::string(nameBuf);
+            }
+            
+            // 2. Колонка: Визуальное отображение куда ведет связь
+            ImGui::TableSetColumnIndex(1);
+            if (it->targetComponent) {
+                std::string path = it->targetComponent->owner->getPathRelativeTo(prefabRoot);
+                ImGui::Text("%s -> %s::%s", path.c_str(), it->targetComponent->getTypeName().c_str(), it->propertyName.c_str());
+                //if (!it->subProperty.empty()) ImGui::SameLine(); ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), " (%s)", it->subProperty.c_str());
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Unlinked!");
+            }
+            
+            // 3. Колонка: Кнопка связывания (Link Menu)
+            ImGui::TableSetColumnIndex(2);
+            if (ImGui::Button("Link...")) {
+                ImGui::OpenPopup("LinkBindingPopup");
+            }
+            
+            // РЕКУРСИВНОЕ КОНТЕНСТНОЕ МЕНЮ СВЯЗЫВАНИЯ
+            if (ImGui::BeginPopup("LinkBindingPopup"))
+            {
+                ImGui::Text("Select Target Component Property:");
+                ImGui::Separator();
+                
+                // Лямбда для обхода дерева префаба и генерации вложенных подменю ImGui
+                std::function<void(Entity*)> drawEntityMenu = [&](Entity* ent) {
+                    std::string entLabel = ent->getName();
+                    if (ent == prefabRoot) entLabel += " (Root)";
+                    
+                    if (ImGui::BeginMenu(entLabel.c_str()))
+                    {
+                        // Сначала выводим компоненты этой сущности
+                        
+                        if (ImGui::BeginMenu("Transform"))
+                        {
+                            auto& comp = ent->getTransform();
+                            
+                            if (ImGui::MenuItem("Position")) {
+                                it->targetComponent = &comp;
+                                it->propertyName = "position";
+                            }
+                            if (ImGui::MenuItem("Rotation")) {
+                                it->targetComponent = &comp;
+                                it->propertyName = "rotation";
+                            }
+                            if (ImGui::MenuItem("Scale")) {
+                                it->targetComponent = &comp;
+                                it->propertyName = "scale";
+                            }
+                            
+                            ImGui::EndMenu();
+                        }
+                        
+                        /*
+                         for (auto& comp : ent->getComponents())
+                         {
+                         if (ImGui::BeginMenu(comp->getTypeName().c_str()))
+                         {
+                         if (comp->getTypeName() == "TransformComponent")
+                         {
+                         
+                         }
+                         
+                         ImGui::EndMenu();
+                         }
+                         }
+                         */
+                        
+                        // Затем рекурсивно спускаемся к дочерним сущностям в подменю
+                        for (auto* child : ent->getChildren()) {
+                            drawEntityMenu(child);
+                        }
+                        
+                        ImGui::EndMenu();
+                    }
+                };
+                
+                drawEntityMenu(prefabRoot); // Запуск меню от корня префаба
+                ImGui::EndPopup();
+            }
+            
+            // 4. Колонка: Удаление свойства из интерфейса
+            ImGui::TableSetColumnIndex(3);
+            if (ImGui::Button("Delete")) {
+                it = prefabRoot->m_exposedInterfaceCache.erase(it); // Удаляем свойство из таблицы
+            } else {
+                ++it;
+            }
+            
+            ImGui::PopID();
+            propIdx++;
+        }
+        ImGui::EndTable();
+    }
+    
+    if (ImGui::Button("Add New Exposed Property"))
+    {
+        CachedExposedProperty newProp;
+        newProp.displayName = "New Property";
+        prefabRoot->m_exposedInterfaceCache.push_back(newProp);
+    }
+}
+
+static bool isInPrefabEditMode() { return m_editingPrefabRoot != nullptr; }
+
+void InspectorPanel::DrawInspector(Entity* selectedEntity)
+{
+    if (!selectedEntity) return;
+    
+    // Если это префаб, даем кнопку переключения режима
+    if (selectedEntity->isPrefabRoot && !isInPrefabEditMode())
+    {
+        if (ImGui::Button("Edit Prefab Interface")) {
+            togglePrefabEditMode(selectedEntity);
+        }
+        ImGui::Separator();
+    }
+    
+    // Отрисовка в зависимости от режима
+    if (selectedEntity->isPrefabRoot && m_editingPrefabRoot == selectedEntity)
+    {
+        // РЕЖИМ 1: Настройка внешнего интерфейса (экспорта) префаба
+        DrawPrefabInterfaceEditor(selectedEntity);
+    }
+    else if (selectedEntity->isPrefabRoot)
+    {
+        // РЕЖИМ 2: Дизайнер крутит готовые ползунки на сцене (наш прошлый шаг)
+        DrawPrefabInstanceInspector(selectedEntity);
+    }
+    else
+    {
+        // РЕЖИМ 3: Обычный инспектор компонентов для уникального объекта сцены
+        DrawNormalEntityComponents(selectedEntity);
+    }
 }

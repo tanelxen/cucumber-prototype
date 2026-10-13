@@ -14,6 +14,7 @@
 #define CGLTF_IMPLEMENTATION
 #include "../vendor/cgltf.h"
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb_image.h"
 
 #include <glm/glm.hpp>

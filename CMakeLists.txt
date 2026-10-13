@@ -139,6 +139,8 @@ set(SRC_PANELS
         src/ScenePanel.h
         src/InspectorPanel.cpp
         src/InspectorPanel.h
+        src/ComponentInspector.cpp
+        src/ComponentInspector.h
         src/AssetsPanel.cpp
         src/AssetsPanel.h
         src/MaterialPanel.cpp
