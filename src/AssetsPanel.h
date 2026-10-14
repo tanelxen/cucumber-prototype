@@ -63,7 +63,6 @@ private:
     void renderTopBar(float height);
     void renderGridItems();
     void renderDeleteDialog();
-    void renderBottomBar(float height);
     void handleShortcuts();
     
     RenderDevice::handle_t loadTextureFromFile(const std::filesystem::path& path);
