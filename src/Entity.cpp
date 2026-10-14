@@ -11,6 +11,7 @@
 #include <glm/gtx/matrix_decompose.hpp>
 
 #include <iostream>
+#include <unordered_set>
 
 //#define radians(deg) ((deg) * (M_PI / 180.0f))
 
@@ -26,6 +27,11 @@ Entity::~Entity()
 void Entity::destroyComponent(Component* component)
 {
     if (!component || component->isPendingKill) return;
+
+    if (!scene) {
+        std::cerr << "[Entity] Cannot destroy a component without an owning scene." << std::endl;
+        return;
+    }
     
     component->isPendingKill = true;
     component->enabled = false; // Сразу выключаем, чтобы он не апдейтился в этом кадре
@@ -72,15 +78,32 @@ void Entity::freeComponentMemory(Component* component)
 void Entity::destroy()
 {
     if (m_isPendingKill) return;
+
+    if (!scene) {
+        std::cerr << "[Entity] Cannot destroy an entity without an owning scene." << std::endl;
+        return;
+    }
+
+    if (parent) {
+        auto& siblings = parent->children;
+        siblings.erase(std::remove(siblings.begin(), siblings.end(), this), siblings.end());
+        parent = nullptr;
+    }
+
     m_isPendingKill = true;
     
     for (auto& component : m_components) {
         destroyComponent(component.get());
     }
     
-    for (auto& child : children)
+    while (!children.empty())
     {
-        child->setParent(nullptr, true);
+        Entity* child = children.back();
+        if (child) {
+            child->setParent(nullptr, true);
+        } else {
+            children.pop_back();
+        }
     }
     
     // Ставим саму сущность в очередь Сцены на удаление в конце кадра
@@ -89,6 +112,22 @@ void Entity::destroy()
 
 void Entity::setParent(Entity* newParent, bool keepRelative)
 {
+    if (newParent == this ||
+        (newParent && (newParent->m_isPendingKill || newParent->scene != scene))) {
+        return;
+    }
+
+    if (parent == newParent) {
+        return;
+    }
+
+    std::unordered_set<Entity*> visited;
+    for (Entity* ancestor = newParent; ancestor; ancestor = ancestor->parent) {
+        if (ancestor == this || !visited.insert(ancestor).second) {
+            return;
+        }
+    }
+
     // 1. Запоминаем текущую МИРОВУЮ матрицу объекта, пока старая иерархия еще активна
     glm::mat4 oldWorldMatrix = m_transform.getWorldMatrix();
     

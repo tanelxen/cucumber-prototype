@@ -93,59 +93,62 @@ std::vector<std::string> GetAvailableScriptClasses()
     return scriptClasses;
 }
 
-bool InspectorPanel::RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY)
+InspectorPanel::AssetDragResult InspectorPanel::RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY, uint32_t allowedTypes)
 {
-    // 1. Создаем невидимую область
     ImGui::InvisibleButton(str_id, size);
     
     bool isHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    bool isDragging = ImGui::GetDragDropPayload() != nullptr;
-    bool accepted = false;
+    AssetDragResult result; // По умолчанию success = false
     
-    // 2. Отключаем встроенную желтую рамку ImGuiCol_DragDropTarget
+    // Предварительная проверка типа
+    bool isValidAssetDragging = false;
+    if (const ImGuiPayload* currentPayload = ImGui::GetDragDropPayload())
+    {
+        if (currentPayload->IsDataType("ASSET_ITEM"))
+        {
+            AssetDragPayload* dragData = (AssetDragPayload*)currentPayload->Data;
+            if (dragData != nullptr && (dragData->type & allowedTypes))
+            {
+                isValidAssetDragging = true;
+            }
+        }
+    }
+    
     ImGui::PushStyleColor(ImGuiCol_DragDropTarget, IM_COL32(0, 0, 0, 0));
     ImGui::PushStyleColor(ImGuiCol_NavHighlight,   IM_COL32(0, 0, 0, 0));
     
-    // 3. Обрабатываем Drag & Drop
     if (ImGui::BeginDragDropTarget())
     {
-        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET_ITEM", ImGuiDragDropFlags_AcceptBeforeDelivery))
+        if (isValidAssetDragging)
         {
-            AssetsPanel::DragDropAssetInfo* info = static_cast<AssetsPanel::DragDropAssetInfo*>(payload->Data);
-            const bool isModel = info->type == AssetsPanel::AssetType::Mesh;
-            
-            if (payload->IsDelivery() && isModel)
+            if (const ImGuiPayload* imGuiPayload = ImGui::AcceptDragDropPayload("ASSET_ITEM"))
             {
-                auto *meshComponent = m_entity->addComponent<MeshComponent>();
-                meshComponent->loadModel(info->path);
+                // КЛЮЧЕВОЙ МОМЕНТ: Копируем данные по значению, пока они валидны!
+                result.payload = *(AssetDragPayload*)imGuiPayload->Data;
+                result.success = true;
             }
-            
-            accepted = true;
         }
         ImGui::EndDragDropTarget();
     }
     
-    ImGui::PopStyleColor(2); // Возвращаем оригинальные цвета стиля обратно
+    ImGui::PopStyleColor(2);
     
-    // 4. Отрисовываем кастомную синюю линию, если мышь над этой зоной
-    if (isDragging && isHovered)
+    // Отрисовка линии
+    if (isValidAssetDragging && isHovered)
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        
-        // Линия во всю ширину контентной области окна
         float startX = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMin().x;
         float endX   = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
         
         ImVec2 lineStart = ImVec2(startX, targetLineY);
-        ImVec2 lineEnd   = ImVec2(endX, targetLineY + 4.0f); // 4 пикселя толщина полоски
+        ImVec2 lineEnd   = ImVec2(endX, targetLineY + 4.0f);
         
-        // Рисуем синий маркер дропа
         drawList->AddRectFilled(lineStart, lineEnd, IM_COL32(66, 150, 250, 255));
     }
     
-    return accepted;
+    // Теперь данные внутри result.payload в полной безопасности, так как они скопированы в стек
+    return result;
 }
-
 
 void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
 {
@@ -182,9 +185,15 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
         ImGui::Spacing();
     }
     
+    uint32_t allowedInInspector = AssetType_Mesh;
+    
     // ЗОНА 1: Между последним компонентом и кнопкой "Add Component"
     float targetLineY = ImGui::GetCursorScreenPos().y;
-    RenderAssetDropZone("##drop_zone_before_button", ImVec2(-1, 6.0f), targetLineY);
+    auto result1 = RenderAssetDropZone("##drop_before_btn", ImVec2(-1, 6.0f), targetLineY, allowedInInspector);
+    if (result1.success)
+    {
+        ProcessAssetInInspector(&result1.payload); // Передаем адрес скопированных данных
+    }
 
     ImGui::Separator();
     ImGui::Spacing();
@@ -197,7 +206,11 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
     // ЗОНА 2: Пустое пространство в самом низу панели
     ImVec2 remainingSpace = ImGui::GetContentRegionAvail();
     float bottomZoneHeight = std::max(remainingSpace.y, 20.0f);
-    RenderAssetDropZone("##drop_zone_bottom_empty", ImVec2(-1, bottomZoneHeight), targetLineY);
+    auto result2 = RenderAssetDropZone("##drop_bottom", ImVec2(-1, bottomZoneHeight), targetLineY, allowedInInspector);
+    if (result2.success)
+    {
+        ProcessAssetInInspector(&result2.payload);
+    }
     
     if (ImGui::BeginPopup("AddComponentPopup"))
     {
@@ -232,6 +245,19 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
         }
         
         ImGui::EndPopup();
+    }
+}
+
+void InspectorPanel::ProcessAssetInInspector(AssetDragPayload* data)
+{
+    if (data->type == AssetType_Mesh)
+    {
+        auto meshComponent = m_entity->addComponent<MeshComponent>();
+        meshComponent->loadModel(data->path);
+    }
+    else if (data->type == AssetType_Audio)
+    {
+        
     }
 }
 

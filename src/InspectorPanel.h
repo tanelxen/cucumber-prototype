@@ -8,9 +8,11 @@
 #pragma once
 
 #include "EditorPanel.h"
+#include "AssetsPanel.h"
 
 class Entity;
 struct ImVec2;
+struct AssetDragPayload;
 
 class InspectorPanel: public EditorPanel
 {
@@ -28,5 +30,11 @@ private:
     void DrawNormalEntityComponents(Entity* entity);
     void DrawPrefabInstanceInspector(Entity* prefabRoot);
     
-    bool RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY);
+    struct AssetDragResult {
+        bool success = false;
+        AssetDragPayload payload;
+    };
+    
+    AssetDragResult RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY, uint32_t allowedTypes);
+    void ProcessAssetInInspector(AssetDragPayload* data);
 };

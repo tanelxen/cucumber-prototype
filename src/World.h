@@ -45,8 +45,6 @@ public:
     void startSimulation(Viewport* viewport);
     void stopSimulation();
     
-    void selectEntityAtIndex(int index);
-    
     void clear();
     void awake();
     

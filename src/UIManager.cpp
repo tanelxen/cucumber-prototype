@@ -13,7 +13,6 @@
 #include "InspectorPanel.h"
 #include "MaterialPanel.h"
 #include "AssetsPanel.h"
-#include "ScenePanel.h"
 #include "HierarchyPanel.h"
 #include "Viewport.h"
 
@@ -39,9 +38,6 @@ UIManager::UIManager()
     m_pViewportPanel->setViewport(m_pMainView);
     m_pViewportPanel->m_manager = this;
     
-    m_pScenePanel = new ScenePanel();
-    m_pScenePanel->m_manager = this;
-    
     m_pHierarchyPanel = new HierarchyPanel();
     m_pHierarchyPanel->m_manager = this;
     
@@ -56,7 +52,6 @@ UIManager::UIManager()
     m_pMaterialPanel->isVisible = false;
     
     m_panels.push_back(m_pViewportPanel);
-    m_panels.push_back(m_pScenePanel);
     m_panels.push_back(m_pHierarchyPanel);
     m_panels.push_back(m_pInspectorPanel);
     m_panels.push_back(m_pMaterialPanel);
@@ -76,10 +71,6 @@ void UIManager::update(float dt)
     for (auto panel : m_panels)
     {
         panel->update(dt);
-    }
-    
-    if (m_is_picking_mode) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     }
 }
 
@@ -156,8 +147,6 @@ void UIManager::init(struct GLFWwindow *window)
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    
-    io.IniFilename = "assets/imgui.ini";
     
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 150");
@@ -256,7 +245,7 @@ void UIManager::drawMenuBar()
                 if (path != nullptr) SceneManager::Get().openFile(path);
             }
             
-            if (ImGui::MenuItem("Save")) {
+            if (ImGui::MenuItem("Save Current")) {
                 SceneManager::Get().saveCurrent();
             }
             
@@ -269,6 +258,19 @@ void UIManager::drawMenuBar()
                 {
                     SceneManager::Get().saveCurrentAs(path);
                 }
+            }
+            
+            ImGui::Separator();
+            
+            if (ImGui::MenuItem("Reload Scripts"))
+            {
+                ScriptEngine::get().HotReloadAllScripts("assets/scripts");
+                
+            }
+            
+            if (ImGui::MenuItem("New Scene"))
+            {
+                SceneManager::Get().createNewScene();
             }
             
             ImGui::EndMenu();
@@ -333,14 +335,6 @@ void UIManager::drawPanels()
     }
     
     DrawScriptConsoleWindow();
-    
-    if (ImGui::IsKeyDown(ImGuiKey_Escape))
-    {
-        if (g_UIManager->m_is_picking_mode)
-        {
-            g_UIManager->endPicking();
-        }
-    }
 }
 
 void UIManager::setEntity(Entity *entity)
@@ -354,24 +348,11 @@ void UIManager::setMaterial(Material* material)
     m_pMaterialPanel->setMaterial(material);
 }
 
-void UIManager::startPicking(std::function<void (Entity *)> callback)
-{
-    m_active_picking_callback = callback;
-    m_is_picking_mode = true;
-}
-
-void UIManager::endPicking()
-{
-    m_active_picking_callback = nullptr;
-    m_is_picking_mode = false;
-}
-
 void DrawScriptConsoleWindow()
 {
     ImGui::Begin(ICON_MDI_CONSOLE " Script Console###Script Console");
     
-    // Кнопка очистки консоли
-    if (ImGui::Button("Clear")) {
+    if (ImGui::Button(ICON_MDI_TRASH_CAN " Clear")) {
         ScriptEngine::get().ClearLogs();
     }
     

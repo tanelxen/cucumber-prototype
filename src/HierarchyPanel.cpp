@@ -19,9 +19,6 @@
 #include "../vendor/tinyfiledialogs.h"
 #include "../vendor/IconsMaterialDesignIcons.h"
 
-static std::vector<Entity*> rootEntities {};
-static Entity* selectedEntity;
-
 HierarchyPanel::HierarchyPanel() : EditorPanel(ICON_MDI_FILE_TREE " Hierarchy###Hierarchy")
 {
     
@@ -30,6 +27,13 @@ HierarchyPanel::HierarchyPanel() : EditorPanel(ICON_MDI_FILE_TREE " Hierarchy###
 void HierarchyPanel::draw()
 {
     auto activeScene = SceneManager::Get().getActiveScene();
+
+    if (m_scene != activeScene)
+    {
+        m_scene = activeScene;
+        m_selectedEntity = nullptr;
+        g_UIManager->setEntity(nullptr);
+    }
     
     if (!activeScene)
     {
@@ -45,8 +49,8 @@ void HierarchyPanel::draw()
         auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
         entity->scene = activeScene;
         
-        selectedEntity = entity.get();
-        g_UIManager->setEntity(selectedEntity);
+        m_selectedEntity = entity.get();
+        g_UIManager->setEntity(m_selectedEntity);
         
         activeScene->m_entities.push_back(std::move(entity));
     }
@@ -60,8 +64,6 @@ void HierarchyPanel::draw()
         
         if (path != nullptr)
         {
-            auto count = (int)activeScene->m_entities.size();
-            
             std::filesystem::path project_root = std::filesystem::current_path();
             auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
             
@@ -69,76 +71,105 @@ void HierarchyPanel::draw()
             
             if (entity)
             {
-                selectedEntity = entity;
-                g_UIManager->setEntity(selectedEntity);
+                m_selectedEntity = entity;
+                g_UIManager->setEntity(m_selectedEntity);
             }
         }
     }
     
     ImGui::Separator();
     
-    rootEntities.clear();
+    m_liveEntities.clear();
+    for (const auto& entity : activeScene->m_entities)
+    {
+        if (entity) {
+            m_liveEntities.insert(entity.get());
+        }
+    }
+
+    if (m_selectedEntity && m_liveEntities.contains(m_selectedEntity) && m_selectedEntity->isPendingKill())
+    {
+        m_selectedEntity = nullptr;
+        g_UIManager->setEntity(nullptr);
+    }
+    else if (m_selectedEntity && !m_liveEntities.contains(m_selectedEntity))
+    {
+        m_selectedEntity = nullptr;
+        g_UIManager->setEntity(nullptr);
+    }
+
+    m_rootEntities.clear();
     
     for (auto& entity : activeScene->m_entities)
     {
-        if (entity->parent == nullptr) {
-            rootEntities.push_back(entity.get());
+        if (entity && !entity->isPendingKill() &&
+            (!entity->parent || !m_liveEntities.contains(entity->parent))) {
+            m_rootEntities.push_back(entity.get());
         }
     }
-    
-    Draw(rootEntities, selectedEntity);
-    
-    ImGui::End();
-}
-
-void HierarchyPanel::Draw(const std::vector<Entity*>& rootEntities, Entity*& selectedEntity)
-{
-//    ImGui::Begin(ICON_FA_TREE " Hierarchy");
     
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
-    
-    if (selectedEntity == nullptr) {
+    if (!m_selectedEntity) {
         flags |= ImGuiTreeNodeFlags_Selected;
     }
-    
-    if (ImGui::TreeNodeEx(&rootEntities, flags, "Scene"))
+
+    m_visitedEntities.clear();
+    m_pendingReparents.clear();
+    m_pendingDestructions.clear();
+    if (ImGui::TreeNodeEx(&m_rootEntities, flags, "Scene"))
     {
         if (ImGui::IsItemClicked()) {
-            selectedEntity = nullptr;
-            g_UIManager->setEntity(selectedEntity);
+            m_selectedEntity = nullptr;
+            g_UIManager->setEntity(nullptr);
         }
-        
-        // Отрисовываем только корневые сущности (у которых нет родителя)
-        for (Entity* entity : rootEntities) {
-            if (entity->parent == nullptr) {
-                DrawEntityNode(entity, selectedEntity);
-            }
+
+        for (Entity* entity : m_rootEntities) {
+            DrawEntityNode(entity);
         }
-        
         ImGui::TreePop();
     }
-    
-    // Drop-зона на пустое место панели (чтобы сделать объект снова корневым)
+
+    for (Entity* entity : m_pendingDestructions) {
+        if (m_liveEntities.contains(entity)) {
+            entity->destroy();
+        }
+    }
+
+    for (const auto& [child, parent] : m_pendingReparents)
+    {
+        if (m_liveEntities.contains(child) && m_liveEntities.contains(parent) &&
+            !child->isPendingKill() && !parent->isPendingKill()) {
+            child->setParent(parent, true);
+        }
+    }
+
     ImVec2 minPos = ImGui::GetWindowPos();
     ImVec2 maxPos = ImVec2(minPos.x + ImGui::GetWindowWidth(), minPos.y + ImGui::GetWindowHeight());
     if (ImGui::BeginDragDropTargetCustom(ImRect(minPos, maxPos), ImGui::GetID("HierarchyEmptySpace"))) {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY")) {
-            Entity* draggedEntity = *static_cast<Entity**>(payload->Data);
-            if (draggedEntity) {
-                draggedEntity->setParent(nullptr, true); // Отцепляем от родителя
+            if (payload->Data && payload->DataSize == sizeof(Entity*)) {
+                Entity* draggedEntity = *static_cast<Entity* const*>(payload->Data);
+                if (m_liveEntities.contains(draggedEntity) && !draggedEntity->isPendingKill()) {
+                    draggedEntity->setParent(nullptr, true);
+                }
             }
         }
         ImGui::EndDragDropTarget();
     }
     
-//    ImGui::End();
+    ImGui::End();
 }
 
-void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
+void HierarchyPanel::DrawEntityNode(Entity* entity)
 {
+    if (!entity || !m_liveEntities.contains(entity) || entity->isPendingKill() ||
+        !m_visitedEntities.insert(entity).second) {
+        return;
+    }
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DrawLinesToNodes;
     
-    if (selectedEntity == entity) flags |= ImGuiTreeNodeFlags_Selected;
+    if (m_selectedEntity == entity) flags |= ImGuiTreeNodeFlags_Selected;
     if (entity->children.empty())  flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
     
     // Отрисовываем узел дерева
@@ -147,8 +178,8 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     // Умное выделение объекта с учетом, что это может быть просто drag-n-drop
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
     {
-        selectedEntity = entity;
-        g_UIManager->setEntity(selectedEntity);
+        m_selectedEntity = entity;
+        g_UIManager->setEntity(m_selectedEntity);
     }
     
     // --- 1. DRAG-N-DROP: ИСТОЧНИК (Тащим этот объект) ---
@@ -164,13 +195,17 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY"))
         {
-            Entity* draggedEntity = *static_cast<Entity**>(payload->Data);
+            Entity* draggedEntity = payload->Data && payload->DataSize == sizeof(Entity*)
+                ? *static_cast<Entity* const*>(payload->Data)
+                : nullptr;
             
             // Защита: объект не может стать родителем самого себя
             // И не может стать ребенком своего собственного ребенка (цикл)
-            if (draggedEntity && draggedEntity != entity && !IsChildOf(entity, draggedEntity))
+            if (draggedEntity && m_liveEntities.contains(draggedEntity) &&
+                !draggedEntity->isPendingKill() && draggedEntity != entity &&
+                !IsChildOf(entity, draggedEntity))
             {
-                draggedEntity->setParent(entity, true);
+                m_pendingReparents.emplace_back(draggedEntity, entity);
             }
         }
         
@@ -181,16 +216,18 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     {
         if (ImGui::MenuItem("Удалить объект"))
         {
-            selectedEntity->destroy();
-            selectedEntity = nullptr;
-            g_UIManager->setEntity(selectedEntity);
+            m_pendingDestructions.push_back(entity);
+            if (m_selectedEntity == entity) {
+                m_selectedEntity = nullptr;
+                g_UIManager->setEntity(nullptr);
+            }
         }
         
         // Если этот объект на сцене пришел из префаба — даем возможность его открыть!
-        if (selectedEntity && !selectedEntity->prefabAssetPath.empty() && ImGui::MenuItem("Редактировать префаб"))
+        if (!entity->prefabAssetPath.empty() && ImGui::MenuItem("Редактировать префаб"))
         {
             // Открываем префаб, сцена уровня автоматически скрывается в бэкграунд!
-            SceneManager::Get().enterPrefabEditMode(selectedEntity->prefabAssetPath);
+            SceneManager::Get().enterPrefabEditMode(entity->prefabAssetPath);
         }
         
         if (ImGui::MenuItem("Сохранить как префаб"))
@@ -204,7 +241,7 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
                 auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
                 
                 auto activeScene = SceneManager::Get().getActiveScene();
-                SceneSerializer::CreatePrefabFromEntity(activeScene, selectedEntity, rel_path);
+                SceneSerializer::CreatePrefabFromEntity(activeScene, entity, rel_path);
             }
         }
         
@@ -214,19 +251,23 @@ void HierarchyPanel::DrawEntityNode(Entity* entity, Entity*& selectedEntity)
     // Рекурсивный вызов для отрисовки детей, если папка раскрыта
     if (isOpened) {
         for (Entity* child : entity->children) {
-            DrawEntityNode(child, selectedEntity);
+            DrawEntityNode(child);
         }
         ImGui::TreePop();
     }
 }
 
-bool HierarchyPanel::IsChildOf(Entity* potentialChild, Entity* potentialParent)
+bool HierarchyPanel::IsChildOf(Entity* potentialChild, Entity* potentialParent) const
 {
+    if (!potentialChild || !potentialParent) {
+        return false;
+    }
+
+    std::unordered_set<Entity*> visited;
     Entity* current = potentialChild->parent;
-    while (current != nullptr) {
+    while (current && m_liveEntities.contains(current) && visited.insert(current).second) {
         if (current == potentialParent) return true;
         current = current->parent;
     }
     return false;
 }
-

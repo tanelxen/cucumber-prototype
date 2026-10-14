@@ -135,8 +135,6 @@ set(SRC_PANELS
 
         src/ViewportPanel.cpp
         src/ViewportPanel.h
-        src/ScenePanel.cpp
-        src/ScenePanel.h
         src/InspectorPanel.cpp
         src/InspectorPanel.h
         src/ComponentInspector.cpp

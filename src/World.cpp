@@ -268,15 +268,6 @@ void WorldScene::collectRenderCommands(RenderView& view)
     }
 }
 
-void WorldScene::selectEntityAtIndex(int index)
-{
-    if (index < m_entities.size())
-    {
-        Entity* rawPtr = m_entities[index].get();
-        g_UIManager->setEntity(rawPtr);
-    }
-}
-
 Entity* WorldScene::findEntityByName(const std::string &name)
 {
     auto it = std::find_if(m_entities.begin(), m_entities.end(),

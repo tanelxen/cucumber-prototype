@@ -8,24 +8,29 @@
 #pragma once
 
 #include "EditorPanel.h"
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 class Entity;
+class WorldScene;
 
-class HierarchyPanel: public EditorPanel
+class HierarchyPanel : public EditorPanel
 {
 public:
     HierarchyPanel();
     void draw() override;
     
-    // Главный метод отрисовки окна
-    void Draw(const std::vector<Entity*>& rootEntities, Entity*& selectedEntity);
-    
 private:
-    // Рекурсивный метод для отрисовки дерева объектов
-    void DrawEntityNode(Entity* entity, Entity*& selectedEntity);
+    void DrawEntityNode(Entity* entity);
     
-    // Проверка: является ли node потенциальным ребенком parent (защита от зацикливания иерархии)
-    bool IsChildOf(Entity* potentialChild, Entity* potentialParent);
-};
+    bool IsChildOf(Entity* potentialChild, Entity* potentialParent) const;
 
+    Entity* m_selectedEntity = nullptr;
+    WorldScene* m_scene = nullptr;
+    std::vector<Entity*> m_rootEntities;
+    std::vector<std::pair<Entity*, Entity*>> m_pendingReparents;
+    std::vector<Entity*> m_pendingDestructions;
+    std::unordered_set<Entity*> m_liveEntities;
+    std::unordered_set<Entity*> m_visitedEntities;
+};

@@ -16,6 +16,22 @@
 #include <map>
 #include <memory>
 
+enum AssetType: uint32_t {
+    AssetType_None        = 0,
+    AssetType_Folder      = 1 << 0,
+    AssetType_Unknown     = 1 << 1,
+    AssetType_Texture     = 1 << 2,
+    AssetType_Mesh        = 1 << 3,
+    AssetType_Audio       = 1 << 4,
+    AssetType_Scene       = 1 << 5,
+    AssetType_Script      = 1 << 6,
+};
+
+struct AssetDragPayload {
+    AssetType type;
+    char path[256];
+};
+
 class AssetsPanel : public EditorPanel
 {
 public:
@@ -26,26 +42,11 @@ public:
         std::vector<std::filesystem::path> files;
     };
     
-    enum class AssetType {
-        Folder,
-        Unknown,
-        Texture,
-        Mesh,
-        Audio,
-        Scene,
-        Script
-    };
-    
     struct BrowserItem {
         enum class Type { Directory, File } type;
         std::filesystem::path fullPath;
         std::string name;
         AssetType assetType;
-    };
-    
-    struct DragDropAssetInfo {
-        AssetType type;
-        char path[256];
     };
     
     AssetsPanel(const std::filesystem::path& rootPath = "assets");

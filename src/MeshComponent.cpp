@@ -14,27 +14,8 @@
 #include <algorithm>
 #include <cctype>
 
-bool MeshComponent::IsModelFile(const std::filesystem::path& filepath)
-{
-    if (!std::filesystem::is_regular_file(filepath))
-    {
-        return false;
-    }
-
-    std::string extension = filepath.extension().string();
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return extension == ".glb" || extension == ".gltf";
-}
-
 bool MeshComponent::loadModel(const std::filesystem::path& filepath)
 {
-    if (!IsModelFile(filepath))
-    {
-        return false;
-    }
-
     auto resource = ModelLoader::LoadModel(filepath.string());
 
     mesh = resource.mesh;

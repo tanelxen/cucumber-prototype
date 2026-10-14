@@ -21,25 +21,25 @@ AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(IC
     std::memset(m_searchBuffer, 0, sizeof(m_searchBuffer));
     std::memset(m_renameBuffer, 0, sizeof(m_renameBuffer));
     
-    m_extensionMap[".png"]  = AssetType::Texture;
-    m_extensionMap[".jpg"]  = AssetType::Texture;
-    m_extensionMap[".tga"]  = AssetType::Texture;
-    m_extensionMap[".glb"]  = AssetType::Mesh;
-    m_extensionMap[".gltf"] = AssetType::Mesh;
-    m_extensionMap[".wav"]  = AssetType::Audio;
-    m_extensionMap[".mp3"]  = AssetType::Audio;
-    m_extensionMap[".scene"] = AssetType::Scene;
-    m_extensionMap[".json"]  = AssetType::Scene;
-    m_extensionMap[".as"]   = AssetType::Script;
-    m_extensionMap[".glsl"]  = AssetType::Script;
+    m_extensionMap[".png"]  = AssetType_Texture;
+    m_extensionMap[".jpg"]  = AssetType_Texture;
+    m_extensionMap[".tga"]  = AssetType_Texture;
+    m_extensionMap[".glb"]  = AssetType_Mesh;
+    m_extensionMap[".gltf"] = AssetType_Mesh;
+    m_extensionMap[".wav"]  = AssetType_Audio;
+    m_extensionMap[".mp3"]  = AssetType_Audio;
+    m_extensionMap[".scene"] = AssetType_Scene;
+    m_extensionMap[".json"]  = AssetType_Scene;
+    m_extensionMap[".as"]   = AssetType_Script;
+    m_extensionMap[".glsl"]  = AssetType_Script;
     
-    m_icons[AssetType::Folder]  = loadTextureFromFile("assets/icons/folder.png");
-    m_icons[AssetType::Unknown] = loadTextureFromFile("assets/icons/file_unknown.png");
-    m_icons[AssetType::Texture] = loadTextureFromFile("assets/icons/file_texture.png");
-    m_icons[AssetType::Mesh]    = loadTextureFromFile("assets/icons/file_mesh.png");
-    m_icons[AssetType::Audio]   = loadTextureFromFile("assets/icons/file_audio.png");
-    m_icons[AssetType::Scene]   = loadTextureFromFile("assets/icons/file_scene.png");
-    m_icons[AssetType::Script]  = loadTextureFromFile("assets/icons/file_script.png");
+    m_icons[AssetType_Folder]  = loadTextureFromFile("assets/icons/folder.png");
+    m_icons[AssetType_Unknown] = loadTextureFromFile("assets/icons/file_unknown.png");
+    m_icons[AssetType_Texture] = loadTextureFromFile("assets/icons/file_texture.png");
+    m_icons[AssetType_Mesh]    = loadTextureFromFile("assets/icons/file_mesh.png");
+    m_icons[AssetType_Audio]   = loadTextureFromFile("assets/icons/file_audio.png");
+    m_icons[AssetType_Scene]   = loadTextureFromFile("assets/icons/file_scene.png");
+    m_icons[AssetType_Script]  = loadTextureFromFile("assets/icons/file_script.png");
     
     refresh();
 }
@@ -60,14 +60,14 @@ RenderDevice::handle_t AssetsPanel::loadTextureFromFile(const std::filesystem::p
     return texture;
 }
 
-AssetsPanel::AssetType AssetsPanel::getAssetTypeFromExtension(const std::string& extension) const
+AssetType AssetsPanel::getAssetTypeFromExtension(const std::string& extension) const
 {
     std::string extLower = extension;
     std::transform(extLower.begin(), extLower.end(), extLower.begin(), ::tolower);
     if (m_extensionMap.contains(extLower)) {
         return m_extensionMap.at(extLower);
     }
-    return AssetType::Unknown;
+    return AssetType_Unknown;
 }
 
 void AssetsPanel::draw()
@@ -205,7 +205,7 @@ void AssetsPanel::changeDirectory(std::shared_ptr<DirectoryInfo>& directory)
                 BrowserItem::Type::Directory,
                 m_rootPath / subdir->filePath,
                 subdir->filePath.filename().string(),
-                AssetType::Folder
+                AssetType_Folder
             });
         }
         
@@ -289,7 +289,7 @@ void AssetsPanel::renderDirectoryHierarchy(std::shared_ptr<DirectoryInfo>& direc
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM"))
         {
-            DragDropAssetInfo* info = (DragDropAssetInfo*)payload->Data;
+            AssetDragPayload* info = (AssetDragPayload*)payload->Data;
             
             std::filesystem::path src = info->path;
             std::filesystem::rename(src, m_rootPath / directory->filePath / src.filename());
@@ -488,7 +488,7 @@ void AssetsPanel::renderGridItems()
     {
         ImGui::PushID(item.fullPath.string().c_str());
         
-        RenderDevice::handle_t icon = m_icons.contains(item.assetType) ? m_icons[item.assetType] : m_icons[AssetType::Unknown];
+        RenderDevice::handle_t icon = m_icons.contains(item.assetType) ? m_icons[item.assetType] : m_icons[AssetType_Unknown];
         
         bool isSelected = std::find(m_selectedPaths.begin(), m_selectedPaths.end(), item.fullPath) != m_selectedPaths.end();
         
@@ -537,11 +537,11 @@ void AssetsPanel::renderGridItems()
         
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
         {
-            DragDropAssetInfo info;
+            AssetDragPayload info;
             info.type = item.assetType;
             strncpy(info.path, item.fullPath.c_str(), sizeof(info.path));
             
-            ImGui::SetDragDropPayload("ASSET_ITEM", &info, sizeof(DragDropAssetInfo));
+            ImGui::SetDragDropPayload("ASSET_ITEM", &info, sizeof(AssetDragPayload));
             
             ImGui::Text("%s", item.name.c_str());
             ImGui::EndDragDropSource();
@@ -552,7 +552,7 @@ void AssetsPanel::renderGridItems()
         {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM"))
             {
-                DragDropAssetInfo* info = (DragDropAssetInfo*)payload->Data;
+                AssetDragPayload* info = (AssetDragPayload*)payload->Data;
                 
                 std::filesystem::path src = info->path;
                 std::filesystem::rename(src, item.fullPath / src.filename());

@@ -24,7 +24,6 @@ struct MeshComponent : public Component
     
     const std::string getTypeName() const override { return "MeshComponent"; }
     
-    static bool IsModelFile(const std::filesystem::path& filepath);
     bool loadModel(const std::filesystem::path& filepath);
 
     void save(nlohmann::json& j) const override

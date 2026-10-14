@@ -32,7 +32,7 @@ public:
     
     bool m_isActive = true;
     
-    WorldScene* scene;
+    WorldScene* scene = nullptr;
     
     Entity* parent = nullptr;
     std::vector<Entity*> children;

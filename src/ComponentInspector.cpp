@@ -59,7 +59,7 @@ std::string ComponentInspector::GetName(std::type_index id) {
 static bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
 {
     ImGuiIO& io = ImGui::GetIO();
-    auto boldFont = io.Fonts->Fonts[0];
+    auto boldFont = io.Fonts->Fonts[1];
     
     ImGui::PushID(label.c_str());
     
@@ -243,24 +243,22 @@ static void DrawCollisionBits(const char* label, uint32_t& bitmask)
 
 static void DrawMeshComponent(MeshComponent* comp)
 {
-//    ImGui::SetCursorPosY(10);
-    ImGui::TextUnformatted("Mesh ");
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Source");
     ImGui::SameLine();
     
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(24, 24, 24, 255));
     char pathBuffer[256];
     std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", comp->path.c_str());
     ImGui::InputText("##Path", pathBuffer, sizeof(pathBuffer), ImGuiInputTextFlags_ReadOnly);
-    ImGui::PopStyleColor();
     
     ImGui::PushStyleColor(ImGuiCol_DragDropTarget, IM_COL32(0, 0, 0, 0));
     if (ImGui::BeginDragDropTarget())
     {
         if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM", ImGuiDragDropFlags_AcceptBeforeDelivery))
         {
-            AssetsPanel::DragDropAssetInfo* info = static_cast<AssetsPanel::DragDropAssetInfo*>(payload->Data);
+            AssetDragPayload* info = static_cast<AssetDragPayload*>(payload->Data);
             
-            const bool isModel = info->type == AssetsPanel::AssetType::Mesh;
+            const bool isModel = info->type == AssetType_Mesh;
             
             const ImVec2 fieldMin = ImGui::GetItemRectMin();
             const ImVec2 fieldMax = ImGui::GetItemRectMax();

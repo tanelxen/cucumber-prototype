@@ -14,7 +14,6 @@ class EditorPanel;
 class ViewportPanel;
 class InspectorPanel;
 class AssetsPanel;
-class ScenePanel;
 class HierarchyPanel;
 class MaterialPanel;
 class Viewport;
@@ -36,23 +35,14 @@ public:
     
     Viewport* getMainViewport() { return m_pMainView; }
     
-    void startPicking(std::function<void(Entity*)> callback);
-    void endPicking();
-    
     void update(float dt);
     void preRender();
     void draw();
-    
-    bool m_is_picking_mode = false;
-    std::function<void(Entity*)> m_active_picking_callback = nullptr;
     
     ViewportPanel* m_pViewportPanel;
     Viewport* m_pMainView;
     
 private:
-    
-    
-    ScenePanel* m_pScenePanel;
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
     MaterialPanel* m_pMaterialPanel;

@@ -313,12 +313,24 @@ bool SceneSerializer::CreatePrefabFromEntity(WorldScene* scene, Entity* rootEnti
 bool SceneSerializer::SaveScene(const WorldScene* scene, const std::string& filename)
 {
     nlohmann::json sceneJson;
-    auto entitiesArray = nlohmann::json::array();
-    
-    SaveSceneToMemory(scene, sceneJson);
+    if (!scene || !SaveSceneToMemory(scene, sceneJson)) {
+        std::cerr << "[Engine] Не удалось подготовить данные сцены для сохранения." << std::endl;
+        return false;
+    }
     
     std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "[Engine] Не удалось открыть файл сцены для записи: " << filename << std::endl;
+        return false;
+    }
+
     file << sceneJson.dump(4);
+    if (!file) {
+        std::cerr << "[Engine] Не удалось записать файл сцены: " << filename << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity* entity)
