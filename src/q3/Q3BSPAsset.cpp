@@ -34,6 +34,7 @@ bool Q3BSPAsset::initFromFile(const std::string& filename)
     
     if(fp == nullptr) {
         printf("unable to open %s\n", filename.c_str());
+        return false;
     }
 
     tBSPHeader header;

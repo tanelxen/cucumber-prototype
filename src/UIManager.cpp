@@ -21,18 +21,25 @@
 #include "ScriptEngine.h"
 #include "ProjectManager.h"
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
+
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
 #include "../vendor/tinyfiledialogs.h"
 #include "../vendor/IconsMaterialDesignIcons.h"
 
+#include "../vendor/stb_image.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 
-void DrawScriptConsoleWindow();
+static void DrawScriptConsoleWindow();
+
+static ImTextureID LoadTextureFromFile(const char* filename);
+static ImTextureID s_projectIcon = 0;
 
 UIManager::UIManager()
 {
@@ -70,6 +77,8 @@ UIManager::UIManager()
     m_panels.push_back(m_pAssetsPanel);
     
     g_UIManager = this;
+    
+    s_projectIcon = LoadTextureFromFile("resources/icons/project.png");
 }
 
 UIManager::~UIManager()
@@ -156,7 +165,12 @@ static void InitFonts(ImGuiIO& io)
     io.Fonts->Fonts[1] = io.Fonts->AddFontFromFileTTF("resources/fonts/Ruda/Ruda-Bold.ttf", 17.0f);
     
     // Сливаем FontAwesome с Bold
-    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
+    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 17.0f, &config, icon_ranges);
+    
+    
+    
+    io.Fonts->Fonts[2] = io.Fonts->AddFontFromFileTTF("resources/fonts/Ruda/Ruda-Regular.ttf", 15.0f);
+//    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 18.0f, &config, icon_ranges);
 }
 
 void UIManager::init(struct GLFWwindow *window)
@@ -358,24 +372,99 @@ void UIManager::drawMenuBar()
 void UIManager::drawProjectLauncher()
 {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const ImVec2 size(620.0f, 570.0f);
+    // Немного увеличим высоту окна по умолчанию, чтобы комфортно вмещать и форму, и список
+    const ImVec2 size(650.0f, 600.0f);
     
     ImGui::SetNextWindowPos(
-        ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f,
-               viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f),
-        ImGuiCond_Always);
+                            ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f,
+                                   viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f),
+                            ImGuiCond_Always);
     
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-
+    
     if (!ImGui::Begin("Cucumber Project Manager", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
     {
         ImGui::End();
         return;
     }
-
-    ImGui::Text("Open a project");
-    ImGui::Separator();
     
+    // --- ВЕРХНЯЯ ПАНЕЛЬ КНОПОК ---
+    if (ImGui::Button("Browse..."))
+    {
+        const char* path = tinyfd_selectFolderDialog("Open Project", ".");
+        if (path) openProjectPath(path);
+    }
+    
+    ImGui::SameLine();
+    
+    static bool m_showCreateForm = false;
+    
+    // Кнопка переключает видимость формы создания проекта
+    if (ImGui::Button("Create New..."))
+    {
+        m_showCreateForm = !m_showCreateForm;
+        m_projectError.clear();
+    }
+    
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    // --- ДИНАМИЧЕСКАЯ ФОРМА СОЗДАНИЯ ПРОЕКТА ---
+    if (m_showCreateForm)
+    {
+        ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), "Configure New Project");
+        ImGui::Spacing();
+        
+        ImGui::InputText("Project name", m_projectNameBuffer, sizeof(m_projectNameBuffer));
+        ImGui::InputText("Location", m_projectLocationBuffer, sizeof(m_projectLocationBuffer));
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Browse...###InlineBrowse"))
+        {
+            const char* path = tinyfd_selectFolderDialog("Choose project location", m_projectLocationBuffer);
+            if (path)
+            {
+                std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s", path);
+            }
+        }
+        
+        ImGui::Spacing();
+        
+        if (ImGui::Button("Create & Edit", ImVec2(120, 0)))
+        {
+            std::string error;
+            if (ProjectManager::Get().createProject(m_projectLocationBuffer, m_projectNameBuffer, error))
+            {
+                m_showCreateForm = false; // Закрываем форму при успехе
+                openProjectPath(ProjectManager::Get().projectPath());
+            }
+            else
+            {
+                m_projectError = std::move(error);
+            }
+        }
+        
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Cancel", ImVec2(80, 0)))
+        {
+            m_showCreateForm = false; // Просто скрываем форму
+            m_projectError.clear();
+        }
+        
+        if (!m_projectError.empty())
+        {
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error: %s", m_projectError.c_str());
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+    
+    // --- ДВУХСТРОЧНЫЙ СПИСОК ПРОЕКТОВ ---
     const auto recentProjects = ProjectManager::Get().recentProjects();
     
     if (recentProjects.empty())
@@ -384,68 +473,64 @@ void UIManager::drawProjectLauncher()
     }
     else
     {
-        ImGui::BeginChild("RecentProjects", ImVec2(0, 210), true);
+        ImGui::BeginChild("RecentProjectsList", ImVec2(0, 0), true);
         
         for (const auto& projectPath : recentProjects)
         {
-            const std::string label = projectPath.filename().string() + "###" + projectPath.string();
+            std::string projectName = projectPath.filename().string();
+            std::string fullPath = projectPath.string();
+            std::string id = "###" + fullPath;
             
-            if (ImGui::Selectable(label.c_str(), false, 0, ImVec2(0, 42)))
+            const float itemHeight = 64.0f;
+            ImVec2 selectableSize(0, itemHeight);
+            
+            ImGui::PushID(fullPath.c_str());
+            
+            // Запоминаем стартовую позицию элемента
+            ImVec2 screenCursorPos = ImGui::GetCursorScreenPos();
+            float initialLocalY = ImGui::GetCursorPosY();
+            
+            // Кликабельная область на всю высоту элемента
+            if (ImGui::Selectable(id.c_str(), false, 0, selectableSize))
             {
                 openProjectPath(projectPath);
             }
             
-            ImGui::TextDisabled("%s", projectPath.string().c_str());
+            // Переключаемся в режим "рисования поверх"
+            // Используем относительный SetCursorPosY вместо абсолютного экрана, чтобы не ломать контейнер
+            ImGui::SetCursorPosY(initialLocalY);
+            
+            // 1. ИКОНКА ПРОЕКТА
+            ImGui::SetCursorScreenPos(screenCursorPos + ImVec2(4, 4));
+            ImGui::Image(s_projectIcon, ImVec2(56.0f, 56.0f));
+            
+            // 2. НАЗВАНИЕ ПРОЕКТА
+            ImGui::SetCursorScreenPos(screenCursorPos + ImVec2(76.0f, 12.0f));
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+            ImGui::Text("%s", projectName.c_str());
+            ImGui::PopFont();
+            
+            // 3. ПУТЬ К ПРОЕКТУ
+            ImGui::SetCursorScreenPos(screenCursorPos + ImVec2(76.0f, 36.0f));
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
+            ImGui::TextDisabled("%s", fullPath.c_str());
+            ImGui::PopFont();
+            
+            ImGui::PopID();
+            
+            // Возвращаем курсор в нормальный поток ImGui строго в конец текущего элемента
+            ImGui::SetCursorPosY(initialLocalY + itemHeight);
+            
+            // Добавляем небольшой отступ между карточками проектов
+            ImGui::Dummy(ImVec2(0.0f, 4.0f));
         }
         
         ImGui::EndChild();
     }
-
-    if (ImGui::Button("Browse for project..."))
-    {
-        const char* path = tinyfd_selectFolderDialog("Open Project", ".");
-        if (path) openProjectPath(path);
-    }
-
-    ImGui::Spacing();
-    ImGui::Text("Create a new project");
-    ImGui::Separator();
-    ImGui::InputText("Project name", m_projectNameBuffer, sizeof(m_projectNameBuffer));
-    ImGui::InputText("Location", m_projectLocationBuffer, sizeof(m_projectLocationBuffer));
-    ImGui::SameLine();
-    
-    if (ImGui::Button("Browse..."))
-    {
-        const char* path = tinyfd_selectFolderDialog("Choose project location", m_projectLocationBuffer);
-        
-        if (path)
-        {
-            std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s", path);
-        }
-    }
-    
-    if (ImGui::Button("Create Project"))
-    {
-        std::string error;
-        
-        if (ProjectManager::Get().createProject(m_projectLocationBuffer, m_projectNameBuffer, error))
-        {
-            openProjectPath(ProjectManager::Get().projectPath());
-        }
-        else
-        {
-            m_projectError = std::move(error);
-        }
-    }
-
-    if (!m_projectError.empty())
-    {
-        ImGui::Spacing();
-        ImGui::TextWrapped("%s", m_projectError.c_str());
-    }
     
     ImGui::End();
 }
+
 
 bool UIManager::openProjectPath(const std::filesystem::path& path)
 {
@@ -535,7 +620,7 @@ void UIManager::setMaterial(Material* material)
     m_pMaterialPanel->setMaterial(material);
 }
 
-void DrawScriptConsoleWindow()
+static void DrawScriptConsoleWindow()
 {
     ImGui::Begin(ICON_MDI_CONSOLE " Script Console###Script Console");
     
@@ -597,4 +682,30 @@ void DrawScriptConsoleWindow()
     ImGui::EndChild();
     
     ImGui::End();
+}
+
+static ImTextureID LoadTextureFromFile(const char* filename)
+{
+    int width = 0, height = 0, channels = 0;
+    // Декодируем PNG/JPG в сырой массив пикселей (RGBA)
+    unsigned char* data = stbi_load(filename, &width, &height, &channels, 4);
+    if (data == nullptr) return 0;
+    
+    // Создаем текстуру в OpenGL
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    
+    // Настраиваем фильтрацию (чтобы иконка не размывалась при изменении размеров)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    // Загружаем пиксели в видеопамять
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB_ALPHA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    
+    // Освобождаем память процессора, так как картинка уже на видеокарте
+    stbi_image_free(data);
+    
+    // Приводим GLuint к типу ImTextureID, который ждет ImGui
+    return (ImTextureID)(intptr_t)textureID;
 }
