@@ -54,6 +54,7 @@ public:
     
     virtual void draw() override;
     void refresh();
+    void setRootPath(const std::filesystem::path& rootPath);
     
 private:
     void processDirectory(const std::filesystem::path& absolutePath, std::shared_ptr<DirectoryInfo>& info);

@@ -59,10 +59,10 @@ namespace RenderDevice {
         
         glFrontFace(GL_CCW);
         
-        flat_shader.init("assets/shaders/cube_shaded.glsl");
-        grid_shader.init("assets/shaders/grid.glsl");
+        flat_shader.init("resources/shaders/cube_shaded.glsl");
+        grid_shader.init("resources/shaders/grid.glsl");
         
-        generic.init("assets/shaders/generic.glsl");
+        generic.init("resources/shaders/generic.glsl");
         
         {
             unsigned char pixels[4] = { 255, 255, 255, 255 };

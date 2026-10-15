@@ -7,9 +7,7 @@
 
 #include <glad/glad.h>
 
-#include "../vendor/stb_image_write.h"
-
-//#define STB_IMAGE_IMPLEMENTATION
+//#include "../vendor/stb_image_write.h"
 #include "../vendor/stb_image.h"
 
 #include <unordered_map>
@@ -30,6 +28,8 @@
 #include "IndexBuffer.h"
 
 #include "Q3Shaders.h"
+
+#include "ProjectManager.h"
 
 #define FACE_POLYGON 1
 #define FACE_PATCH 2
@@ -56,7 +56,8 @@ void Q3BspMesh::initFromBsp(Q3BSPAsset* bsp)
     adjastLightmapCoords(bsp, atlas);
     m_lightmap = RenderDevice::makeTexture(atlas.width, atlas.height, false, false, atlas.buffer);
     
-    s_q3shaders.initFromDir("assets/wolf/scripts/");
+    auto scriptsPath = ProjectManager::Get().resolveProjectPath("assets/wolf/scripts/");
+    s_q3shaders.initFromDir(scriptsPath);
     
     GenerateTexture();
     initBuffers();
@@ -106,8 +107,8 @@ Image loadImage(std::string& map)
 {
     Image image;
     
-    std::filesystem::path folder("assets/wolf");
-    std::filesystem::path path = folder / std::filesystem::path(map);
+    auto wolfPath = ProjectManager::Get().resolveProjectPath("assets/wolf/");
+    std::filesystem::path path = wolfPath / std::filesystem::path(map);
     
     image.data = stbi_load(path.replace_extension("jpg").c_str(), &image.width, &image.height, &image.num_channels, 3);
     
@@ -129,7 +130,7 @@ void Q3BspMesh::GenerateTexture()
     int width, height;
     int num_channels = 3;
 
-    unsigned char* image = stbi_load("assets/_engine/missing.png", &width, &height, &num_channels, 3);
+    unsigned char* image = stbi_load("resources/textures/missing.png", &width, &height, &num_channels, 3);
     m_missingTexId = RenderDevice::makeTexture(width, height, false, true, image);
     stbi_image_free(image);
 
@@ -331,4 +332,3 @@ void makeVertexlit(std::vector<Surface>& surfaces, std::vector<unsigned int>& in
         indices.insert(indices.end(), pair.second.begin(), pair.second.end());
     }
 }
-

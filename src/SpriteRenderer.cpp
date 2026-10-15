@@ -7,6 +7,7 @@
 
 #include "SpriteRenderer.h"
 #include "ShaderVariant.h"
+#include "ProjectManager.h"
 
 #include "../vendor/stb_image.h"
 #include <glad/glad.h>
@@ -209,19 +210,19 @@ namespace SpriteRenderer {
         s_shader->init(billboard_vs, billboard_fs);
     }
     
-    int PreloadTexture(const std::string& filename)
+    int PreloadTexture(const std::string& path)
     {
         // Если текстура уже загружена — возвращаем кэшированный ID
-        if (s_loadedTextures.count(filename)) {
-            return s_loadedTextures[filename];
+        if (s_loadedTextures.count(path)) {
+            return s_loadedTextures[path];
         }
         
         int width, height, channels;
-//        stbi_set_flip_vertically_on_load(true);
-        unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 4);
+        unsigned char *data = stbi_load(path.c_str(), &width, &height, &channels, 4);
         
         if (!data) {
-            std::cerr << "[SpriteRenderer] Не удалось загрузить текстуру: " << filename << std::endl;
+            std::cerr << "[SpriteRenderer] Не удалось загрузить текстуру: "
+            << path << std::endl;
             return 0;
         }
         
@@ -239,8 +240,18 @@ namespace SpriteRenderer {
         
         stbi_image_free(data);
         
-        s_loadedTextures[filename] = textureId;
+        s_loadedTextures[path] = textureId;
         return textureId;
+    }
+    
+    int PreloadEngineTexture(const std::string& filename)
+    {
+        return PreloadTexture("resources/" + filename);
+    }
+    
+    int PreloadProjectTexture(const std::string& filename)
+    {
+        return PreloadTexture(ProjectManager::Get().assetsPath() / filename);
     }
     
     void Shutdown()

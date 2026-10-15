@@ -39,7 +39,7 @@ public:
         return instance;
     }
     
-    bool init();
+    bool init(const std::string& scriptsFolder);
     bool CompileAllScripts(const std::string& scriptsFolder);
     void HotReloadAllScripts(const std::string& scriptsFolder);
     

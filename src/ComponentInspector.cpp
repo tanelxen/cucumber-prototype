@@ -19,6 +19,7 @@
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
 #include "MeshComponent.h"
+#include "ProjectManager.h"
 
 #include "Mesh.h"
 #include <imgui.h>
@@ -380,13 +381,14 @@ static void DrawAudioComponent(AudioComponent* comp)
     if (ImGui::Button("..."))
     {
         char const * filter[2] = { "*.mp3", "*.wav" };
-        const char* path = tinyfd_openFileDialog(NULL, "./assets/sounds/", 2, filter, NULL, 0);
+        const auto soundsPath = ProjectManager::Get().assetsPath() / "sounds";
+        const char* path = tinyfd_openFileDialog(NULL, soundsPath.string().c_str(), 2, filter, NULL, 0);
         
         if (path != nullptr)
         {
             comp->init(path);
             
-            std::filesystem::path base_path("./assets");
+            const auto base_path = ProjectManager::Get().assetsPath();
             auto rel_path = std::filesystem::relative(path, base_path);
             comp->path = rel_path;
         }

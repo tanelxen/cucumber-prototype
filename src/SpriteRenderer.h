@@ -23,9 +23,9 @@ namespace SpriteRenderer {
     // Освобождает текстуры и буферы при выходе
     void Shutdown();
     
-    // Загружает текстуру и возвращает её OpenGL ID
-    int PreloadTexture(const std::string& filename);
-    
+    int PreloadEngineTexture(const std::string& filename);
+    int PreloadProjectTexture(const std::string& filename);
+
     // Добавляет биллборд в очередь отрисовки на один текущий кадр
     void AddBillboard(int textureId, glm::vec3 position, float scale, float zRot,
                       const glm::vec4& color = glm::vec4(1.0f), BlendMode blendMode = BlendMode::Alpha);

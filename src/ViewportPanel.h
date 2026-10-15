@@ -8,6 +8,7 @@
 #pragma once
 
 #include "EditorPanel.h"
+#include <glm/glm.hpp>
 
 class Viewport;
 class Entity;
@@ -22,6 +23,8 @@ public:
     
     void setViewport(Viewport* viewport);
     void setEntity(Entity* entity);
+    void setEditorCameraPosition(const glm::vec3& position);
+    glm::vec3 getEditorCameraPosition() const;
     
     void update(float dt) override;
     void draw() override;

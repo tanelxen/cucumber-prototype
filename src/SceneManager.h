@@ -23,7 +23,7 @@ public:
     WorldScene* getActiveScene() { return m_activeScene.get(); }
     
     void createNewScene(const std::string& name = "Untitled");
-    void openFile(const std::string& filePath);
+    bool openFile(const std::string& filePath);
     void saveCurrentAs(const std::string& filename);
     void saveCurrent();
     
@@ -41,4 +41,3 @@ private:
     
     SceneManager() = default;
 };
-

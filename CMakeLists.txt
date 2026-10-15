@@ -31,6 +31,8 @@ set(SRC_COMMON
         
         src/Application.cpp
         src/Application.h
+        src/ProjectManager.cpp
+        src/ProjectManager.h
         src/Input.cpp
         src/Input.h
 
@@ -193,7 +195,7 @@ source_group("imgui" FILES ${SRC_IMGUI})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)
 
-#set(SHADERS_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders")
+#set(SHADERS_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
 #file(GLOB_RECURSE SHADER_FILES "${SHADERS_FOLDER}/*")
 #source_group("Shaders" FILES ${SHADER_FILES})
 #add_custom_target(Shaders SOURCES ${SHADER_FILES})
@@ -259,12 +261,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui ImGuizmo miniaudio
 
 
 
-set(ASSETS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets")
-set(ASSETS_LINK_NAME "${CMAKE_BINARY_DIR}/bin/assets")
+set(RESOURCES_SOURCE_DIR "${CMAKE_SOURCE_DIR}/resources")
+set(RESOURCES_LINK_NAME "${CMAKE_BINARY_DIR}/bin/resources")
 
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}/assets
+        ${RESOURCES_SOURCE_DIR}
+        ${RESOURCES_LINK_NAME}
 )

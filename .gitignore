@@ -1,8 +1,8 @@
 .DS_Store
 build
-assets/scripts/as.predefined
-assets/textures/cubemaps
-assets/wolf
-assets/meshes/gltf
-assets/sounds
+resources/scripts/as.predefined
+resources/textures/cubemaps
+resources/wolf
+resources/meshes/gltf
+resources/sounds
 .cache

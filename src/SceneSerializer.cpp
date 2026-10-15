@@ -22,6 +22,7 @@
 #include "MeshComponent.h"
 
 #include "ModelLoader.h"
+#include "ProjectManager.h"
 
 //#include <nlohmann/json.hpp>
 #include "../vendor/json_fwd.hpp"
@@ -64,7 +65,8 @@ bool SceneSerializer::LoadFile(WorldScene* scene, const std::string& filename)
         scene->m_type = SceneType::Prefab;
         file.close(); // Переоткроем файл внутри InstantiatePrefab
         
-        Entity* prefabRoot = InstantiatePrefab(scene, filename);
+        Entity* prefabRoot = InstantiatePrefab(
+            scene, ProjectManager::Get().resolveProjectPath(filename).string());
         
         if (prefabRoot)
         {
@@ -354,7 +356,7 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
             newComp = entity->addComponent<MeshComponent>();
             
             std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            ModelResource model = ModelLoader::LoadModel((ProjectManager::Get().assetsPath() / path).string());
             
             auto meshComp = static_cast<MeshComponent*>(newComp);
             meshComp->mesh = model.mesh;
@@ -365,7 +367,7 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
             newComp = entity->addComponent<AnimatorComponent>();
             
             std::string path = compData.at("source_glb");
-            ModelResource model = ModelLoader::LoadModel("assets/" + path);
+            ModelResource model = ModelLoader::LoadModel((ProjectManager::Get().assetsPath() / path).string());
             
             auto animComp = static_cast<AnimatorComponent*>(newComp);
             animComp->setSkeleton(model.skeleton);
@@ -379,7 +381,7 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
             std::string path = compData.at("source");
             
             auto audioComp = static_cast<AudioComponent*>(newComp);
-            audioComp->init("assets/" + path);
+            audioComp->init((ProjectManager::Get().assetsPath() / path).string());
         }
         else if (compName == "ScriptComponent")
         {
@@ -426,7 +428,8 @@ bool SceneSerializer::SaveSceneToMemory(const WorldScene* scene, nlohmann::json&
         if (entity->isPrefabRoot)
         {
             // СЛУЧАЙ 1: Это экземпляр префаба
-            entityJson["prefab_path"] = entity->prefabAssetPath;
+            entityJson["prefab_path"] =
+                ProjectManager::Get().makeProjectRelative(entity->prefabAssetPath);
             
             // ПРИНУДИТЕЛЬНО сохраняем трансформацию именно этого экземпляра на сцене
             auto transformJson = nlohmann::json::object();
@@ -514,7 +517,8 @@ bool SceneSerializer::LoadSceneFromMemory(WorldScene* scene, const nlohmann::jso
     {
         if (entityJson.contains("prefab_path"))
         {
-            std::string prefabPath = entityJson["prefab_path"];
+            std::string prefabPath = ProjectManager::Get().resolveProjectPath(
+                entityJson["prefab_path"].get<std::string>()).string();
             UID savedRootUid = entityJson["uid"].get<UID>();
             
             // 1. Просто спавним чистую структуру из префаба.

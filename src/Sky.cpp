@@ -295,10 +295,10 @@ static GLuint skyboxVAO = 0;
 
 void Sky::init()
 {
-    g_skyShader.init("assets/shaders/skybox.glsl");
+    g_skyShader.init("resources/shaders/skybox.glsl");
     
     // Путь к папке, где лежат файлы: posx.hdr, negx.hdr и т.д.
-    std::string cubemapDir = "assets/textures/cubemaps/tantolunden2";
+    std::string cubemapDir = "resources/textures/cubemaps/tantolunden2";
     
     skyboxTextureID = loadCubemapWithSHCache(cubemapDir, ".jpg");
     

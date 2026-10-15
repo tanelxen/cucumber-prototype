@@ -17,8 +17,8 @@ struct Application
     static void setCursorEnabled(bool state);
     
 private:
-    struct GLFWwindow* m_pWindow;
-    class UIManager* m_pUIManager;
+    struct GLFWwindow* m_pWindow = nullptr;
+    class UIManager* m_pUIManager = nullptr;
     bool m_cursorEnabled = true;
     
     void updateInputState();

@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "ProjectManager.h"
 #include "miniaudio.h"
 #include <iostream>
 
@@ -36,8 +37,9 @@ public:
     
     ma_engine* GetEngine() { return &m_engine; }
     
-    void PlaySound(const std::string& path)
+    void PlaySound(const std::string& filename)
     {
+        auto path = ProjectManager::Get().assetsPath() / filename;
         ma_engine_play_sound(&m_engine, path.c_str(), NULL);
     }
     

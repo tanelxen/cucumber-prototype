@@ -6,6 +6,7 @@
 //
 
 #include "GameUIScreen.h"
+#include "ProjectManager.h"
 
 #include <fstream>
 #include <iostream>
@@ -16,8 +17,10 @@ using json = nlohmann::json;
 
 namespace GameUI {
     
-    void Screen::Init(const std::string& path)
+    void Screen::Init(const std::string& filename)
     {
+        auto path = ProjectManager::Get().assetsPath() / filename;
+        
         m_widgets.clear();
         m_nameToIndex.clear();
         

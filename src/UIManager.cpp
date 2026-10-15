@@ -19,6 +19,7 @@
 #include "SceneManager.h"
 #include "World.h"
 #include "ScriptEngine.h"
+#include "ProjectManager.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -27,12 +28,23 @@
 #include "../vendor/tinyfiledialogs.h"
 #include "../vendor/IconsMaterialDesignIcons.h"
 
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+
 void DrawScriptConsoleWindow();
 
 UIManager::UIManager()
 {
     m_pMainView = new Viewport();
     m_pMainView->init();
+
+    const char* home = std::getenv("HOME");
+    const std::string defaultLocation = home
+        ? (std::filesystem::path(home) / "Projects").string()
+        : std::filesystem::current_path().string();
+    std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s",
+                  defaultLocation.c_str());
     
     m_pViewportPanel = new ViewportPanel("Perspective");
     m_pViewportPanel->setViewport(m_pMainView);
@@ -87,25 +99,32 @@ void UIManager::draw()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     
-    drawMenuBar();
-    
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->Pos);
-    ImGui::SetNextWindowSize(viewport->Size);
-    ImGui::SetNextWindowViewport(viewport->ID);
-    
-    ImGuiWindowFlags flags =
-    ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
-    
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    ImGui::Begin("DockSpace", nullptr, flags);
-    ImGui::PopStyleVar();
-    ImGui::DockSpace(ImGui::GetID("MainDockSpace"));
-    ImGui::End();
-    
-    drawPanels();
+    if (m_showProjectLauncher)
+    {
+        drawProjectLauncher();
+    }
+    else
+    {
+        drawMenuBar();
+
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::SetNextWindowViewport(viewport->ID);
+
+        ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+            ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ImGui::Begin("DockSpace", nullptr, flags);
+        ImGui::PopStyleVar();
+        ImGui::DockSpace(ImGui::GetID("MainDockSpace"));
+        ImGui::End();
+
+        drawPanels();
+    }
     
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -125,19 +144,19 @@ static void InitFonts(ImGuiIO& io)
     // СЕКЦИЯ 1: Загрузка Medium шрифта + FontAwesome к нему
     // ----------------------------------------------------
     // Загружаем основной Medium (он автоматически станет Fonts[0])
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Medium.ttf", 17.0f);
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("resources/fonts/Ruda/Ruda-Medium.ttf", 17.0f);
     
-    io.Fonts->AddFontFromFileTTF("assets/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
+    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
     
     
     // ----------------------------------------------------
     // СЕКЦИЯ 2: Загрузка Bold шрифта + FontAwesome к нему
     // ----------------------------------------------------
     // Загружаем основной Bold (он станет Fonts[1])
-    io.Fonts->Fonts[1] = io.Fonts->AddFontFromFileTTF("assets/fonts/Ruda/Ruda-Bold.ttf", 17.0f);
+    io.Fonts->Fonts[1] = io.Fonts->AddFontFromFileTTF("resources/fonts/Ruda/Ruda-Bold.ttf", 17.0f);
     
     // Сливаем FontAwesome с Bold
-    io.Fonts->AddFontFromFileTTF("assets/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
+    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 14.0f, &config, icon_ranges);
 }
 
 void UIManager::init(struct GLFWwindow *window)
@@ -241,7 +260,8 @@ void UIManager::drawMenuBar()
         {
             if (ImGui::MenuItem("Load Scene or Prefab")) {
                 char const * filter[3] = { "*.json", "*.scene", "*.prefab" };
-                const char* path = tinyfd_openFileDialog("Open Scene or Prefab", "./assets/scenes/", 3, filter, NULL, 0);
+                const auto scenesPath = ProjectManager::Get().scenesPath().string();
+                const char* path = tinyfd_openFileDialog("Open Scene or Prefab", scenesPath.c_str(), 3, filter, NULL, 0);
                 if (path != nullptr) SceneManager::Get().openFile(path);
             }
             
@@ -252,7 +272,8 @@ void UIManager::drawMenuBar()
             if (ImGui::MenuItem("Save As..."))
             {
                 char const * filter[3] = { "*.json", "*.scene", "*.prefab" };
-                const char* path = tinyfd_saveFileDialog("Save Prefab", "./assets/scenes/", 3, filter, NULL);
+                const auto scenesPath = ProjectManager::Get().scenesPath().string();
+                const char* path = tinyfd_saveFileDialog("Save Prefab", scenesPath.c_str(), 3, filter, NULL);
                 
                 if (path != nullptr)
                 {
@@ -264,7 +285,7 @@ void UIManager::drawMenuBar()
             
             if (ImGui::MenuItem("Reload Scripts"))
             {
-                ScriptEngine::get().HotReloadAllScripts("assets/scripts");
+                ScriptEngine::get().HotReloadAllScripts(ProjectManager::Get().scriptsPath().string());
                 
             }
             
@@ -273,9 +294,18 @@ void UIManager::drawMenuBar()
                 SceneManager::Get().createNewScene();
             }
             
+            ImGui::Separator();
+            
+            if (ImGui::MenuItem("Open Project..."))
+            {
+                const char* path = tinyfd_selectFolderDialog("Open Project", ".");
+                if (path) openProjectPath(path);
+            }
+            
             ImGui::EndMenu();
         }
         
+        /*
         if (ImGui::BeginMenu("Edit"))
         {
             if (ImGui::MenuItem("Undo", "Ctrl+Z")) {}
@@ -288,6 +318,7 @@ void UIManager::drawMenuBar()
             if (ImGui::MenuItem("Paste", "Ctrl+V")) {}
             ImGui::EndMenu();
         }
+         */
         
         if (ImGui::BeginMenu("View"))
         {
@@ -322,6 +353,162 @@ void UIManager::drawMenuBar()
         
         ImGui::EndMainMenuBar();
     }
+}
+
+void UIManager::drawProjectLauncher()
+{
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImVec2 size(620.0f, 570.0f);
+    
+    ImGui::SetNextWindowPos(
+        ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f,
+               viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f),
+        ImGuiCond_Always);
+    
+    ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+
+    if (!ImGui::Begin("Cucumber Project Manager", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+    {
+        ImGui::End();
+        return;
+    }
+
+    ImGui::Text("Open a project");
+    ImGui::Separator();
+    
+    const auto recentProjects = ProjectManager::Get().recentProjects();
+    
+    if (recentProjects.empty())
+    {
+        ImGui::TextDisabled("No recent projects");
+    }
+    else
+    {
+        ImGui::BeginChild("RecentProjects", ImVec2(0, 210), true);
+        
+        for (const auto& projectPath : recentProjects)
+        {
+            const std::string label = projectPath.filename().string() + "###" + projectPath.string();
+            
+            if (ImGui::Selectable(label.c_str(), false, 0, ImVec2(0, 42)))
+            {
+                openProjectPath(projectPath);
+            }
+            
+            ImGui::TextDisabled("%s", projectPath.string().c_str());
+        }
+        
+        ImGui::EndChild();
+    }
+
+    if (ImGui::Button("Browse for project..."))
+    {
+        const char* path = tinyfd_selectFolderDialog("Open Project", ".");
+        if (path) openProjectPath(path);
+    }
+
+    ImGui::Spacing();
+    ImGui::Text("Create a new project");
+    ImGui::Separator();
+    ImGui::InputText("Project name", m_projectNameBuffer, sizeof(m_projectNameBuffer));
+    ImGui::InputText("Location", m_projectLocationBuffer, sizeof(m_projectLocationBuffer));
+    ImGui::SameLine();
+    
+    if (ImGui::Button("Browse..."))
+    {
+        const char* path = tinyfd_selectFolderDialog("Choose project location", m_projectLocationBuffer);
+        
+        if (path)
+        {
+            std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s", path);
+        }
+    }
+    
+    if (ImGui::Button("Create Project"))
+    {
+        std::string error;
+        
+        if (ProjectManager::Get().createProject(m_projectLocationBuffer, m_projectNameBuffer, error))
+        {
+            openProjectPath(ProjectManager::Get().projectPath());
+        }
+        else
+        {
+            m_projectError = std::move(error);
+        }
+    }
+
+    if (!m_projectError.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextWrapped("%s", m_projectError.c_str());
+    }
+    
+    ImGui::End();
+}
+
+bool UIManager::openProjectPath(const std::filesystem::path& path)
+{
+    saveProjectSettings();
+
+    std::string error;
+    auto& projectManager = ProjectManager::Get();
+    
+    if (!projectManager.openProject(path, error))
+    {
+        m_projectError = std::move(error);
+        return false;
+    }
+
+    SceneManager::Get().createNewScene();
+
+    if (!ScriptEngine::get().init(projectManager.scriptsPath().string()))
+    {
+        m_projectError = "Не удалось инициализировать AngelScript для проекта.";
+        return false;
+    }
+    
+    if (!ScriptEngine::get().CompileAllScripts(projectManager.scriptsPath().string()))
+    {
+        m_projectError = "Не удалось скомпилировать скрипты проекта.";
+        return false;
+    }
+
+    bool sceneOpened = true;
+    
+    if (projectManager.startScene().empty())
+    {
+        SceneManager::Get().createNewScene();
+    }
+    else
+    {
+        const auto scenePath = projectManager.resolveProjectPath(projectManager.startScene());
+        sceneOpened = SceneManager::Get().openFile(scenePath.string());
+    }
+
+    if (!sceneOpened)
+    {
+        m_projectError = "Не удалось загрузить стартовую сцену проекта.";
+        return false;
+    }
+
+    m_pAssetsPanel->setRootPath(projectManager.assetsPath());
+    
+    const auto cameraPosition = projectManager.editorCameraPosition();
+    m_pViewportPanel->setEditorCameraPosition({cameraPosition[0], cameraPosition[1], cameraPosition[2]});
+    
+    m_projectError.clear();
+    m_showProjectLauncher = false;
+    
+    return true;
+}
+
+void UIManager::saveProjectSettings()
+{
+    if (!ProjectManager::Get().hasOpenProject()) return;
+    
+    const auto position = m_pViewportPanel->getEditorCameraPosition();
+    ProjectManager::Get().saveEditorCamera(position.x, position.y, position.z);
 }
 
 void UIManager::drawPanels()

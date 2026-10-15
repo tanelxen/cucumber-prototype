@@ -41,7 +41,7 @@
 #include <cassert>
 
 static CScriptHandle GetScriptOnEntity(Entity* entity, const std::string& className);
-static void GenerateScriptPredefined(const asIScriptEngine* engine, const std::string& path);
+static bool GenerateScriptPredefined(const asIScriptEngine* engine, const std::string& path);
 
 static CScriptBuilder g_builder;
 
@@ -51,27 +51,45 @@ static CScriptBuilder g_builder;
 //    if (m_asEngine) m_asEngine->ShutDownAndRelease();
 //}
 
-bool ScriptEngine::init()
+bool ScriptEngine::init(const std::string& scriptsFolder)
 {
-    // 1. Создаем движок AngelScript
-    m_asEngine = asCreateScriptEngine();
-    if (!m_asEngine) return false;
-    
-    // Настраиваем вывод ошибок
-    m_asEngine->SetMessageCallback(asFUNCTION(MessageCallback), this, asCALL_CDECL);
-    
-    // 2. Регистрируем стандартные строки из аддонов
-    RegisterStdString(m_asEngine);
-    RegisterScriptHandle(m_asEngine);
-    
-    RegisterScriptArray(m_asEngine, true);
-    
-    // 3. Создаем один контекст для выполнения (переиспользуемый)
-    m_Context = m_asEngine->CreateContext();
-    
-    // 4. Регистрируем API нашего движка (математику, GameObject и т.д.)
-    RegisterEngineAPI();
-    GenerateScriptPredefined(m_asEngine, "assets/scripts/as.predefined");
+    if (!m_asEngine)
+    {
+        m_asEngine = asCreateScriptEngine();
+        if (!m_asEngine) return false;
+
+        m_asEngine->SetMessageCallback(asFUNCTION(MessageCallback), this, asCALL_CDECL);
+
+        RegisterStdString(m_asEngine);
+        RegisterScriptHandle(m_asEngine);
+        RegisterScriptArray(m_asEngine, true);
+
+        m_Context = m_asEngine->CreateContext();
+        if (!m_Context)
+        {
+            m_asEngine->ShutDownAndRelease();
+            m_asEngine = nullptr;
+            return false;
+        }
+
+        RegisterEngineAPI();
+    }
+
+    std::error_code filesystemError;
+    std::filesystem::create_directories(scriptsFolder, filesystemError);
+    if (filesystemError)
+    {
+        std::cerr << "Failed to create project scripts folder " << scriptsFolder
+                  << ": " << filesystemError.message() << std::endl;
+        return false;
+    }
+    if (!GenerateScriptPredefined(m_asEngine,
+                                  (std::filesystem::path(scriptsFolder) / "as.predefined").string()))
+    {
+        std::cerr << "Failed to generate project script API definitions in "
+                  << scriptsFolder << std::endl;
+        return false;
+    }
     
     std::cout << "Success to init AngelScript!" << std::endl;
     
@@ -165,6 +183,24 @@ void ScriptEngine::RegisterEngineAPI()
 
 bool ScriptEngine::CompileAllScripts(const std::string& scriptsFolder)
 {
+    std::error_code filesystemError;
+    const bool hasScriptsFolder = std::filesystem::exists(scriptsFolder, filesystemError);
+    if (filesystemError)
+    {
+        std::cerr << "Invalid scripts folder: " << scriptsFolder << std::endl;
+        return false;
+    }
+    if (hasScriptsFolder && !std::filesystem::is_directory(scriptsFolder, filesystemError))
+    {
+        std::cerr << "Invalid scripts folder: " << scriptsFolder << std::endl;
+        return false;
+    }
+    if (filesystemError)
+    {
+        std::cerr << "Failed to inspect scripts folder: " << filesystemError.message() << std::endl;
+        return false;
+    }
+
     int r = g_builder.StartNewModule(m_asEngine, "Game");
     if (r < 0) return false;
     
@@ -192,27 +228,30 @@ bool ScriptEngine::CompileAllScripts(const std::string& scriptsFolder)
     g_builder.AddSectionFromMemory("common", monoBehaviourCode);
     if (r < 0) return false;
     
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(scriptsFolder))
+    if (hasScriptsFolder)
     {
-        if (entry.is_regular_file() && entry.path().extension() == ".as")
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(scriptsFolder))
         {
-            std::string sectionName = entry.path().string();
-            
-            std::ifstream file(entry.path());
-            if (!file.is_open()) {
-                std::cout << "Failed to open file: " << sectionName << std::endl;
-                continue;
-            }
-            
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            std::string scriptCode = buffer.str();
-            
-            g_builder.AddSectionFromMemory(sectionName.c_str(), scriptCode.c_str());
-            
-            if (r < 0) {
-                std::cout << "Failed to add " << sectionName << std::endl;
-                return false;
+            if (entry.is_regular_file() && entry.path().extension() == ".as")
+            {
+                std::string sectionName = entry.path().string();
+
+                std::ifstream file(entry.path());
+                if (!file.is_open()) {
+                    std::cout << "Failed to open file: " << sectionName << std::endl;
+                    continue;
+                }
+
+                std::stringstream buffer;
+                buffer << file.rdbuf();
+                std::string scriptCode = buffer.str();
+
+                g_builder.AddSectionFromMemory(sectionName.c_str(), scriptCode.c_str());
+
+                if (r < 0) {
+                    std::cout << "Failed to add " << sectionName << std::endl;
+                    return false;
+                }
             }
         }
     }
@@ -659,7 +698,7 @@ static void AddBillboardShort(int textureId, glm::vec3 position, float scale, fl
 void RegisterSpriteRenderer(asIScriptEngine* engine)
 {
     engine->SetDefaultNamespace("SpriteRenderer");
-    engine->RegisterGlobalFunction("int preloadTexture(const string &in)", asFUNCTION(SpriteRenderer::PreloadTexture), asCALL_CDECL);
+    engine->RegisterGlobalFunction("int preloadTexture(const string &in)", asFUNCTION(SpriteRenderer::PreloadProjectTexture), asCALL_CDECL);
     engine->RegisterGlobalFunction("void AddBillboard(int, Vector3, float, float)", asFUNCTION(AddBillboardShort), asCALL_CDECL);
     engine->SetDefaultNamespace("");
     
@@ -921,11 +960,12 @@ namespace
 }
 
 /// @brief Generate 'as.predefined' file, which contains all defined symbols in C++. It is used by the language server.
-static void GenerateScriptPredefined(const asIScriptEngine* engine, const std::string& path)
+static bool GenerateScriptPredefined(const asIScriptEngine* engine, const std::string& path)
 {
     assert(path.ends_with("as.predefined"));
     
     std::ofstream stream{path};
+    if (!stream) return false;
     
     stream << "// ===================================================\n";
     stream << "// АВТОГЕНЕРИРУЕМОЕ API ДВИЖКА ДЛЯ АВТОДОПОЛНЕНИЯ\n";
@@ -943,4 +983,5 @@ static void GenerateScriptPredefined(const asIScriptEngine* engine, const std::s
     printGlobalTypedef(engine, stream);
     
     printBaseClass(engine, stream);
+    return static_cast<bool>(stream);
 }

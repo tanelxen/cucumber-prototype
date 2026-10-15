@@ -47,6 +47,16 @@ void ViewportPanel::setEntity(Entity *entity)
     m_entity = entity;
 }
 
+void ViewportPanel::setEditorCameraPosition(const glm::vec3& position)
+{
+    m_pCameraController->position = position;
+}
+
+glm::vec3 ViewportPanel::getEditorCameraPosition() const
+{
+    return m_pCameraController->position;
+}
+
 void ViewportPanel::update(float dt)
 {
     if (!isVisible)

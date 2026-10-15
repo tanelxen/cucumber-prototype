@@ -26,8 +26,8 @@ namespace GameUI {
         void Release() { if (--m_refCount == 0) delete this; }
         
         // Загрузка экрана из JSON файла
-        void Init(const std::string& path);
-        void Save(const std::string& path);
+        void Init(const std::string& filename);
+        void Save(const std::string& filename);
         
         void Draw();
         

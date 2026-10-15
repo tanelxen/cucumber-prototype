@@ -6,6 +6,7 @@
 //
 
 #include "AssetsPanel.h"
+#include "ProjectManager.h"
 
 #include <algorithm>
 #include <fstream>
@@ -33,14 +34,21 @@ AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(IC
     m_extensionMap[".as"]   = AssetType_Script;
     m_extensionMap[".glsl"]  = AssetType_Script;
     
-    m_icons[AssetType_Folder]  = loadTextureFromFile("assets/icons/folder.png");
-    m_icons[AssetType_Unknown] = loadTextureFromFile("assets/icons/file_unknown.png");
-    m_icons[AssetType_Texture] = loadTextureFromFile("assets/icons/file_texture.png");
-    m_icons[AssetType_Mesh]    = loadTextureFromFile("assets/icons/file_mesh.png");
-    m_icons[AssetType_Audio]   = loadTextureFromFile("assets/icons/file_audio.png");
-    m_icons[AssetType_Scene]   = loadTextureFromFile("assets/icons/file_scene.png");
-    m_icons[AssetType_Script]  = loadTextureFromFile("assets/icons/file_script.png");
+    m_icons[AssetType_Folder]  = loadTextureFromFile("resources/icons/folder.png");
+    m_icons[AssetType_Unknown] = loadTextureFromFile("resources/icons/file_unknown.png");
+    m_icons[AssetType_Texture] = loadTextureFromFile("resources/icons/file_texture.png");
+    m_icons[AssetType_Mesh]    = loadTextureFromFile("resources/icons/file_mesh.png");
+    m_icons[AssetType_Audio]   = loadTextureFromFile("resources/icons/file_audio.png");
+    m_icons[AssetType_Scene]   = loadTextureFromFile("resources/icons/file_scene.png");
+    m_icons[AssetType_Script]  = loadTextureFromFile("resources/icons/file_script.png");
     
+    refresh();
+}
+
+void AssetsPanel::setRootPath(const std::filesystem::path& rootPath)
+{
+    m_rootPath = std::filesystem::absolute(rootPath);
+    m_currentDirectory.reset();
     refresh();
 }
 

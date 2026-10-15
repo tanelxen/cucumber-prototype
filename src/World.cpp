@@ -25,9 +25,10 @@
 
 #include "PhysicsCommon.h"
 
+#include "ProjectManager.h"
+
 #include <iostream>
 #include <fstream>
-
 
 
 // Скорее всего переедет в отдельную Entity
@@ -41,7 +42,8 @@ WorldScene::WorldScene()
     if (!inited)
     {
         // Временный хак пока не решу куда вставить bsp-меш и коллизию
-        loadBSP("assets/wolf/maps/escape2.bsp");
+        auto mapsPath = ProjectManager::Get().resolveProjectPath("assets/wolf/maps/");
+        loadBSP(mapsPath / "escape2.bsp");
         inited = true;
     }
 }

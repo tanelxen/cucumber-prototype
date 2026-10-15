@@ -104,7 +104,7 @@ void GizmoRender::Initialize()
     glBindVertexArray(0);
     
     // 3. Генерация Встроенного Атласа (Шрифт + Процедурная Иконка)
-    GenerateAtlas("assets/fonts/Ruda/Ruda-Medium.ttf");
+    GenerateAtlas("resources/fonts/Ruda/Ruda-Medium.ttf");
 }
 
 void GizmoRender::GenerateAtlas(const std::string& fontPath)

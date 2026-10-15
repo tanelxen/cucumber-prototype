@@ -71,7 +71,7 @@ Q3MapScene::Q3MapScene(Camera *camera) : m_pCamera(camera)
     
     ma_engine_init(NULL, &g_engine);
     
-    loadMap("assets/wolf/maps/escape2.bsp");
+    loadMap("resources/wolf/maps/escape2.bsp");
     
     cube.init();
     
@@ -145,7 +145,7 @@ void Q3MapScene::loadMap(const std::string &filename)
         
         if (i == 0)
         {
-            m_pPlayer->m_pModelInstance = makeModelInstance("assets/models/v_9mmhandgun.mdl");
+            m_pPlayer->m_pModelInstance = makeModelInstance("resources/models/v_9mmhandgun.mdl");
             m_pPlayer->position = position + glm::vec3{0, 0, 0.25};
             m_pPlayer->yaw = yaw;
             m_pPlayer->pitch = 0;
@@ -157,7 +157,7 @@ void Q3MapScene::loadMap(const std::string &filename)
         {
 //            auto& character = m_characters.emplace_back();
             
-            std::string folder = "assets/wolf/models/players/infantryss";
+            std::string folder = "resources/wolf/models/players/infantryss";
             std::string skinName = "escape2";
             
             std::string animPath = folder + "/wolfanim.cfg";
@@ -172,7 +172,7 @@ void Q3MapScene::loadMap(const std::string &filename)
 //        else
 //        {
 //            auto& monster = m_monsters.emplace_back();
-//            monster.m_pModelInstance = makeModelInstance("assets/models/barney.mdl");
+//            monster.m_pModelInstance = makeModelInstance("resources/models/barney.mdl");
 //            monster.position = position;
 //            monster.yaw = yaw;
 //            
@@ -199,7 +199,7 @@ void Q3MapScene::loadMap(const std::string &filename)
         
         SoundEntity& entity = g_ambients.emplace_back();
         
-        entity.filename = "assets/wolf/" + speaker.properties["noise"];
+        entity.filename = "resources/wolf/" + speaker.properties["noise"];
         entity.origin = origin;
     }
     

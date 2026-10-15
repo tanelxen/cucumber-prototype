@@ -12,6 +12,7 @@
 #include "SceneSerializer.h"
 #include "World.h"
 #include "Entity.h"
+#include "ProjectManager.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -60,14 +61,12 @@ void HierarchyPanel::draw()
     if (ImGui::Button("Add Prefab"))
     {
         char const * filter[2] = { "*.json", "*.prefab" };
-        const char* path = tinyfd_openFileDialog("Load Prefab", "./assets/prefabs/", 2, filter, NULL, 0);
+        const auto prefabFolder = ProjectManager::Get().assetsPath() / "prefabs";
+        const char* path = tinyfd_openFileDialog("Load Prefab", prefabFolder.string().c_str(), 2, filter, NULL, 0);
         
         if (path != nullptr)
         {
-            std::filesystem::path project_root = std::filesystem::current_path();
-            auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
-            
-            auto entity = SceneSerializer::InstantiatePrefab(activeScene, rel_path);
+            auto entity = SceneSerializer::InstantiatePrefab(activeScene, path);
             
             if (entity)
             {
@@ -233,15 +232,13 @@ void HierarchyPanel::DrawEntityNode(Entity* entity)
         if (ImGui::MenuItem("Сохранить как префаб"))
         {
             char const * filter[2] = { "*.prefab", "*.json" };
-            const char* path = tinyfd_saveFileDialog("Save Prefab", "./assets/prefabs/", 2, filter, NULL);
+            const auto prefabFolder = ProjectManager::Get().assetsPath() / "prefabs";
+            const char* path = tinyfd_saveFileDialog("Save Prefab", prefabFolder.string().c_str(), 2, filter, NULL);
             
             if (path != nullptr)
             {
-                std::filesystem::path project_root = std::filesystem::current_path();
-                auto rel_path = "assets" / std::filesystem::relative(path, project_root / "assets");
-                
                 auto activeScene = SceneManager::Get().getActiveScene();
-                SceneSerializer::CreatePrefabFromEntity(activeScene, entity, rel_path);
+                SceneSerializer::CreatePrefabFromEntity(activeScene, entity, path);
             }
         }
         

@@ -53,11 +53,11 @@ namespace ParticleSystem {
     {
         s_particlePool.resize(MAX_PARTICLES);
 
-        s_texSpark  = SpriteRenderer::PreloadTexture("assets/textures/tracer2.jpg");
-        s_texBlood  = SpriteRenderer::PreloadTexture("assets/textures/blood_dot1.png");
-        s_texDust   = SpriteRenderer::PreloadTexture("assets/textures/smokepuff.png");
-        s_texSmoke  = SpriteRenderer::PreloadTexture("assets/textures/smokepuff_b1.png");
-        s_texTracer = SpriteRenderer::PreloadTexture("assets/textures/tracer2.jpg");
+        s_texSpark  = SpriteRenderer::PreloadEngineTexture("textures/tracer2.jpg");
+        s_texBlood  = SpriteRenderer::PreloadEngineTexture("textures/blood_dot1.png");
+        s_texDust   = SpriteRenderer::PreloadEngineTexture("textures/smokepuff.png");
+        s_texSmoke  = SpriteRenderer::PreloadEngineTexture("textures/smokepuff_b1.png");
+        s_texTracer = SpriteRenderer::PreloadEngineTexture("textures/tracer2.jpg");
     }
     
     // Поиск мертвой частицы в пуле (работает за O(1) в большинстве случаев)

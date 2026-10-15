@@ -8,7 +8,8 @@
 #pragma once
 
 #include <vector>
-#include <functional>
+#include <filesystem>
+#include <string>
 
 class EditorPanel;
 class ViewportPanel;
@@ -38,6 +39,7 @@ public:
     void update(float dt);
     void preRender();
     void draw();
+    void saveProjectSettings();
     
     ViewportPanel* m_pViewportPanel;
     Viewport* m_pMainView;
@@ -51,8 +53,14 @@ private:
 private:
     void drawMenuBar();
     void drawPanels();
+    void drawProjectLauncher();
+    bool openProjectPath(const std::filesystem::path& path);
     
     std::vector<EditorPanel*> m_panels;
+    bool m_showProjectLauncher = true;
+    char m_projectNameBuffer[128] = "MyProject";
+    char m_projectLocationBuffer[1024] = {};
+    std::string m_projectError;
 };
 
 inline UIManager* g_UIManager;

@@ -9,7 +9,6 @@
 
 #include "RenderDevice.h"
 #include "AudioSystem.h"
-#include "ScriptEngine.h"
 #include "GizmoRender.h"
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
@@ -66,9 +65,6 @@ Application::Application()
     m_pUIManager = new UIManager();
     m_pUIManager->init(m_pWindow);
     
-    // Инициализируем стартовую пустую сцену в менеджере!
-    SceneManager::Get().createNewScene();
-    
     // У нас свое ограничение частоты кадров
     glfwSwapInterval(0);
     
@@ -77,6 +73,11 @@ Application::Application()
 
 Application::~Application()
 {
+    if (m_pUIManager)
+    {
+        m_pUIManager->saveProjectSettings();
+        delete m_pUIManager;
+    }
     glfwDestroyWindow(m_pWindow);
     glfwTerminate();
 }
@@ -171,13 +172,4 @@ void Application::initSubSystems()
     ParticleSystem::Init();
     DecalManager::Init();
     GameUI::Init();
-    
-    if (ScriptEngine::get().init())
-    {
-        ScriptEngine::get().CompileAllScripts("assets/scripts");
-    }
-    else
-    {
-        std::cerr << "Failed to init AngelScript!" << std::endl;
-    }
 }

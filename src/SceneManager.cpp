@@ -30,14 +30,16 @@ void SceneManager::createNewScene(const std::string& name)
     m_activeScene->m_filePath = name;
 }
 
-void SceneManager::openFile(const std::string& filePath)
+bool SceneManager::openFile(const std::string& filePath)
 {
     auto newScene = std::make_unique<WorldScene>();
     
     if (SceneSerializer::LoadFile(newScene.get(), filePath))
     {
         m_activeScene = std::move(newScene);
+        return true;
     }
+    return false;
 }
 
 void SceneManager::saveCurrentAs(const std::string& filename)

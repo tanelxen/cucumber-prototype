@@ -285,7 +285,7 @@ namespace GameUI {
         
         
         // 4. Загрузка и запекание шрифта через stb_truetype
-        const std::string& fontPath = "assets/fonts/Georgia/SdGeorgiaLight.ttf";
+        const std::string& fontPath = "resources/fonts/Georgia/SdGeorgiaLight.ttf";
         std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             std::cerr << "[HUD] Не удалось открыть файл шрифта: " << fontPath << std::endl;

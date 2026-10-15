@@ -10,6 +10,7 @@
 #include "AnimatorComponent.h"
 #include "Entity.h"
 #include "ModelLoader.h"
+#include "ProjectManager.h"
 
 #include <algorithm>
 #include <cctype>
@@ -21,7 +22,7 @@ bool MeshComponent::loadModel(const std::filesystem::path& filepath)
     mesh = resource.mesh;
     materials = resource.embeddedMaterials;
 
-    const auto assetRoot = std::filesystem::absolute("assets");
+    const auto assetRoot = ProjectManager::Get().assetsPath();
     path = std::filesystem::relative(filepath, assetRoot).generic_string();
 
     if (resource.hasSkeleton())
