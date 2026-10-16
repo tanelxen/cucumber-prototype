@@ -608,20 +608,25 @@ void RegisterEntity(asIScriptEngine* engine)
     
     // Регистрируем метод получения TransformComponent у Entity
     engine->RegisterObjectMethod("Entity", "TransformComponent@ GetTransform()",
-                                 asMETHOD(Entity, getComponent<TransformComponent>), asCALL_THISCALL);
-    
+                                 asMETHODPR(Entity, getComponent<TransformComponent>, (), TransformComponent*),
+                                 asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Entity", "AudioComponent@ GetAudio()",
-                                 asMETHOD(Entity, getComponent<AudioComponent>), asCALL_THISCALL);
-    
+                                 asMETHODPR(Entity, getComponent<AudioComponent>, (), AudioComponent*),
+                                 asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Entity", "AnimatorComponent@ GetAnimator()",
-                                 asMETHOD(Entity, getComponent<AnimatorComponent>), asCALL_THISCALL);
-    
+                                 asMETHODPR(Entity, getComponent<AnimatorComponent>, (), AnimatorComponent*),
+                                 asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Entity", "MovementComponent@ GetMovement()",
-                                 asMETHOD(Entity, getComponent<MovementComponent>), asCALL_THISCALL);
-    
+                                 asMETHODPR(Entity, getComponent<MovementComponent>, (), MovementComponent*),
+                                 asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Entity", "CollisionComponent@ GetCollider()",
-                                 asMETHOD(Entity, getComponent<CollisionComponent>), asCALL_THISCALL);
-    
+                                 asMETHODPR(Entity, getComponent<CollisionComponent>, (), CollisionComponent*),
+                                 asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Entity", "const string& GetName() const",
                                  asMETHOD(Entity, GetName), asCALL_THISCALL);
     

@@ -43,8 +43,8 @@ void Mesh::draw(RenderView& view, glm::mat4& transform) const
             
             .pipeline = PipelineType::Generic,
             .featureMask = features,
-            .blendMode = material.blendMode,
             .baseTexture = material.albedoMap,
+            .blendMode = material.blendMode,
             .color = material.tintColor,
             
             .transform = transform
@@ -79,8 +79,8 @@ void Mesh::draw(RenderView& view, glm::mat4& transform, const std::vector<glm::m
             
             .pipeline = PipelineType::Generic,
             .featureMask = features,
-            .blendMode = material.blendMode,
             .baseTexture = material.albedoMap,
+            .blendMode = material.blendMode,
             .color = material.tintColor,
             
             .transform = transform,

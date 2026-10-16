@@ -154,7 +154,7 @@ void AssetsPanel::refresh()
 
 // Если вы поддерживаете Windows и хотите фильтровать нативные скрытые файлы Windows:
 #if defined(_WIN32)
-##include <windows.h>
+#include <windows.h>
 #endif
 
 void AssetsPanel::processDirectory(const std::filesystem::path& absolutePath, std::shared_ptr<DirectoryInfo>& info)
@@ -547,7 +547,7 @@ void AssetsPanel::renderGridItems()
         {
             AssetDragPayload info;
             info.type = item.assetType;
-            strncpy(info.path, item.fullPath.c_str(), sizeof(info.path));
+            strncpy(info.path, item.fullPath.string().c_str(), sizeof(info.path));
             
             ImGui::SetDragDropPayload("ASSET_ITEM", &info, sizeof(AssetDragPayload));
             

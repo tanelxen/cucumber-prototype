@@ -21,7 +21,7 @@ void Quake3Shaders::initFromDir(const std::string& path)
     {
         if (fs::is_regular_file(entry) && entry.path().extension() == ".shader")
         {
-            readFile(entry.path());
+            readFile(entry.path().string());
 //            break;
         }
     }

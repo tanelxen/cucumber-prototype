@@ -15,7 +15,7 @@ bool Q3BspComponent::loadQ3BSP(const std::filesystem::path& filepath)
 {
     Q3BSPAsset bsp;
     
-    if (!bsp.initFromFile(filepath.c_str())) {
+    if (!bsp.initFromFile(filepath.string().c_str())) {
         return false;
     }
     

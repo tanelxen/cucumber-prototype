@@ -251,7 +251,8 @@ namespace SpriteRenderer {
     
     int PreloadProjectTexture(const std::string& filename)
     {
-        return PreloadTexture(ProjectManager::Get().assetsPath() / filename);
+        auto path = ProjectManager::Get().assetsPath() / filename;
+        return PreloadTexture(path.string());
     }
     
     void Shutdown()

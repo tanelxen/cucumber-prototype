@@ -28,6 +28,10 @@
 #include <stdio.h>
 #include <thread>
 
+#if defined(_M_X64) || defined(__x86_64__)
+#include <immintrin.h>
+#endif
+
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
 static Application* s_currentInstance = nullptr;

@@ -57,7 +57,7 @@ void Q3BspMesh::initFromBsp(Q3BSPAsset* bsp)
     m_lightmap = RenderDevice::makeTexture(atlas.width, atlas.height, false, false, atlas.buffer);
     
     auto scriptsPath = ProjectManager::Get().resolveProjectPath("assets/wolf/scripts/");
-    s_q3shaders.initFromDir(scriptsPath);
+    s_q3shaders.initFromDir(scriptsPath.string().c_str());
     
     GenerateTexture();
     initBuffers();
@@ -110,11 +110,11 @@ Image loadImage(std::string& map)
     auto wolfPath = ProjectManager::Get().resolveProjectPath("assets/wolf/");
     std::filesystem::path path = wolfPath / std::filesystem::path(map);
     
-    image.data = stbi_load(path.replace_extension("jpg").c_str(), &image.width, &image.height, &image.num_channels, 3);
+    image.data = stbi_load(path.replace_extension("jpg").string().c_str(), &image.width, &image.height, &image.num_channels, 3);
     
     if (image.data == nullptr)
     {
-        image.data = stbi_load(path.replace_extension("tga").c_str(), &image.width, &image.height, &image.num_channels, 4);
+        image.data = stbi_load(path.replace_extension("tga").string().c_str(), &image.width, &image.height, &image.num_channels, 4);
     }
     
     if (image.data == nullptr)

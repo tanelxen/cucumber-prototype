@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <memory>
 
 #include <glm/gtc/matrix_transform.hpp>
 

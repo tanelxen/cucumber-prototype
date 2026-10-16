@@ -45,11 +45,11 @@ UIManager::UIManager()
 {
     m_pMainView = new Viewport();
     m_pMainView->init();
-
+    
     const char* home = std::getenv("HOME");
     const std::string defaultLocation = home
-        ? (std::filesystem::path(home) / "Projects").string()
-        : std::filesystem::current_path().string();
+    ? (std::filesystem::path(home) / "Projects").string()
+    : std::filesystem::current_path().string();
     std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s",
                   defaultLocation.c_str());
     
@@ -115,23 +115,23 @@ void UIManager::draw()
     else
     {
         drawMenuBar();
-
+        
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->Pos);
         ImGui::SetNextWindowSize(viewport->Size);
         ImGui::SetNextWindowViewport(viewport->ID);
-
+        
         ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-            ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
-
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+        
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("DockSpace", nullptr, flags);
         ImGui::PopStyleVar();
         ImGui::DockSpace(ImGui::GetID("MainDockSpace"));
         ImGui::End();
-
+        
         drawPanels();
     }
     
@@ -170,7 +170,7 @@ static void InitFonts(ImGuiIO& io)
     
     
     io.Fonts->Fonts[2] = io.Fonts->AddFontFromFileTTF("resources/fonts/Ruda/Ruda-Regular.ttf", 15.0f);
-//    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 18.0f, &config, icon_ranges);
+    //    io.Fonts->AddFontFromFileTTF("resources/fonts/materialdesignicons-webfont.ttf", 18.0f, &config, icon_ranges);
 }
 
 void UIManager::init(struct GLFWwindow *window)
@@ -320,18 +320,18 @@ void UIManager::drawMenuBar()
         }
         
         /*
-        if (ImGui::BeginMenu("Edit"))
-        {
-            if (ImGui::MenuItem("Undo", "Ctrl+Z")) {}
-            if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {} // Disabled item
-            
-            ImGui::Separator();
-            
-            if (ImGui::MenuItem("Cut", "Ctrl+X")) {}
-            if (ImGui::MenuItem("Copy", "Ctrl+C")) {}
-            if (ImGui::MenuItem("Paste", "Ctrl+V")) {}
-            ImGui::EndMenu();
-        }
+         if (ImGui::BeginMenu("Edit"))
+         {
+         if (ImGui::MenuItem("Undo", "Ctrl+Z")) {}
+         if (ImGui::MenuItem("Redo", "Ctrl+Y", false, false)) {} // Disabled item
+         
+         ImGui::Separator();
+         
+         if (ImGui::MenuItem("Cut", "Ctrl+X")) {}
+         if (ImGui::MenuItem("Copy", "Ctrl+C")) {}
+         if (ImGui::MenuItem("Paste", "Ctrl+V")) {}
+         ImGui::EndMenu();
+         }
          */
         
         if (ImGui::BeginMenu("View"))
@@ -535,7 +535,7 @@ void UIManager::drawProjectLauncher()
 bool UIManager::openProjectPath(const std::filesystem::path& path)
 {
     saveProjectSettings();
-
+    
     std::string error;
     auto& projectManager = ProjectManager::Get();
     
@@ -544,9 +544,9 @@ bool UIManager::openProjectPath(const std::filesystem::path& path)
         m_projectError = std::move(error);
         return false;
     }
-
+    
     SceneManager::Get().createNewScene();
-
+    
     if (!ScriptEngine::get().init(projectManager.scriptsPath().string()))
     {
         m_projectError = "Не удалось инициализировать AngelScript для проекта.";
@@ -558,7 +558,7 @@ bool UIManager::openProjectPath(const std::filesystem::path& path)
         m_projectError = "Не удалось скомпилировать скрипты проекта.";
         return false;
     }
-
+    
     bool sceneOpened = true;
     
     if (projectManager.startScene().empty())
@@ -570,13 +570,13 @@ bool UIManager::openProjectPath(const std::filesystem::path& path)
         const auto scenePath = projectManager.resolveProjectPath(projectManager.startScene());
         sceneOpened = SceneManager::Get().openFile(scenePath.string());
     }
-
+    
     if (!sceneOpened)
     {
         m_projectError = "Не удалось загрузить стартовую сцену проекта.";
         return false;
     }
-
+    
     m_pAssetsPanel->setRootPath(projectManager.assetsPath());
     
     const auto cameraPosition = projectManager.editorCameraPosition();

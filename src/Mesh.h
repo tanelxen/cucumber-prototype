@@ -14,6 +14,7 @@
 #include <glm/gtc/type_precision.hpp>
 
 #include <string>
+#include <memory>
 
 class VertexArray;
 class VertexBuffer;

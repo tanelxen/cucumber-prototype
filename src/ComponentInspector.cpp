@@ -390,7 +390,7 @@ static void DrawAudioComponent(AudioComponent* comp)
             
             const auto base_path = ProjectManager::Get().assetsPath();
             auto rel_path = std::filesystem::relative(path, base_path);
-            comp->path = rel_path;
+            comp->path = rel_path.string();
         }
     }
     

@@ -40,7 +40,7 @@ public:
     void PlaySound(const std::string& filename)
     {
         auto path = ProjectManager::Get().assetsPath() / filename;
-        ma_engine_play_sound(&m_engine, path.c_str(), NULL);
+        ma_engine_play_sound(&m_engine, path.string().c_str(), NULL);
     }
     
 private:
