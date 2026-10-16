@@ -11,11 +11,13 @@ class VertexBuffer;
 class VertexArray;
 class IndexBuffer;
 
+#include <glm/glm.hpp>
+
 class Grid
 {
 public:
     void init();
-    void draw() const;
+    void draw(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) const;
     
 private:
     VertexBuffer* posBuffer;

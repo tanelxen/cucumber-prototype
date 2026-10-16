@@ -6,10 +6,13 @@
 //
 
 #include "Grid.h"
+#include "ShaderVariant.h"
 #include "RenderDevice.h"
 #include "VertexBuffer.h"
 #include "VertexArray.h"
 #include "IndexBuffer.h"
+
+static ShaderVariant s_grid_shader;
 
 void Grid::init()
 {
@@ -33,18 +36,25 @@ void Grid::init()
     
     indexBuffer = new IndexBuffer(indices, 6);
     vertexArray->setIndexBuffer(indexBuffer);
+    
+    s_grid_shader.init("resources/shaders/grid.glsl");
 }
 
-void Grid::draw() const
+void Grid::draw(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) const
 {
-    RenderCommand cmd = {
-        .vao = vertexArray->getID(),
-        .start = 0,
-        .count = indexBuffer->getCount(),
-        
-        .pipeline = PipelineType::Grid,
-        .blendMode = BlendMode::Transparent,
-    };
+    s_grid_shader.bind();
+    s_grid_shader.setUniform("uVP", projectionMatrix * viewMatrix);
     
-//    RenderDevice::submit(cmd);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    glDepthMask(GL_FALSE);
+    
+    glBindVertexArray(vertexArray->getID());
+    glDrawElements(GL_TRIANGLES, indexBuffer->getCount(), GL_UNSIGNED_INT, (void *)0);
+    
+    s_grid_shader.unbind();
+    
+    glDepthMask(GL_TRUE);
 }

@@ -295,10 +295,10 @@ namespace RenderDevice {
 //                g_sky.draw(view.viewMatrix, view.projectionMatrix);
             }
             
-//            if (view.drawGrid)
-//            {
-//                g_grid.draw();
-//            }
+            if (view.drawGrid)
+            {
+                g_grid.draw(view.viewMatrix, view.projectionMatrix);
+            }
             
             glm::mat4x4 viewProj = view.projectionMatrix * view.viewMatrix;
             

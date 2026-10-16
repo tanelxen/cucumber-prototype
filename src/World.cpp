@@ -31,10 +31,6 @@
 #include <fstream>
 
 
-// Скорее всего переедет в отдельную Entity
-//static Q3BspMesh g_mesh;
-//static Q3BspCollision g_collision;
-
 WorldScene::WorldScene()
 {
     

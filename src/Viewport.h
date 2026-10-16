@@ -45,7 +45,7 @@ public:
     
     bool drawSkybox = true;
     bool drawGizmos = false;
-    bool drawGrid = false;
+    bool drawGrid = true;
     
 private:
     std::unique_ptr<FrameBuffer> m_frameBuffer;

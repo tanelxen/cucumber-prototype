@@ -4,14 +4,13 @@
 layout (location = 0) in vec4 position;
 layout (location = 1) in vec3 in_color;
 
-uniform mat4 uModel;
 uniform mat4 uVP;
 
 out vec2 g_uv;
 
 void main()
 {
-    gl_Position = uModel * uVP * position;
+    gl_Position = uVP * position;
 
     g_uv = position.xz;
 }
