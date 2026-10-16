@@ -91,6 +91,8 @@ set(SRC_COMPONENTS
         src/MovementComponent.h
         src/CollisionComponent.cpp
         src/CollisionComponent.h
+        src/Q3BspComponent.cpp
+        src/Q3BspComponent.h
 )
 
 set(SRC_RENDERER

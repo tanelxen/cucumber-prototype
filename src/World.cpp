@@ -16,10 +16,10 @@
 #include "CameraComponent.h"
 #include "AnimatorComponent.h"
 #include "MeshComponent.h"
+#include "Q3BspComponent.h"
 
 #include "RenderDevice.h"
 
-#include "q3/Q3BSPAsset.h"
 #include "q3/Q3BspMesh.h"
 #include "q3/Q3BspCollision.h"
 
@@ -32,32 +32,12 @@
 
 
 // Скорее всего переедет в отдельную Entity
-static Q3BspMesh g_mesh;
-static Q3BspCollision g_collision;
+//static Q3BspMesh g_mesh;
+//static Q3BspCollision g_collision;
 
 WorldScene::WorldScene()
 {
-    static bool inited = false;
     
-    if (!inited)
-    {
-        // Временный хак пока не решу куда вставить bsp-меш и коллизию
-        auto mapsPath = ProjectManager::Get().resolveProjectPath("assets/wolf/maps/");
-        loadBSP(mapsPath / "escape2.bsp");
-        inited = true;
-    }
-}
-
-void WorldScene::loadBSP(const std::string &filename)
-{
-    Q3BSPAsset bsp;
-    
-    if (!bsp.initFromFile(filename.c_str())) {
-        return;
-    }
-    
-    g_mesh.initFromBsp(&bsp);
-    g_collision.initFromBsp(&bsp);
 }
 
 WorldScene::~WorldScene() = default;
@@ -235,9 +215,9 @@ void WorldScene::prepareRenderViews()
 
 void WorldScene::collectRenderCommands(RenderView& view)
 {
-    if (Layers::Static & view.cullingMask)
+    if (m_bsp != nullptr && m_bsp->mesh != nullptr && Layers::Static & view.cullingMask)
     {
-        g_mesh.draw(view);
+        m_bsp->mesh->draw(view);
     }
     
     for (auto& entity : m_entities)
@@ -267,6 +247,13 @@ void WorldScene::collectRenderCommands(RenderView& view)
                 meshComp->mesh->draw(view, worldMatrix, animator->getFinalBoneMatrices());
             }
         }
+        
+//        auto bspComp = entity->getComponent<BSPMeshComponent>();
+//        
+//        if (bspComp && bspComp->mesh)
+//        {
+//            bspComp->mesh->draw(view);
+//        }
     }
 }
 
@@ -314,6 +301,11 @@ void WorldScene::registerComponent(Component *component)
     }
     
     m_allComponents.push_back(component);
+    
+    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
+    {
+        m_bsp = bsp;
+    }
 }
 
 void WorldScene::unregisterComponent(Component *component)
@@ -330,6 +322,11 @@ void WorldScene::unregisterComponent(Component *component)
     // А нужен ли тут dynamic_cast???
     if (auto* collider = dynamic_cast<CollisionComponent*>(component)) {
         m_globalColliders.erase(std::remove(m_globalColliders.begin(), m_globalColliders.end(), collider), m_globalColliders.end());
+    }
+    
+    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
+    {
+        m_bsp = nullptr;
     }
 }
 
@@ -410,7 +407,8 @@ void WorldScene::trace(HitResult &result,
     result.hitCollider = nullptr;
     
     // 1. Сначала считаем коллизию со статичной BSP геометрией Quake 3
-    g_collision.trace(result, q_start, q_end, q_mins, q_maxs);
+    if (m_bsp == nullptr || m_bsp->collision == nullptr) return;
+    m_bsp->collision->trace(result, q_start, q_end, q_mins, q_maxs);
     
     const glm::vec3 gl_start = Quake2OpenGL(q_start);
     const glm::vec3 gl_end = Quake2OpenGL(q_end);

@@ -23,6 +23,8 @@ class CameraComponent;
 class RenderView;
 class Camera;
 
+class Q3BspComponent;
+
 enum class SceneType
 {
     Level,    // Обычный игровой уровень (.scene)
@@ -35,7 +37,6 @@ public:
     WorldScene();
     ~WorldScene();
     
-    void loadBSP(const std::string &filename);
     void update(float dt);
     
     void prepareRenderViews();
@@ -100,4 +101,6 @@ private:
     
     Viewport* m_pGameplayViewport = nullptr; // Храним только на время симуляции
     CameraComponent* m_pActiveCameraComponent = nullptr; // Указатель на текущий компонент
+    
+    Q3BspComponent* m_bsp = nullptr;
 };
