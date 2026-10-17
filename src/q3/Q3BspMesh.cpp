@@ -56,7 +56,7 @@ void Q3BspMesh::initFromBsp(Q3BSPAsset* bsp)
     adjastLightmapCoords(bsp, atlas);
     m_lightmap = RenderDevice::makeTexture(atlas.width, atlas.height, false, false, atlas.buffer);
     
-    auto scriptsPath = ProjectManager::Get().resolveProjectPath("assets/wolf/scripts/");
+    auto scriptsPath = bsp->m_basepath / "scripts";
     s_q3shaders.initFromDir(scriptsPath.string().c_str());
     
     GenerateTexture();
@@ -103,12 +103,11 @@ struct Image
     void* data;
 };
 
-Image loadImage(std::string& map)
+static Image loadImage(std::string& filename, std::filesystem::path basepath)
 {
     Image image;
     
-    auto wolfPath = ProjectManager::Get().resolveProjectPath("assets/wolf/");
-    std::filesystem::path path = wolfPath / std::filesystem::path(map);
+    std::filesystem::path path = basepath / std::filesystem::path(filename);
     
     image.data = stbi_load(path.replace_extension("jpg").string().c_str(), &image.width, &image.height, &image.num_channels, 3);
     
@@ -143,7 +142,7 @@ void Q3BspMesh::GenerateTexture()
         
         s_q3shaders.getBaseTextureName(g_bsp->m_textures[i].strName, mapParam, blendMode);
         
-        Image image = loadImage(mapParam);
+        Image image = loadImage(mapParam, g_bsp->m_basepath);
         
         if (image.data)
         {

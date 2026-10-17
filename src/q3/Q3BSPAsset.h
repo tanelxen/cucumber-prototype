@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <filesystem>
 
 #include "Q3BSPTypes.h"
 
@@ -31,4 +32,10 @@ struct Q3BSPAsset
     std::vector<tBSPLightVolume> m_lightVolumes;
     
     tBSPVisData m_clusters;
+    
+    std::filesystem::path m_filepath;
+    
+    // все пути к текстурам идут относительно этой папки
+    // сами уровни лежат в папке maps
+    std::filesystem::path m_basepath;
 };

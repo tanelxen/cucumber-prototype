@@ -30,6 +30,9 @@ enum eLumps {
 
 bool Q3BSPAsset::initFromFile(const std::string& filename)
 {
+    m_filepath = filename;
+    m_basepath = m_filepath.parent_path().parent_path();
+    
     FILE* fp = fopen(filename.c_str(), "rb" );
     
     if(fp == nullptr) {
