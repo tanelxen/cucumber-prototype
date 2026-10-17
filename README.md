@@ -1,21 +1,24 @@
 # Cucumber
 
-Crossplatform level editor. It was made with GLFW and support modern rendering via OpenGL 4.1.
+Прототип кроссплатформенного игрового движка.
+Движок имеет Unity-подобную комопнентную архитектуру (не ECS). В качестве скриптового языка используется AngelScript.
 
-On startup, the editor shows the project manager. Choose a recent project, browse to a
-project folder containing `project.json`, or create a new project. New projects contain
-an `assets/` directory and a starter scene.
+## PREVIEW
+![screenshot](https://github.com/tanelxen/cucumber-prototype/blob/master/screenshots/screenshot_0.png)
 
-`project.json` stores the project name, startup scene path, and editor settings:
-
-```json
-{
-  "name": "MyProject",
-  "start_scene": "assets/scenes/main.json",
-  "editor": {
-    "camera_position": [0, 128, 128]
-  }
-}
+## Запуск из готовых бинарников
+Для MacOS может понадобиться выполнить команду:
 ```
+xattr -cr Cucumber.app
+```
+в папке куда поместили архив, чтобы разрешить системе запускать редактор.
 
-Editor-owned fonts, icons, shaders, and other built-in files live in `resources/`.
+## Сборка
+Для сборки проекта используется CMake. Проверялась сборка через VS Code и CLion.
+
+Сборку на Windows необходимо выполнять с правами администратора, иначе в папке с билдом не сможет создасться символьная ссылка на папку resources.
+
+## Скриптинг
+Для удобства скриптинга рекомендуется использовать VS Code с расширением AngelScript Language Server от sashi0034. При запуске редактор движка в папке Scripts вашего проекта генерирует файл as.predefined, который содержит все необходимые декларации API движка. Благодаря этому файлу расширение сможет делать подсказки.
+
+Сейчас в движке нет авто-компиляции при сохранении измененного файла скрипта. Поэтому необходимо вручную вызывать перекомпиляцию скриптов через меню File -> Reload Scripts. Желательно не делать этого в процессе симуляции.
