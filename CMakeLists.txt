@@ -59,6 +59,11 @@ set(SRC_COMMON
         src/UID.h
         
         src/PhysicsCommon.h
+        
+        src/PhysicsSystem.cpp
+        src/PhysicsSystem.h
+        src/PhysicsContactListener.cpp
+        src/PhysicsContactListener.h
 )
 
 set(SRC_SCENE
@@ -93,6 +98,8 @@ set(SRC_COMPONENTS
         src/CollisionComponent.h
         src/Q3BspComponent.cpp
         src/Q3BspComponent.h
+        src/RigidbodyComponent.cpp
+        src/RigidbodyComponent.h
 )
 
 set(SRC_RENDERER
@@ -157,8 +164,6 @@ set(SRC_Q3
         src/q3/Q3BSPTypes.h
         src/q3/Q3BspMesh.cpp
         src/q3/Q3BspMesh.h
-        src/q3/Q3BspCollision.cpp
-        src/q3/Q3BspCollision.h
         src/q3/Q3Bezier.cpp
         src/q3/Q3Bezier.h
         src/q3/Q3LightGrid.cpp
@@ -196,6 +201,13 @@ source_group("Game UI" FILES ${SRC_GameUI})
 source_group("imgui" FILES ${SRC_IMGUI})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)
+
+# Настройки компиляции для вашего движка, чтобы они совпадали с Jolt
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE JPH_DEBUG JPH_PROFILE_ENABLED)
+else()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE JPH_PROFILE_ENABLED)
+endif()
 
 #set(SHADERS_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
 #file(GLOB_RECURSE SHADER_FILES "${SHADERS_FOLDER}/*")
@@ -252,14 +264,32 @@ target_include_directories(angelscript_addons PUBLIC ${angelscript_SOURCE_DIR}/s
 #######################
 
 
+############################# JOLT ####################################
+# Загружаем Jolt Physics
+FetchContent_Declare(
+    JoltPhysics
+    GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics
+    GIT_TAG        master
+    SOURCE_SUBDIR  Build
+)
+
+# Опции сборки Jolt перед его добавлением
+set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
+set(TARGET_SAMPLES OFF CACHE INTERNAL "")
+set(PROFILER_IMPLEMENTATION "None" CACHE INTERNAL "")
+
+FetchContent_MakeAvailable(JoltPhysics)
+############################# JOLT ####################################
+
 target_include_directories(${PROJECT_NAME} PRIVATE
     src
     vendor/glm
     #vendor/ImGuizmo
     ${angelscript_SOURCE_DIR}/sdk/angelscript/include
+    ${joltphysics_SOURCE_DIR}
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui ImGuizmo miniaudio angelscript angelscript_addons)
+target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui ImGuizmo miniaudio angelscript angelscript_addons Jolt)
 
 
 

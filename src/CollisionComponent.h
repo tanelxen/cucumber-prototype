@@ -6,11 +6,19 @@
 //
 
 #include "Component.h"
+#include "PhysicsCommon.h"
 #include <glm/glm.hpp>
+
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
 
 struct CollisionComponent : public Component
 {
+    ~CollisionComponent();
+    
     const std::string getTypeName() const override { return "CollisionComponent"; }
+    
+    void awake() override;
     
     void save(nlohmann::json& j) const override;
     void load(const nlohmann::json& j) override;
@@ -18,8 +26,8 @@ struct CollisionComponent : public Component
     void gizmo() override;
     
     // Локальные границы объекта (относительно его Transform)
-    glm::vec3 m_mins = { -15, 0, 15 };
-    glm::vec3 m_maxs = { 15, 72, -15 };
+    glm::vec3 m_mins = { -16, -16, -16 };
+    glm::vec3 m_maxs = { 16, 16, 16 };
     
     // --- СИСТЕМА ФИЛЬТРАЦИИ КОЛЛИЗИЙ ---
     // По умолчанию объект находится на 1-м слое и сталкивается со всеми слоями (0xFFFFFFFF)
@@ -31,14 +39,6 @@ struct CollisionComponent : public Component
     std::function<void(Entity*)> onTriggerEnter;
     std::function<void(Entity*)> onTriggerExit;
     
-    // Хелпер получения мирового AABB (учитывая позицию сущности)
-    void getWorldAABB(glm::vec3& outMins, glm::vec3& outMaxs);
-    
-    // Сюда мы добавим метод математической проверки пересечения (см. Шаг 2)
-    bool sweepTest(const glm::vec3& start, const glm::vec3& end,
-                   const glm::vec3& extMins, const glm::vec3& extMaxs,
-                   float& outFraction, glm::vec3& outNormal) const;
-    
     void CallTriggerEnter(Entity* other)
     {
         if (onTriggerEnter)
@@ -46,4 +46,14 @@ struct CollisionComponent : public Component
             onTriggerEnter(other);
         }
     }
+    
+    
+    // Ссылка на тело в Jolt
+    JPH::BodyID m_bodyID;
+    PhysicsUserData m_userData;
+    
+    void CreatePhysicsBody();
+    void DestroyPhysicsBody();
+    void SyncTransformToPhysics();
+    void SyncPhysicsToTransform();
 };

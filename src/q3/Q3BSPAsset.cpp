@@ -105,13 +105,13 @@ bool Q3BSPAsset::initFromFile(const std::string& filename)
     fread(m_planes.data(), numPlanes, sizeof(tBSPPlane), fp);
     
     // Brushes
-    int numBrushes = lumps[kBrushes].length / sizeof(int);
+    int numBrushes = lumps[kBrushes].length / sizeof(tBSPBrush);
     m_brushes.resize(numBrushes);
     fseek(fp, lumps[kBrushes].offset, SEEK_SET);
     fread(m_brushes.data(), numBrushes, sizeof(tBSPBrush), fp);
     
     // Brush sides
-    int numBrushSides = lumps[kBrushSides].length / sizeof(int);
+    int numBrushSides = lumps[kBrushSides].length / sizeof(tBSPBrushSide);
     m_brushSides.resize(numBrushSides);
     fseek(fp, lumps[kBrushSides].offset, SEEK_SET);
     fread(m_brushSides.data(), numBrushSides, sizeof(tBSPBrushSide), fp);
@@ -147,5 +147,5 @@ bool Q3BSPAsset::initFromFile(const std::string& filename)
     tesselateBezierPatches(m_faces, m_verts, m_indices, 9);
 
     fclose(fp);
-    return (fp);
+    return true;
 }

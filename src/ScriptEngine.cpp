@@ -626,6 +626,10 @@ void RegisterEntity(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Entity", "CollisionComponent@ GetCollider()",
                                  asMETHODPR(Entity, getComponent<CollisionComponent>, (), CollisionComponent*),
                                  asCALL_THISCALL);
+    
+    engine->RegisterObjectMethod("Entity", "void AddImpulse(const Vector3 &in force, const Vector3 &in point)",
+                                 asMETHODPR(Entity, addImpulse, (const glm::vec3&, const glm::vec3&), void),
+                                 asCALL_THISCALL);
 
     engine->RegisterObjectMethod("Entity", "const string& GetName() const",
                                  asMETHOD(Entity, GetName), asCALL_THISCALL);
@@ -758,18 +762,15 @@ namespace {
         auto activeScene = SceneManager::Get().getActiveScene();
         if (!activeScene) return false;
         
-        HitResult result;
-        result.endpos = { 0, 0, 0 };
-        result.normal = { 0, 1, 0 };
+        RaycastHit result;
+        uint32_t mask = LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE | LAYER_STATIC;
+        activeScene->lineTrace(result, start, dir, distance, ignore, mask);
         
-        uint32_t mask = LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE;
-        activeScene->trace(result, OpenGL2Quake(start), OpenGL2Quake(start + dir * distance), glm::vec3(0), glm::vec3(0), ignore, mask);
-        
-        hit.point = Quake2OpenGL(result.endpos);
-        hit.normal = Quake2OpenGL(result.normal);
+        hit.point = result.hitPosition;
+        hit.normal = result.hitNormal;
         hit.entity = result.hitEntity;
         
-        return result.fraction > 0.0f && result.fraction < 1.0f;
+        return result.bHit;
     }
 }
 

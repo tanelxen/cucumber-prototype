@@ -50,8 +50,8 @@ struct tBSPFace {
 // This is our BSP texture structure
 struct tBSPTexture {
     char strName[64]; // The name of the texture w/o the extension
-    int  flags;       // The surface flags (unknown)
-    int  contents;    // The content flags (unknown)
+    uint32_t  flags;       // The surface flags (unknown)
+    uint32_t  contents;    // The content flags (unknown)
 };
 
 struct tBSPLightmap {

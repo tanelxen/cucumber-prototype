@@ -13,6 +13,8 @@
 #include <iostream>
 #include <unordered_set>
 
+#include "RigidbodyComponent.h"
+
 //#define radians(deg) ((deg) * (M_PI / 180.0f))
 
 Entity::Entity(const std::string& name) : m_name(std::move(name))
@@ -22,6 +24,14 @@ Entity::Entity(const std::string& name) : m_name(std::move(name))
 
 Entity::~Entity()
 {
+}
+
+void Entity::addImpulse(const glm::vec3& force, const glm::vec3& point)
+{
+    if(auto body = getComponent<RigidbodyComponent>())
+    {
+        body->addImpulse(force, point);
+    }
 }
 
 void Entity::destroyComponent(Component* component)

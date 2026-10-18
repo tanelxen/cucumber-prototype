@@ -4,7 +4,7 @@
 Движок имеет Unity-подобную комопнентную архитектуру (не ECS). В качестве скриптового языка используется AngelScript.
 
 ## PREVIEW
-![screenshot](https://github.com/tanelxen/cucumber-prototype/blob/master/screenshots/screenshot_0.png)
+![screenshot](https://github.com/tanelxen/cucumber-prototype/blob/master/screenshots/screenshot_0.jpg)
 
 ## Запуск из готовых бинарников
 Для MacOS может понадобиться выполнить команду:

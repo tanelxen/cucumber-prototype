@@ -12,6 +12,7 @@
 #include "UIManager.h"
 
 #include "TransformComponent.h"
+#include "RigidbodyComponent.h"
 #include "CollisionComponent.h"
 #include "MovementComponent.h"
 #include "AnimatorComponent.h"
@@ -319,6 +320,14 @@ static void DrawCollisionComponent(CollisionComponent* comp)
     ImGui::Checkbox("Trigger", &comp->isTrigger);
 }
 
+static void DrawRigidbodyComponent(RigidbodyComponent* comp)
+{
+    //    ImGui::DragFloat3("Mins", &comp->m_mins.x, 1.f);
+    //    ImGui::DragFloat3("Maxs", &comp->m_maxs.x, 1.f);
+    
+    DrawVec3Control("Half Extents", comp->boxHalfExtents, -16.0f, 100.0f);
+}
+
 static void DrawAudioDetails(AudioComponent* component)
 {
     // 1. Управление воспроизведением (Кнопки Play / Pause / Stop в один ряд)
@@ -481,6 +490,11 @@ void RegisterComponentsUI()
     inspector.Register<CollisionComponent>("Collision", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<CollisionComponent*>(c);
         DrawCollisionComponent(comp);
+    });
+    
+    inspector.Register<RigidbodyComponent>("Rigidbody", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<RigidbodyComponent*>(c);
+        DrawRigidbodyComponent(comp);
     });
     
     inspector.Register<CameraComponent>("Camera", [](Component* c, InspectorPanel* p) {

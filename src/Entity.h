@@ -45,6 +45,8 @@ public:
     Entity* findEntityByPath(const std::string& path) const;
     std::string getPathRelativeTo(const Entity* root) const;
     
+    void addImpulse(const glm::vec3& force, const glm::vec3& point);
+    
     // Добавление компонента
     template<typename T, typename... TArgs>
     T* addComponent(TArgs&&... args)

@@ -20,6 +20,8 @@
 #include "World.h"
 #include "Input.h"
 
+#include "PhysicsSystem.h"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -176,4 +178,6 @@ void Application::initSubSystems()
     ParticleSystem::Init();
     DecalManager::Init();
     GameUI::Init();
+    
+    PhysicsSystem::Get().Init();
 }

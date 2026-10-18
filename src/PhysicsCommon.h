@@ -6,18 +6,30 @@
 //
 
 #pragma once
+
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+
 #include <glm/glm.hpp>
 
 class Entity;
-class CollisionComponent;
+class Component;
 
-enum CollisionLayer
+struct PhysicsUserData {
+    Entity* entity = nullptr;
+    Component* component = nullptr;
+};
+
+enum CollisionLayer : uint32_t
 {
     LAYER_PLAYER        = 1 << 0, // Игрок
     LAYER_ENEMY         = 1 << 1, // Все NPC
     LAYER_PROJECTILE    = 1 << 2, // Летящие ракеты, плазма, гранаты
     LAYER_TRIGGER       = 1 << 3, // Интерактивные зоны (аптечки, триггерные двери, зоны урона)
     LAYER_INTERACTIVE   = 1 << 4, // Двигающиеся платформы, разрушаемые ящики, двери-сущности
+    LAYER_STATIC        = 1 << 5  // Статичная BSP карта мира
 };
 
 namespace PhysicsMask
@@ -29,112 +41,110 @@ namespace PhysicsMask
     const uint32_t PlayerRocket   = LAYER_ENEMY | LAYER_INTERACTIVE;
 }
 
-struct HitResult
+struct RaycastHit
 {
-    glm::vec3 endpos;
-    glm::vec3 normal;
-    float fraction;
-    
-    bool startsolid;
-    bool allsolid;
-    
-    int textureId;
-    int surfaceFlags;
-    
-    Entity* hitEntity = nullptr;
-    CollisionComponent* hitCollider = nullptr;
+    bool bHit = false;             // Было ли попадание?
+    float fraction = 1.0f;         // Доля пути луча (от 0.0 до 1.0)
+    glm::vec3 hitPosition{0.0f};   // Точка пересечения в мировых координатах движка
+    glm::vec3 hitNormal{0.0f};     // Нормаль поверхности в точке попадания
+    Entity* hitEntity = nullptr;   // Сущность, в которую попали
+    Component* hitComponent = nullptr; // Компонент коллизии, если попали в динамику
 };
 
-inline glm::vec3 OpenGL2Quake(const glm::vec3& in)
-{
-    return { in.x, -in.z, in.y };
+// Преобразуем битовые слои в плоские индексы Jolt (Object Layers)
+namespace Layers {
+    static constexpr JPH::ObjectLayer STATIC      = 0;
+    static constexpr JPH::ObjectLayer PLAYER      = 1;
+    static constexpr JPH::ObjectLayer ENEMY       = 2;
+    static constexpr JPH::ObjectLayer PROJECTILE  = 3;
+    static constexpr JPH::ObjectLayer TRIGGER     = 4;
+    static constexpr JPH::ObjectLayer INTERACTIVE = 5;
+    static constexpr JPH::ObjectLayer NUM_LAYERS  = 6;
+    
+    // Вспомогательные функции перевода
+    inline JPH::ObjectLayer FromCollisionLayer(uint32_t layerBit) {
+        if (layerBit & LAYER_PLAYER)      return PLAYER;
+        if (layerBit & LAYER_ENEMY)       return ENEMY;
+        if (layerBit & LAYER_PROJECTILE)  return PROJECTILE;
+        if (layerBit & LAYER_TRIGGER)     return TRIGGER;
+        if (layerBit & LAYER_INTERACTIVE) return INTERACTIVE;
+        return STATIC;
+    }
+    
+    inline uint32_t ToCollisionLayerBit(JPH::ObjectLayer layer) {
+        switch (layer) {
+            case PLAYER:      return LAYER_PLAYER;
+            case ENEMY:       return LAYER_ENEMY;
+            case PROJECTILE:  return LAYER_PROJECTILE;
+            case TRIGGER:     return LAYER_TRIGGER;
+            case INTERACTIVE: return LAYER_INTERACTIVE;
+            default:          return LAYER_STATIC;
+        }
+    }
+    
+    // Дефолтные маски столкновений
+    inline uint32_t GetDefaultMask(JPH::ObjectLayer layer) {
+        switch (layer) {
+            case STATIC:      return LAYER_PLAYER | LAYER_ENEMY | LAYER_PROJECTILE | LAYER_INTERACTIVE;
+            case PLAYER:      return LAYER_STATIC | LAYER_ENEMY | LAYER_PROJECTILE | LAYER_TRIGGER | LAYER_INTERACTIVE;
+            case ENEMY:       return LAYER_STATIC | LAYER_PLAYER | LAYER_PROJECTILE | LAYER_TRIGGER | LAYER_INTERACTIVE;
+            case PROJECTILE:  return LAYER_STATIC | LAYER_PLAYER | LAYER_ENEMY | LAYER_INTERACTIVE;
+            case TRIGGER:     return LAYER_PLAYER;
+            case INTERACTIVE: return LAYER_STATIC | LAYER_PLAYER | LAYER_ENEMY | LAYER_PROJECTILE | LAYER_INTERACTIVE;
+            default:          return 0xFFFFFFFF;
+        }
+    }
 }
 
-inline glm::vec3 Quake2OpenGL(const glm::vec3& in)
-{
-    return { in.x, in.z, -in.y };
+namespace BroadPhaseLayers {
+    static constexpr JPH::BroadPhaseLayer STATIC(0);
+    static constexpr JPH::BroadPhaseLayer DYNAMIC(1);
+    static constexpr JPH::BroadPhaseLayer TRIGGER(2);
+    static constexpr uint32_t NUM_LAYERS = 3;
 }
 
-/*
-class ICharacterCollider {
+class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface {
 public:
-    virtual ~ICharacterCollider() = default;
-    
-    // Инициализация (например, создание CharacterVirtual в Jolt или привязка к BSP)
-    virtual void Init(Entity* owner, const glm::vec3& mins, const glm::vec3& maxs) = 0;
-    
-    // Главный метод: принимает желаемую скорость, двигает хитбокс с учетом
-    // коллизий (slide/step) и возвращает ИТОГОВУЮ скорость после столкновений со стенами.
-    virtual glm::vec3 moveAndSlide(const glm::vec3& velocity, float dt, bool useGravity) = 0;
-    
-    // Возвращает позицию хитбокса после симуляции
-    virtual glm::vec3 getPosition() const = 0;
-    
-    // Телепортация (например, при спавне или респавне)
-    virtual void setPosition(const glm::vec3& position) = 0;
+    BPLayerInterfaceImpl() {
+        mObjectToBroadPhase[Layers::STATIC]      = BroadPhaseLayers::STATIC;
+        mObjectToBroadPhase[Layers::PLAYER]      = BroadPhaseLayers::DYNAMIC;
+        mObjectToBroadPhase[Layers::ENEMY]       = BroadPhaseLayers::DYNAMIC;
+        mObjectToBroadPhase[Layers::PROJECTILE]  = BroadPhaseLayers::DYNAMIC;
+        mObjectToBroadPhase[Layers::TRIGGER]     = BroadPhaseLayers::TRIGGER;
+        mObjectToBroadPhase[Layers::INTERACTIVE] = BroadPhaseLayers::DYNAMIC;
+    }
+    uint32_t GetNumBroadPhaseLayers() const override { return BroadPhaseLayers::NUM_LAYERS; }
+    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override { return mObjectToBroadPhase[inLayer]; }
+#if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
+    const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer inLayer) const override {
+        if (inLayer == BroadPhaseLayers::STATIC) return "STATIC";
+        if (inLayer == BroadPhaseLayers::DYNAMIC) return "DYNAMIC";
+        if (inLayer == BroadPhaseLayers::TRIGGER) return "TRIGGER";
+        return "INVALID";
+    }
+#endif
+private:
+    JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
 };
 
-class BspCharacterCollider : public ICharacterCollider {
-private:
-    Entity* m_pOwner = nullptr;
-    glm::vec3 m_position;
-    glm::vec3 m_mins, m_maxs;
-    
+// Фильтр: какие слои могут сталкиваться друг с другом
+class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
 public:
-    void Init(Entity* owner, const glm::vec3& mins, const glm::vec3& maxs) override {
-        m_pOwner = owner;
-        m_mins = mins;
-        m_maxs = maxs;
-        m_position = owner->m_transform.getPosition();
-    }
-    
-    glm::vec3 MoveAndSlide(const glm::vec3& velocity, float dt, bool useGravity) override {
-        // Переносим сюда вашу текущую логику:
-        // 1. Копируем velocity в глобальную/локальную m_velocity, с которой работает старый step_slide
-        // 2. Вызываем ваш старый метод: step_slide(useGravity, dt);
-        // 3. step_slide изменяет m_position игрока и m_velocity (при ударе о стены)
+    bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::ObjectLayer inLayer2) const override {
+        uint32_t bit1 = Layers::ToCollisionLayerBit(inLayer1);
+        uint32_t bit2 = Layers::ToCollisionLayerBit(inLayer2);
         
-        // Возвращаем то, что получилось после симуляции коллизий Quake BSP
-        return m_velocityAfterStepSlide;
-    }
-    
-    glm::vec3 GetPosition() const override { return m_position; }
-    void SetPosition(const glm::vec3& position) override { m_position = position; }
-};
- 
-class JoltCharacterCollider : public ICharacterCollider {
-private:
-    JPH::CharacterVirtual* m_pJoltCharacter = nullptr;
-    // ... ссылки на Jolt Physics System ...
-    
-public:
-    void Init(Entity* owner, const glm::vec3& mins, const glm::vec3& maxs) override {
-        // Создаем капсулу или коробку в Jolt на основе mins/maxs
-        // Создаем JPH::CharacterVirtualSettings и инициализируем m_pJoltCharacter
-        m_pJoltCharacter->SetPosition(toJoltVec3(owner->m_transform.getPosition()));
-    }
-    
-    glm::vec3 MoveAndSlide(const glm::vec3& velocity, float dt, bool useGravity) override {
-        // 1. Отдаем квейковскую скорость в Jolt
-        m_pJoltCharacter->SetLinearVelocity(toJoltVec3(velocity));
-        
-        // 2. Jolt сам крутит свои коллизии, слайды по стенам и ступеньки
-        JPH::CharacterVirtual::ExtendedUpdateSettings updateSettings;
-        m_pJoltCharacter->ExtendedUpdate(dt, ..., updateSettings);
-        
-        // Jolt автоматически обработал стояние на движущемся лифте!
-        // Нам не нужно было передавать или вычитать m_baseVelocity вручную.
-        
-        // 3. Возвращаем измененную скорость назад в компонент игрока
-        return toGlmVec3(m_pJoltCharacter->GetLinearVelocity());
-    }
-    
-    glm::vec3 GetPosition() const override {
-        return toGlmVec3(m_pJoltCharacter->GetPosition());
-    }
-    
-    void SetPosition(const glm::vec3& position) override {
-        m_pJoltCharacter->SetPosition(toJoltVec3(position));
+        // Проверяем, разрешено ли слою 1 сталкиваться с битовой маской слоя 2, и наоборот
+        return (Layers::GetDefaultMask(inLayer1) & bit2) && (Layers::GetDefaultMask(inLayer2) & bit1);
     }
 };
-*/
+
+class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override {
+        if (inLayer1 == Layers::STATIC) return inLayer2 == BroadPhaseLayers::DYNAMIC;
+        if (inLayer2 == BroadPhaseLayers::STATIC) return inLayer1 != Layers::TRIGGER;
+        if (inLayer1 == Layers::TRIGGER) return inLayer2 == BroadPhaseLayers::DYNAMIC;
+        return true;
+    }
+};

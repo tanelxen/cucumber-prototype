@@ -5,10 +5,14 @@
 //  Created by Fedor Artemenkov on 20.09.26.
 //
 
+// MovementComponent.h
 #pragma once
 
 #include "Component.h"
+#include "PhysicsCommon.h"
 #include <glm/glm.hpp>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Character/CharacterVirtual.h>
 
 #include "../vendor/json.hpp"
 
@@ -16,59 +20,39 @@ class MovementComponent : public Component
 {
 public:
     MovementComponent();
+    ~MovementComponent() override;
     
-    void save(nlohmann::json& j) const override
-    {
-        j["forward_speed"] = m_forwardspeed;
-    }
-    
-    void load(const nlohmann::json& j) override
-    {
-        m_forwardspeed = j.value("forward_speed", 400.f);
-    }
-    
+    void awake() override;
+    void update(float dt) override;
     void gizmo() override;
+    
+    void save(nlohmann::json& j) const override { j["forward_speed"] = m_forwardspeed; }
+    void load(const nlohmann::json& j) override { m_forwardspeed = j.value("forward_speed", 400.f); }
     
     const std::string getTypeName() const override { return "MovementComponent"; }
     
-    void update(float dt) override;
-    
     void addMovementInput(const glm::vec3& direction, float scale = 1.0f);
     void jump();
-    
-    // Если надо перезаписать скорость
     void launch(const glm::vec3& launchVelocity, bool overrideCurrent);
     
     const glm::vec3& getVelocity() const { return m_velocity; }
     bool isWalking() const { return m_isGrounded && glm::length(m_velocity) > 0.1f; }
     bool isGrounded() const { return m_isGrounded; }
-    int getSurfaceFlags() const { return m_surfaceFlags; }
     
     float m_forwardspeed = 400.f;
     
 private:
-    void apply_inputs(float dt);
-    void apply_air_control(const glm::vec3& direction, float wishspeed, float dt);
-    void apply_acceleration(const glm::vec3& direction, float wishspeed, float acceleration, float dt);
-    void apply_friction(float dt);
-    void apply_jump();
-    
-    void trace_ground();
-    void step_slide(bool gravity, float dt);
-    bool slide(bool gravity, float dt);
+    void HandleGroundAndFriction(float dt);
+    void HandleMovementAndAcceleration(float dt);
     
 private:
+    // Ссылка на виртуального персонажа Jolt
+    JPH::CharacterVirtual* m_character = nullptr;
+    PhysicsUserData m_userData;
+    
     glm::vec3 m_inputVector{0.0f};
-    
-    // Физическое состояние
-    glm::vec3 m_position;
-    glm::vec3 m_forward;
-    glm::vec3 m_right;
-    
     glm::vec3 m_velocity{0.0f};
-    glm::vec3 m_groundNormal{0.0f};
-    int m_surfaceFlags = 0;
+    
     bool m_isGrounded = false;
-    int m_movementBits = 0;
+    bool m_wantJump = false;
 };
-

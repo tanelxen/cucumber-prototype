@@ -21,6 +21,7 @@
 #include "AudioComponent.h"
 #include "MeshComponent.h"
 #include "Q3BspComponent.h"
+#include "RigidbodyComponent.h"
 
 #include "ModelLoader.h"
 #include "ProjectManager.h"
@@ -407,6 +408,10 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
             newComp = entity->addComponent<Q3BspComponent>();
             auto meshComp = static_cast<Q3BspComponent*>(newComp);
             meshComp->loadQ3BSP(ProjectManager::Get().assetsPath() / path);
+        }
+        else if (compName == "RigidbodyComponent")
+        {
+            newComp = entity->addComponent<RigidbodyComponent>();
         }
         
         // Загружаем уникальное состояние

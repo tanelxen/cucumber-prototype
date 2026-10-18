@@ -17,13 +17,14 @@
 #include "AnimatorComponent.h"
 #include "MeshComponent.h"
 #include "Q3BspComponent.h"
+#include "RigidbodyComponent.h"
 
 #include "RenderDevice.h"
 
 #include "q3/Q3BspMesh.h"
-#include "q3/Q3BspCollision.h"
 
 #include "PhysicsCommon.h"
+#include "PhysicsSystem.h"
 
 #include "ProjectManager.h"
 
@@ -60,6 +61,27 @@ void WorldScene::update(float dt)
 {
     if (m_isSimulationMode)
     {
+        // 1. Шагаем физику Jolt
+        PhysicsSystem::Get().Update(dt);
+        
+        // 2. Итерируемся по всем сущностям, у которых есть RigidbodyComponent,
+        // и забираем новые позиции динамических объектов.
+        for (auto& entity : m_entities)
+        {
+            auto* rb = entity->getComponent<RigidbodyComponent>();
+            if (rb && rb->enabled) {
+                rb->SyncPhysicsToTransform();
+            }
+        }
+        
+        // 2. Извлекаем результаты симуляции Jolt обратно в наши Transform компоненты
+        for (auto* component : m_globalColliders) {
+            if (component && component->enabled && !component->isTrigger) {
+                component->SyncPhysicsToTransform();
+            }
+        }
+        
+        // 3. Стандартное обновление скриптов/компонентов
         for (auto* component : m_globalUpdatables)
         {
             if (component->owner->m_isActive && component->enabled) {
@@ -389,89 +411,104 @@ void WorldScene::switchCamera(CameraComponent* newCameraComponent)
     m_pGameplayViewport->setCamera(&newCameraComponent->m_camera);
 }
 
-// Временно вручную - потом через Jolt
-void WorldScene::trace(HitResult &result,
-                       const glm::vec3 &q_start,
-                       const glm::vec3 &q_end,
-                       const glm::vec3 &q_mins,
-                       const glm::vec3 &q_maxs,
-                       Entity* ignore,
-                       uint32_t mask) const
-{
-    // Инициализируем новые поля дефолтными значениями
-    result.hitEntity = nullptr;
-    result.hitCollider = nullptr;
-    
-    // 1. Сначала считаем коллизию со статичной BSP геометрией Quake 3
-    if (m_bsp == nullptr || m_bsp->collision == nullptr) return;
-    m_bsp->collision->trace(result, q_start, q_end, q_mins, q_maxs);
-    
-    const glm::vec3 gl_start = Quake2OpenGL(q_start);
-    const glm::vec3 gl_end = Quake2OpenGL(q_end);
-    const glm::vec3 gl_mins = Quake2OpenGL(q_mins);
-    const glm::vec3 gl_maxs = Quake2OpenGL(q_maxs);
-    
-    float closestFraction = result.fraction;
-    glm::vec3 entityNormal = Quake2OpenGL(result.normal);
-    CollisionComponent* closestCollider = nullptr;
-    bool hitDynamicEntity = false;
-    
-    // 2. Итерируемся по динамическим сущностям сцены
-    for (const auto& collider : m_globalColliders)
-    {
-        // Пропускаем неактивные сущности или те, что ожидают удаления
-        if (!collider || !collider->enabled || collider->isPendingKill) continue;
-        if (!collider->owner->m_isActive || collider->owner->isPendingKill()) continue;
-        
-        // ИГНОРИРОВАНИЕ СЕБЯ: Пропускаем, если это наш собственный коллайдер
-        if (collider->owner == ignore) continue;
-        
-        // ПРОВЕРКА МАСКИ: Объект должен подходить под маску трассировки
-        if ((collider->layer & mask) == 0) continue;
-        
-        float entityFrac = 1.0f;
-        glm::vec3 localNormal = glm::vec3(0.0f);
-        
-        // Тестируем отрезок от start до текущего найденного максимума (currentEnd)
-        if (collider->sweepTest(gl_start, gl_end, gl_mins, gl_maxs, entityFrac, localNormal))
-        {
-            // Это зона-триггер
-            if (collider->isTrigger)
-            {
-                // Триггеры НЕ прерывают полет луча/ракеты, они просто регистрируют пересечение.
-                // Вызываем коллбэк на триггере (например, OnTriggerEnter), передавая туда того, кто в него вошел.
-                if (ignore)
-                {
-                    collider->CallTriggerEnter(ignore);
-                }
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Body/BodyLockInterface.h>
 
-                continue; // Летим дальше, не уменьшая closestFraction!
+void WorldScene::lineTrace(struct RaycastHit& outHit,
+                           const glm::vec3& start,
+                           const glm::vec3& direction,
+                           float maxDistance,
+                           Entity* ignoreEntity,
+                           uint32_t mask) const
+{
+    outHit.bHit = false;
+    outHit.fraction = 1.0f;
+    outHit.hitPosition = start + direction * maxDistance;
+    outHit.hitNormal = -direction;
+    outHit.hitEntity = nullptr;
+    outHit.hitComponent = nullptr;
+    
+    glm::vec3 normDir = glm::normalize(direction);
+    glm::vec3 rayVector = normDir * maxDistance;
+    JPH::RRayCast joltRay(JPH::RVec3(start.x, start.y, start.z), JPH::Vec3(rayVector.x, rayVector.y, rayVector.z));
+    
+    JPH::ClosestHitCollisionCollector<JPH::CastRayCollector> collector;
+    JPH::RayCastSettings raySettings;
+    
+    // УЛУЧШЕННЫЙ ФИЛЬТР ЛУЧА
+    class CucumberBodyFilter : public JPH::BodyFilter
+    {
+    public:
+        uint32_t mMask;
+        const Entity* mIgnoreEntity;
+        
+        CucumberBodyFilter(uint32_t mask, const Entity* ignoreEntity)
+        : mMask(mask), mIgnoreEntity(ignoreEntity) {}
+        
+        bool ShouldCollide(const JPH::BodyID& inBodyID) const override
+        {
+            JPH::BodyLockRead lock(PhysicsSystem::Get().GetJolt().GetBodyLockInterface(), inBodyID);
+            
+            if (lock.Succeeded())
+            {
+                const JPH::Body& body = lock.GetBody();
+                
+                // 1. СРАЗУ ИГНОРИРУЕМ СТРЕЛКА (или указанную сущность) по UserData
+                if (mIgnoreEntity && body.GetUserData() != 0)
+                {
+                    auto* userData = reinterpret_cast<const PhysicsUserData*>(body.GetUserData());
+                    if (userData && userData->entity == mIgnoreEntity)
+                    {
+                        return false; // Луч пролетит насквозь
+                    }
+                }
+                
+                // 2. Проверяем битовую маску слоев
+                uint32_t bodyLayerBit = Layers::ToCollisionLayerBit(body.GetObjectLayer());
+                return (mMask & bodyLayerBit) != 0;
             }
             
-            // Берем только если этот объект БЛИЖЕ, чем всё, что мы нашли ранее (включая стены BSP)
-            if (entityFrac < closestFraction)
+            return false;
+        }
+    };
+    
+    // Передаем mask и ignoreEntity в конструктор фильтра
+    CucumberBodyFilter filter(mask, ignoreEntity);
+    
+    PhysicsSystem::Get().GetJolt().GetNarrowPhaseQuery().CastRay(joltRay,
+                                                                 raySettings,
+                                                                 collector,
+                                                                 JPH::BroadPhaseLayerFilter(),
+                                                                 JPH::ObjectLayerFilter(),
+                                                                 filter);
+    
+    if (collector.HadHit())
+    {
+        outHit.fraction = collector.mHit.mFraction;
+        outHit.bHit = true;
+        outHit.hitPosition = start + normDir * (maxDistance * outHit.fraction);
+        
+        JPH::BodyLockRead lock(PhysicsSystem::Get().GetJolt().GetBodyLockInterface(), collector.mHit.mBodyID);
+        
+        if (lock.Succeeded())
+        {
+            const JPH::Body& body = lock.GetBody();
+            
+            JPH::Vec3 joltNormal = body.GetWorldSpaceSurfaceNormal(collector.mHit.mSubShapeID2, joltRay.GetPointOnRay(outHit.fraction));
+            outHit.hitNormal = glm::vec3(joltNormal.GetX(), joltNormal.GetY(), joltNormal.GetZ());
+            
+            if (body.GetUserData() != 0)
             {
-                closestFraction = entityFrac;
-                closestCollider = collider;
-                entityNormal = localNormal;
-                hitDynamicEntity = true;
+                auto* userData = reinterpret_cast<PhysicsUserData*>(body.GetUserData());
+                if (userData)
+                {
+                    outHit.hitEntity = userData->entity;
+                    outHit.hitComponent = userData->component;
+                }
             }
         }
     }
-    
-    // 3. Если мы перезаписали точку коллизии динамическим объектом, обновляем результирующий HitResult
-    if (hitDynamicEntity)
-    {
-        result.fraction = closestFraction;
-        result.endpos = OpenGL2Quake(gl_start + closestFraction * (gl_end - gl_start));
-        result.normal = OpenGL2Quake(entityNormal);
-        result.hitEntity = closestCollider->owner;
-        result.hitCollider = closestCollider;
-        
-        // Обнуляем Quake-специфичные флаги текстур брашей, так как попали в динамический объект
-        result.textureId = -1;
-        result.surfaceFlags = 0;
-        result.startsolid = (closestFraction == 0.0f);
-        result.allsolid = false; // Для динамических объектов рассчитывается индивидуально
-    }
 }
+

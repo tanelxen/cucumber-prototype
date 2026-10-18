@@ -54,13 +54,12 @@ public:
     void queueComponentDestruction(Component* component);
     void queueEntityDestruction(Entity* entity);
     
-    void trace(struct HitResult& result,
-               const glm::vec3 &start,
-               const glm::vec3 &end,
-               const glm::vec3 &mins,
-               const glm::vec3 &maxs,
-               Entity* ignore,
-               uint32_t mask = 0xFFFFFFFF) const;
+    void lineTrace(struct RaycastHit& outHit,
+                   const glm::vec3& start,
+                   const glm::vec3& direction,
+                   float maxDistance,
+                   Entity* ignoreEntity,
+                   uint32_t mask = 0xFFFFFFFF) const;
     
     // Открыто для удобства редактора
     std::vector<std::unique_ptr<Entity>> m_entities;
