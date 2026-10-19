@@ -34,17 +34,13 @@ void PhysicsSystem::Init()
                                                JPH::cMaxPhysicsBarriers,
                                                static_cast<int>(std::thread::hardware_concurrency()) - 1);
     
-    // --- НАСТРОЙКА СИСТЕМЫ ЮНИТОВ QUAKE ДЛЯ JOLT 5.6.0 ---
+    // Jolt works in meters; convert Quake-scale tolerances at the physics boundary.
     JPH::PhysicsSettings settings;
     
-    // Линейная и угловая скорость, ниже которой объект считает улегшимся спать (Sleeping)
-    // Поднимаем значения, так как числа в юнитах Quake значительно больше метров
     settings.mTimeBeforeSleep = 0.5f;
-    settings.mPointVelocitySleepThreshold = 2.0f; // 2 юнита в секунду вместо 0.03 метра
+    settings.mPointVelocitySleepThreshold = 2.0f * QUAKE_UNITS_TO_METERS;
     
-    // Допустимое проникновение объектов друг в друга до начала выталкивания (по умолч. 0.02м)
-    // Для Quake это примерно 0.5 - 1.0 юнит
-    settings.mPenetrationSlop = 0.5f;
+    settings.mPenetrationSlop = 0.5f * QUAKE_UNITS_TO_METERS;
     
     // Инициализируем систему базовыми параметрами
     m_physicsSystem.Init(1024, 0, 1024, 1024,
@@ -55,8 +51,7 @@ void PhysicsSystem::Init()
     // Применяем настройки сна и погрешностей к физическому миру
     m_physicsSystem.SetPhysicsSettings(settings);
     
-    // Устанавливаем классическую гравитацию Quake 3 (800 юнитов/сек^2 вниз по оси Y)
-    m_physicsSystem.SetGravity(JPH::Vec3(0.0f, -800.0f, 0.0f));
+    m_physicsSystem.SetGravity(QuakeToJolt(glm::vec3(0.0f, -800.0f, 0.0f)));
     
     m_contactListener = std::make_unique<PhysicsContactListener>();
     m_physicsSystem.SetContactListener(m_contactListener.get());

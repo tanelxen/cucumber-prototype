@@ -432,7 +432,7 @@ void WorldScene::lineTrace(struct RaycastHit& outHit,
     
     glm::vec3 normDir = glm::normalize(direction);
     glm::vec3 rayVector = normDir * maxDistance;
-    JPH::RRayCast joltRay(JPH::RVec3(start.x, start.y, start.z), JPH::Vec3(rayVector.x, rayVector.y, rayVector.z));
+    JPH::RRayCast joltRay(QuakeToJoltPosition(start), QuakeToJolt(rayVector));
     
     JPH::ClosestHitCollisionCollector<JPH::CastRayCollector> collector;
     JPH::RayCastSettings raySettings;
@@ -511,4 +511,3 @@ void WorldScene::lineTrace(struct RaycastHit& outHit,
         }
     }
 }
-

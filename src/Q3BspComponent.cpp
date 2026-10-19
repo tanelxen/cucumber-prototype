@@ -125,12 +125,12 @@ bool Q3BspComponent::loadQ3BSP(const std::filesystem::path& filepath)
                             glm::vec3 openGLPos = Quake2OpenGL(intersectionPoint);
                             
                             // Защита от дублирования точек (улучшает стабильность ConvexHullShape в Jolt)
-                            JPH::Vec3 joltPos(openGLPos.x, openGLPos.y, openGLPos.z);
+                            JPH::Vec3 joltPos = QuakeToJolt(openGLPos);
                             bool duplicate = false;
                             
                             for (const auto& v : brushVertices)
                             {
-                                if (v.IsClose(joltPos, 1.0f))
+                                if (v.IsClose(joltPos, QUAKE_UNITS_TO_METERS))
                                 {
                                     duplicate = true;
                                     break;

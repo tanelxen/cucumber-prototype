@@ -81,22 +81,22 @@ void MovementComponent::awake()
 {
     // 1. Создаем форму игрока (Коробка AABB)
     glm::vec3 halfExtents = (player_maxs - player_mins) * 0.5f;
-    JPH::BoxShapeSettings boxSettings(JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+    JPH::BoxShapeSettings boxSettings(QuakeToJolt(halfExtents));
     
     // Смещаем форму так, чтобы Pivot персонажа был у него в ногах
-    JPH::RotatedTranslatedShapeSettings offsetSettings(JPH::Vec3(0, halfExtents.y, 0), JPH::Quat::sIdentity(), boxSettings.Create().Get());
+    JPH::RotatedTranslatedShapeSettings offsetSettings(QuakeToJolt(glm::vec3(0, halfExtents.y, 0)), JPH::Quat::sIdentity(), boxSettings.Create().Get());
     JPH::RefConst<JPH::Shape> playerShape = offsetSettings.Create().Get();
     
     // 2. Настраиваем виртуального персонажа
     JPH::CharacterVirtualSettings settings;
     settings.mShape = playerShape;
     settings.mMaxSlopeAngle = JPH::DegreesToRadians(45.0f); // Максимальный угол подъема
-    settings.mPredictiveContactDistance = 2.0f; // Дистанция сканирования контактов
+    settings.mPredictiveContactDistance = 2.0f * QUAKE_UNITS_TO_METERS;
     
     // 3. Инстанцируем контроллер в мире Jolt
     glm::vec3 startPos = owner->getTransform().getPosition();
     m_character = new JPH::CharacterVirtual(&settings,
-                                            JPH::RVec3(startPos.x, startPos.y, startPos.z),
+                                            QuakeToJoltPosition(startPos),
                                             JPH::Quat::sIdentity(),
                                             &PhysicsSystem::Get().GetJolt());
     
@@ -146,7 +146,7 @@ void MovementComponent::update(float dt)
     m_isGrounded = m_character->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
     
     JPH::Vec3 joltVel = m_character->GetLinearVelocity();
-    m_velocity = glm::vec3(joltVel.GetX(), joltVel.GetY(), joltVel.GetZ());
+    m_velocity = JoltToQuake(joltVel);
     
     // 2. Обрабатываем трение, гравитацию и прыжок (на основе m_isGrounded)
     HandleGroundAndFriction(dt);
@@ -155,12 +155,12 @@ void MovementComponent::update(float dt)
     HandleMovementAndAcceleration(dt);
     
     // 4. Передаем измененную скорость обратно в персонажа перед симуляцией шага
-    m_character->SetLinearVelocity(JPH::Vec3(m_velocity.x, m_velocity.y, m_velocity.z));
+    m_character->SetLinearVelocity(QuakeToJolt(m_velocity));
     
     // 5. Настраиваем параметры кадра для преодоления ступеней (заменяет старый STEPSIZE = 18)
     JPH::CharacterVirtual::ExtendedUpdateSettings updateSettings;
-    updateSettings.mWalkStairsStepUp = m_character->GetUp() * 18.0f;
-    updateSettings.mStickToFloorStepDown = -m_character->GetUp() * 18.0f;
+    updateSettings.mWalkStairsStepUp = m_character->GetUp() * (18.0f * QUAKE_UNITS_TO_METERS);
+    updateSettings.mStickToFloorStepDown = -m_character->GetUp() * (18.0f * QUAKE_UNITS_TO_METERS);
     
     IgnoreSelfEntityFilter myFilter(owner, PhysicsSystem::Get().GetJolt());
     
@@ -176,7 +176,7 @@ void MovementComponent::update(float dt)
     
     // 7. Сразу после симуляции забираем итоговую позицию и отдаем её в Transform вашего движка
     JPH::RVec3 finalPos = m_character->GetPosition();
-    owner->getTransform().setPosition(glm::vec3(finalPos.GetX(), finalPos.GetY(), finalPos.GetZ()));
+    owner->getTransform().setPosition(JoltToQuakePosition(finalPos));
     
     // Зануляем ввод для следующего кадра
     m_inputVector = { 0.0f, 0.0f, 0.0f };
@@ -213,7 +213,7 @@ void MovementComponent::HandleGroundAndFriction(float dt)
         // Если в воздухе — Jolt ExtendedUpdate применит гравитацию сам,
         // но для предсказуемости движения добавим падение по оси Y вручную
         JPH::Vec3 gravity = PhysicsSystem::Get().GetJolt().GetGravity();
-        m_velocity.y += gravity.GetY() * dt;
+        m_velocity.y += JoltToQuake(gravity).y * dt;
     }
 }
 

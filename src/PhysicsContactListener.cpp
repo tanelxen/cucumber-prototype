@@ -62,10 +62,10 @@ void PhysicsContactListener::OnContactAdded(const JPH::CharacterVirtual* inChara
                 pushDirection = pushDirection.Normalized();
                 
                 // Сила толчка. Подберите значение под массу ваших ящиков
-                float pushForce = 1000.0f;
+                float pushForce = 1500.0f;// * QUAKE_UNITS_TO_METERS;
                 JPH::Vec3 impulse = pushDirection * pushForce;
                 
-                bodyInterface.AddImpulse(inContact.mBodyB, impulse, inContact.mPosition);
+                bodyInterface.AddImpulse(inContact.mBodyB, impulse/*, inContact.mPosition*/);
             }
         }
     }

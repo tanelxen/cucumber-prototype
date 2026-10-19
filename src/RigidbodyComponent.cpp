@@ -13,7 +13,6 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
-#include <iostream>
 
 void RigidbodyComponent::CreatePhysicsBody()
 {
@@ -23,12 +22,12 @@ void RigidbodyComponent::CreatePhysicsBody()
     
     if (shapeType == PhysicsShapeType::Box)
     {
-        JPH::BoxShapeSettings boxSettings(JPH::Vec3(boxHalfExtents.x, boxHalfExtents.y, boxHalfExtents.z));
+        JPH::BoxShapeSettings boxSettings(QuakeToJolt(boxHalfExtents));
         JoltShape = boxSettings.Create().Get();
     }
     else
     {
-        JPH::SphereShapeSettings sphereSettings(sphereRadius);
+        JPH::SphereShapeSettings sphereSettings(sphereRadius * QUAKE_UNITS_TO_METERS);
         JoltShape = sphereSettings.Create().Get();
     }
     
@@ -50,7 +49,7 @@ void RigidbodyComponent::CreatePhysicsBody()
     }
     
     JPH::BodyCreationSettings settings(JoltShape,
-                                       JPH::RVec3(worldPos.x, worldPos.y, worldPos.z),
+                                       QuakeToJoltPosition(worldPos),
                                        JPH::Quat(worldRot.x, worldRot.y, worldRot.z, worldRot.w),
                                        joltMotionType,
                                        joltLayer);
@@ -63,6 +62,7 @@ void RigidbodyComponent::CreatePhysicsBody()
     
     settings.mFriction = friction;
     settings.mRestitution = restitution;
+    // settings.mAllowSleeping = false;
     
     JPH::Body* body = bodyInterface.CreateBody(settings);
     m_bodyID = body->GetID();
@@ -111,7 +111,7 @@ void RigidbodyComponent::SyncPhysicsToTransform()
     JPH::Quat rot = bodyInterface.GetRotation(m_bodyID);
     
     // Передаем координаты обратно в трансформ сущности движка
-    owner->getTransform().setPosition(glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ()));
+    owner->getTransform().setPosition(JoltToQuakePosition(pos));
 //    owner->getTransform().setRotation(glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ()));
     // Внимание: проверьте порядок аргументов вашего конструктора кватернионов (W,X,Y,Z или X,Y,Z,W)
 }
@@ -137,10 +137,10 @@ void RigidbodyComponent::gizmo()
 
 void RigidbodyComponent::addImpulse(const glm::vec3& force, const glm::vec3& point)
 {
-    JPH::Vec3 pushDirection;
-    
     JPH::BodyInterface& bodyInterface = PhysicsSystem::Get().GetJolt().GetBodyInterface();
     
+    if (m_bodyID.IsInvalid() || motionType != PhysicsMotionType::Dynamic) return;
+
     bodyInterface.ActivateBody(m_bodyID);
-    bodyInterface.AddImpulse(m_bodyID, JPH::Vec3(force.x, force.y, force.z));
+    bodyInterface.AddImpulse(m_bodyID, QuakeToJolt(force));
 }

@@ -17,6 +17,37 @@
 class Entity;
 class Component;
 
+// One Quake unit is one inch.
+inline constexpr float QUAKE_UNITS_TO_METERS = 0.0254f;
+
+inline JPH::Vec3 QuakeToJolt(const glm::vec3& value)
+{
+    return JPH::Vec3(value.x * QUAKE_UNITS_TO_METERS,
+                     value.y * QUAKE_UNITS_TO_METERS,
+                     value.z * QUAKE_UNITS_TO_METERS);
+}
+
+inline JPH::RVec3 QuakeToJoltPosition(const glm::vec3& value)
+{
+    return JPH::RVec3(value.x * QUAKE_UNITS_TO_METERS,
+                      value.y * QUAKE_UNITS_TO_METERS,
+                      value.z * QUAKE_UNITS_TO_METERS);
+}
+
+inline glm::vec3 JoltToQuake(const JPH::Vec3& value)
+{
+    constexpr float METERS_TO_QUAKE_UNITS = 1.0f / QUAKE_UNITS_TO_METERS;
+    return glm::vec3(value.GetX(), value.GetY(), value.GetZ()) * METERS_TO_QUAKE_UNITS;
+}
+
+inline glm::vec3 JoltToQuakePosition(const JPH::RVec3& value)
+{
+    constexpr float METERS_TO_QUAKE_UNITS = 1.0f / QUAKE_UNITS_TO_METERS;
+    return glm::vec3(static_cast<float>(value.GetX()),
+                     static_cast<float>(value.GetY()),
+                     static_cast<float>(value.GetZ())) * METERS_TO_QUAKE_UNITS;
+}
+
 struct PhysicsUserData {
     Entity* entity = nullptr;
     Component* component = nullptr;

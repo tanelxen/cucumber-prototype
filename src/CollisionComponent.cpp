@@ -53,7 +53,7 @@ void CollisionComponent::CreatePhysicsBody()
     auto& bodyInterface = PhysicsSystem::Get().GetBodyInterface();
     
     glm::vec3 halfExtents = (m_maxs - m_mins) * 0.5f;
-    JPH::BoxShapeSettings shapeSettings(JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+    JPH::BoxShapeSettings shapeSettings(QuakeToJolt(halfExtents));
     JPH::Shape::ShapeResult shapeResult = shapeSettings.Create();
     
     glm::vec3 worldPos = owner->getTransform().getWorldPosition();
@@ -79,7 +79,7 @@ void CollisionComponent::CreatePhysicsBody()
     JPH::ObjectLayer objectLayer = Layers::FromCollisionLayer(layer);
     
     JPH::BodyCreationSettings settings(shapeResult.Get(),
-                                       JPH::RVec3(finalPos.x, finalPos.y, finalPos.z),
+                                       QuakeToJoltPosition(finalPos),
                                        JPH::Quat::sIdentity(),
                                        motionType,
                                        objectLayer);
@@ -127,7 +127,7 @@ void CollisionComponent::SyncTransformToPhysics()
     glm::vec3 centerOffset = (m_mins + m_maxs) * 0.5f;
     glm::vec3 finalPos = worldPos + centerOffset;
     
-    bodyInterface.SetPosition(m_bodyID, JPH::RVec3(finalPos.x, finalPos.y, finalPos.z), JPH::EActivation::Activate);
+    bodyInterface.SetPosition(m_bodyID, QuakeToJoltPosition(finalPos), JPH::EActivation::Activate);
 }
 
 void CollisionComponent::SyncPhysicsToTransform()
@@ -140,7 +140,7 @@ void CollisionComponent::SyncPhysicsToTransform()
     glm::vec3 centerOffset = (m_mins + m_maxs) * 0.5f;
     
     // Возвращаем позицию обратно сущности с учетом смещения центра формы
-    glm::vec3 entityPos = glm::vec3(pos.GetX(), pos.GetY(), pos.GetZ()) - centerOffset;
+    glm::vec3 entityPos = JoltToQuakePosition(pos) - centerOffset;
     owner->getTransform().setPosition(entityPos);
 }
 
