@@ -500,6 +500,17 @@ void RegisterTransformComponent(asIScriptEngine* engine)
     
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetForward()", asMETHOD(TransformComponent, getForward), asCALL_THISCALL); assert(r >= 0);
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRight()", asMETHOD(TransformComponent, getRight), asCALL_THISCALL); assert(r >= 0);
+    
+    
+    r = engine->RegisterObjectMethod("TransformComponent", "void Rotate(const Vector3 &in)", asMETHOD(TransformComponent, rotate), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void RotatePitch(float)", asMETHOD(TransformComponent, rotatePitch), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void RotateYaw(float)", asMETHOD(TransformComponent, rotateYaw), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void RotateRoll(float)", asMETHOD(TransformComponent, rotateRoll), asCALL_THISCALL); assert(r >= 0);
+    
+    r = engine->RegisterObjectMethod("TransformComponent", "void Translate(const Vector3 &in)", asMETHOD(TransformComponent, translate), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void TranslateX(float)", asMETHOD(TransformComponent, translateX), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void TranslateY(float)", asMETHOD(TransformComponent, translateY), asCALL_THISCALL); assert(r >= 0);
+    r = engine->RegisterObjectMethod("TransformComponent", "void TranslateZ(float)", asMETHOD(TransformComponent, translateZ), asCALL_THISCALL); assert(r >= 0);
 }
 
 static void PlaySound(const std::string& path)

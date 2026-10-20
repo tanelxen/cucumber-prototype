@@ -50,6 +50,17 @@ struct TransformComponent : public Component
     void setDirty() { m_isDirty = true; }
     
 public:
+    void translate(const glm::vec3& delta);
+    void translateX(float delta);
+    void translateY(float delta);
+    void translateZ(float delta);
+    
+    void rotate(const glm::vec3& delta);
+    void rotatePitch(float delta);
+    void rotateYaw(float delta);
+    void rotateRoll(float delta);
+    
+public:
     // "Сырые" сеттеры для внутренних нужд движка (например, для setParent)
     void setLocalPositionRaw(const glm::vec3& pos) { m_position = pos; }
     void setLocalRotationRaw(const glm::quat& rot) { m_rotation = rot; }
@@ -66,4 +77,7 @@ private:
     glm::vec3 m_position = { 0.0f, 0.0f, 0.0f };
     glm::quat m_rotation = { 1.0f, 0.0f, 0.0f, 0.0f };
     glm::vec3 m_scale = { 1.0f, 1.0f, 1.0f };
+    
+    // Кэш для стабильного чтения углов Эйлера в скриптах и инспекторе
+    mutable glm::vec3 m_euler = { 0.0f, 0.0f, 0.0f };
 };

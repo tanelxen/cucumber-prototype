@@ -15,22 +15,15 @@
 
 void TransformComponent::save(nlohmann::json& j) const
 {
-    glm::vec3 euler = glm::degrees(glm::eulerAngles(m_rotation));
-    
     j = nlohmann::json {
         {"position", {m_position.x, m_position.y,   m_position.z}},
-        {"rotation", {euler.x,      euler.y,        euler.z}},
+        {"rotation", {m_euler.x,      m_euler.y,        m_euler.z}},
         {"scale",    {m_scale.x,    m_scale.y,      m_scale.z}}
     };
 }
 
 void TransformComponent::load(const nlohmann::json& j)
 {
-    // Обычный load() используется и для полной загрузки, и для оверрайдов.
-    // Если поле есть в JSON, мы его считываем.
-    
-//    if (owner->isPrefabRoot) return;
-    
     if (j.contains("position"))
     {
         auto pos = j.at("position").get<std::vector<float>>();
@@ -40,8 +33,8 @@ void TransformComponent::load(const nlohmann::json& j)
     if (j.contains("rotation"))
     {
         auto rot = j.at("rotation").get<std::vector<float>>();
-        glm::vec3 euler = glm::vec3(rot[0], rot[1], rot[2]);
-        m_rotation = glm::quat(glm::radians(euler));
+        m_euler = glm::vec3(rot[0], rot[1], rot[2]);
+        m_rotation = glm::quat(glm::radians(m_euler));
     }
     
     if (j.contains("scale"))
@@ -51,7 +44,6 @@ void TransformComponent::load(const nlohmann::json& j)
     }
 }
 
-// Вектора направлений берутся из актуальной мировой матрицы
 glm::vec3 TransformComponent::getForward()
 {
     return glm::normalize(-glm::vec3(getWorldMatrix()[2]));
@@ -119,6 +111,7 @@ void TransformComponent::setWorldMatrix(const glm::mat4& newWorldMatrix)
     glm::decompose(newLocalMatrix, m_scale, m_rotation, pos, skew, perspective);
     
     m_position = pos;
+    m_euler = glm::degrees(glm::eulerAngles(m_rotation));
     
     // Инвалидируем кэш для всех дочерних объектов
     owner->invalidateTransform();
@@ -126,19 +119,6 @@ void TransformComponent::setWorldMatrix(const glm::mat4& newWorldMatrix)
 
 void TransformComponent::updateLocalMatrix()
 {
-    m_localMatrix = glm::identity<glm::mat4>();
-    
-//    if (enabled)
-//    {
-//        m_localMatrix = glm::translate(m_localMatrix, m_position);
-//        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.y), glm::vec3(0, 1, 0));
-//        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.x), glm::vec3(1, 0, 0));
-//        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.z), glm::vec3(0, 0, 1));
-//        m_localMatrix = glm::scale(m_localMatrix, m_scale);
-//    }
-    
-    // Для кватернионного m_rotation
-    
     glm::mat4 translationM = glm::translate(glm::mat4(1.0f), m_position);
     glm::mat4 rotationM    = glm::mat4_cast(m_rotation);
     glm::mat4 scaleM       = glm::scale(glm::mat4(1.0f), m_scale);
@@ -167,6 +147,7 @@ glm::vec3 TransformComponent::getWorldPosition()
 void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
 {
     m_rotation = glm::quat(glm::radians(eulerDegrees));
+    m_euler = eulerDegrees;
     
     if (owner) {
         owner->invalidateTransform();
@@ -176,6 +157,7 @@ void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
 void TransformComponent::setRotation(const glm::quat& rotation)
 {
     m_rotation = rotation;
+    m_euler = glm::degrees(glm::eulerAngles(m_rotation));
     
     if (owner) {
         owner->invalidateTransform();
@@ -184,7 +166,7 @@ void TransformComponent::setRotation(const glm::quat& rotation)
 
 glm::vec3 TransformComponent::getRotation() const
 {
-    return glm::degrees(glm::eulerAngles(m_rotation));
+    return m_euler;
 }
 
 glm::quat TransformComponent::getWorldRotation()
@@ -257,4 +239,52 @@ void TransformComponent::setExposedValue(const std::string& propName, const nloh
             owner->invalidateTransform();
         }
     }
+}
+
+// ==================== PROXY TRANSLATE ======================
+void TransformComponent::translate(const glm::vec3& delta)
+{
+    setPosition(m_position + delta);
+}
+
+void TransformComponent::translateX(float delta)
+{
+    m_position.x += delta;
+    setPosition(m_position);
+}
+
+void TransformComponent::translateY(float delta)
+{
+    m_position.y += delta;
+    setPosition(m_position);
+}
+
+void TransformComponent::translateZ(float delta)
+{
+    m_position.z += delta;
+    setPosition(m_position);
+}
+
+// ===================== PROXY ROTATE =======================
+void TransformComponent::rotate(const glm::vec3& delta)
+{
+    setRotation(m_euler + delta);
+}
+
+void TransformComponent::rotatePitch(float delta)
+{
+    m_euler.x += delta;
+    setRotation(m_euler);
+}
+
+void TransformComponent::rotateYaw(float delta)
+{
+    m_euler.y += delta;
+    setRotation(m_euler);
+}
+
+void TransformComponent::rotateRoll(float delta)
+{
+    m_euler.z += delta;
+    setRotation(m_euler);
 }
