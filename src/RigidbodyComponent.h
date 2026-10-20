@@ -103,7 +103,5 @@ struct RigidbodyComponent : public Component
     void DestroyPhysicsBody();
     void SyncTransformToPhysics();
     void SyncPhysicsToTransform();
-    
-    glm::quat getWorldRotation();
 };
 

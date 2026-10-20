@@ -491,7 +491,10 @@ void RegisterTransformComponent(asIScriptEngine* engine)
     
     // Скрываем кватернион! Регистрируем углы Эйлера как свойство "rotation"
     r = engine->RegisterObjectMethod("TransformComponent", "Vector3 GetRotation() const", asMETHOD(TransformComponent, getRotation), asCALL_THISCALL); assert(r >= 0);
-    r = engine->RegisterObjectMethod("TransformComponent", "void SetRotation(const Vector3 &in)", asMETHOD(TransformComponent, setRotation), asCALL_THISCALL); assert(r >= 0);
+    
+    r = engine->RegisterObjectMethod("TransformComponent", "void SetRotation(const Vector3 &in)",
+                                     asMETHODPR(TransformComponent, setRotation, (const glm::vec3&), void),
+                                     asCALL_THISCALL);
     
     // FIXME: Сеттеры и геттеры (set_position и get_position) срабатывают некорректно для цепочек вида transform.position += velocity * dt;
     

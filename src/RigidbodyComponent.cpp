@@ -32,7 +32,7 @@ void RigidbodyComponent::CreatePhysicsBody()
     }
     
     glm::vec3 worldPos = owner->getTransform().getWorldPosition();
-    glm::quat worldRot = getWorldRotation();
+    glm::quat worldRot = owner->getTransform().getWorldRotation();
     
     JPH::EMotionType joltMotionType = JPH::EMotionType::Dynamic;
     JPH::ObjectLayer joltLayer = Layers::INTERACTIVE;
@@ -112,21 +112,7 @@ void RigidbodyComponent::SyncPhysicsToTransform()
     
     // Передаем координаты обратно в трансформ сущности движка
     owner->getTransform().setPosition(JoltToQuakePosition(pos));
-//    owner->getTransform().setRotation(glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ()));
-    // Внимание: проверьте порядок аргументов вашего конструктора кватернионов (W,X,Y,Z или X,Y,Z,W)
-}
-
-glm::quat RigidbodyComponent::getWorldRotation()
-{
-    glm::mat4 worldMatrix = owner->getTransform().getWorldMatrix();
-    
-    // Нормализуем колонки матрицы от масштабирования
-    glm::mat3 rotMat;
-    rotMat[0] = glm::normalize(glm::vec3(worldMatrix[0]));
-    rotMat[1] = glm::normalize(glm::vec3(worldMatrix[1]));
-    rotMat[2] = glm::normalize(glm::vec3(worldMatrix[2]));
-    
-    return glm::quat_cast(rotMat);
+    owner->getTransform().setRotation(glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ()));
 }
 
 void RigidbodyComponent::gizmo()
@@ -142,5 +128,5 @@ void RigidbodyComponent::addImpulse(const glm::vec3& force, const glm::vec3& poi
     if (m_bodyID.IsInvalid() || motionType != PhysicsMotionType::Dynamic) return;
 
     bodyInterface.ActivateBody(m_bodyID);
-    bodyInterface.AddImpulse(m_bodyID, QuakeToJolt(force));
+    bodyInterface.AddImpulse(m_bodyID, QuakeToJolt(force), QuakeToJoltPosition(point));
 }

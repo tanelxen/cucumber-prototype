@@ -15,9 +15,11 @@
 
 void TransformComponent::save(nlohmann::json& j) const
 {
+    glm::vec3 euler = glm::degrees(glm::eulerAngles(m_rotation));
+    
     j = nlohmann::json {
         {"position", {m_position.x, m_position.y,   m_position.z}},
-        {"rotation", {m_euler.x,    m_euler.y,      m_euler.z}},
+        {"rotation", {euler.x,      euler.y,        euler.z}},
         {"scale",    {m_scale.x,    m_scale.y,      m_scale.z}}
     };
 }
@@ -38,7 +40,8 @@ void TransformComponent::load(const nlohmann::json& j)
     if (j.contains("rotation"))
     {
         auto rot = j.at("rotation").get<std::vector<float>>();
-        m_euler = glm::vec3(rot[0], rot[1], rot[2]);
+        glm::vec3 euler = glm::vec3(rot[0], rot[1], rot[2]);
+        m_rotation = glm::quat(glm::radians(euler));
     }
     
     if (j.contains("scale"))
@@ -117,9 +120,6 @@ void TransformComponent::setWorldMatrix(const glm::mat4& newWorldMatrix)
     
     m_position = pos;
     
-    // Обновляем сохраненные углы Эйлера для UI
-    m_euler = glm::degrees(glm::eulerAngles(m_rotation));
-    
     // Инвалидируем кэш для всех дочерних объектов
     owner->invalidateTransform();
 }
@@ -128,22 +128,21 @@ void TransformComponent::updateLocalMatrix()
 {
     m_localMatrix = glm::identity<glm::mat4>();
     
-    if (enabled)
-    {
-        m_localMatrix = glm::translate(m_localMatrix, m_position);
-        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.y), glm::vec3(0, 1, 0));
-        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.x), glm::vec3(1, 0, 0));
-        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.z), glm::vec3(0, 0, 1));
-        m_localMatrix = glm::scale(m_localMatrix, m_scale);
-    }
+//    if (enabled)
+//    {
+//        m_localMatrix = glm::translate(m_localMatrix, m_position);
+//        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.y), glm::vec3(0, 1, 0));
+//        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.x), glm::vec3(1, 0, 0));
+//        m_localMatrix = glm::rotate(m_localMatrix, glm::radians(m_euler.z), glm::vec3(0, 0, 1));
+//        m_localMatrix = glm::scale(m_localMatrix, m_scale);
+//    }
     
     // Для кватернионного m_rotation
-    /*
-     glm::mat4 translationM = glm::translate(glm::mat4(1.0f), m_position);
-     glm::mat4 rotationM    = glm::toMat4(m_rotation);
-     glm::mat4 scaleM       = glm::scale(glm::mat4(1.0f), m_scale);
-     m_localMatrix = translationM * rotationM * scaleM;
-     */
+    
+    glm::mat4 translationM = glm::translate(glm::mat4(1.0f), m_position);
+    glm::mat4 rotationM    = glm::mat4_cast(m_rotation);
+    glm::mat4 scaleM       = glm::scale(glm::mat4(1.0f), m_scale);
+    m_localMatrix = translationM * rotationM * scaleM;
 }
 
 void TransformComponent::setPosition(const glm::vec3 &pos)
@@ -167,8 +166,16 @@ glm::vec3 TransformComponent::getWorldPosition()
 
 void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
 {
-    m_euler = eulerDegrees;
     m_rotation = glm::quat(glm::radians(eulerDegrees));
+    
+    if (owner) {
+        owner->invalidateTransform();
+    }
+}
+
+void TransformComponent::setRotation(const glm::quat& rotation)
+{
+    m_rotation = rotation;
     
     if (owner) {
         owner->invalidateTransform();
@@ -177,7 +184,20 @@ void TransformComponent::setRotation(const glm::vec3 &eulerDegrees)
 
 glm::vec3 TransformComponent::getRotation() const
 {
-    return m_euler;
+    return glm::degrees(glm::eulerAngles(m_rotation));
+}
+
+glm::quat TransformComponent::getWorldRotation()
+{
+    glm::mat4 worldMatrix = getWorldMatrix();
+    
+    // Нормализуем колонки матрицы от масштабирования
+    glm::mat3 rotMat;
+    rotMat[0] = glm::normalize(glm::vec3(worldMatrix[0]));
+    rotMat[1] = glm::normalize(glm::vec3(worldMatrix[1]));
+    rotMat[2] = glm::normalize(glm::vec3(worldMatrix[2]));
+    
+    return glm::quat_cast(rotMat);
 }
 
 void TransformComponent::setScale(const glm::vec3 &scale)
@@ -196,8 +216,10 @@ glm::vec3 TransformComponent::getScale() const
 
 nlohmann::json TransformComponent::getExposedValue(const std::string& propName)
 {
+    glm::vec3 euler = glm::degrees(glm::eulerAngles(m_rotation));
+    
     if (propName == "position") return { m_position.x,  m_position.y,   m_position.z    };
-    if (propName == "rotation") return { m_euler.x,     m_euler.y,      m_euler.z       };
+    if (propName == "rotation") return { euler.x,       euler.y,        euler.z         };
     if (propName == "scale")    return { m_scale.x,     m_scale.y,      m_scale.z       };
     return nlohmann::json();
 }
@@ -216,8 +238,10 @@ void TransformComponent::setExposedValue(const std::string& propName, const nloh
     
     if (propName == "rotation")
     {
-        auto pos = value.get<std::vector<float>>();
-        m_euler = glm::vec3(pos[0], pos[1], pos[2]);
+        auto rot = value.get<std::vector<float>>();
+        
+        glm::vec3 euler = glm::vec3(rot[0], rot[1], rot[2]);
+        m_rotation = glm::quat(glm::radians(euler));
         
         if (owner) {
             owner->invalidateTransform();
