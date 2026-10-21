@@ -6,6 +6,7 @@
 //
 
 #include "ProjectManager.h"
+#include "TextureManager.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -163,6 +164,9 @@ bool ProjectManager::openProject(const std::filesystem::path& path, std::string&
 
     if (!loadProjectFile(projectPath, error)) return false;
     addRecentProject(projectPath);
+    
+    TextureManager::Get().init(assetsPath());
+    
     return true;
 }
 

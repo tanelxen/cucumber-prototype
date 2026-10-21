@@ -25,6 +25,7 @@ enum AssetType: uint32_t {
     AssetType_Audio       = 1 << 4,
     AssetType_Scene       = 1 << 5,
     AssetType_Script      = 1 << 6,
+    AssetType_Map         = 1 << 7,
 };
 
 struct AssetDragPayload {

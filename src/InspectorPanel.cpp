@@ -17,6 +17,7 @@
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
 #include "MeshComponent.h"
+#include "MapComponent.h"
 
 #include "ScriptEngine.h"
 
@@ -185,7 +186,7 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
         ImGui::Spacing();
     }
     
-    uint32_t allowedInInspector = AssetType_Mesh;
+    uint32_t allowedInInspector = AssetType_Mesh | AssetType_Map;
     
     // ЗОНА 1: Между последним компонентом и кнопкой "Add Component"
     float targetLineY = ImGui::GetCursorScreenPos().y;
@@ -214,11 +215,12 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
     
     if (ImGui::BeginPopup("AddComponentPopup"))
     {
-        if (ImGui::MenuItem("Mesh"))        { m_entity->addComponent<MeshComponent>(); }
-        if (ImGui::MenuItem("Sound"))       { m_entity->addComponent<AudioComponent>(); }
-        if (ImGui::MenuItem("Camera"))      { m_entity->addComponent<CameraComponent>(); }
-        if (ImGui::MenuItem("Movement"))    { m_entity->addComponent<MovementComponent>(); }
-        if (ImGui::MenuItem("Collision"))    { m_entity->addComponent<CollisionComponent>(); }
+        if (ImGui::MenuItem("Mesh"))            { m_entity->addComponent<MeshComponent>(); }
+        if (ImGui::MenuItem("Sound"))           { m_entity->addComponent<AudioComponent>(); }
+        if (ImGui::MenuItem("Camera"))          { m_entity->addComponent<CameraComponent>(); }
+        if (ImGui::MenuItem("Movement"))        { m_entity->addComponent<MovementComponent>(); }
+        if (ImGui::MenuItem("Collision"))       { m_entity->addComponent<CollisionComponent>(); }
+        if (ImGui::MenuItem("TrenchBroom Map")) { m_entity->addComponent<MapComponent>(); }
         
         if (ImGui::BeginMenu("Scripts"))
         {
@@ -254,6 +256,11 @@ void InspectorPanel::ProcessAssetInInspector(AssetDragPayload* data)
     {
         auto meshComponent = m_entity->addComponent<MeshComponent>();
         meshComponent->loadModel(data->path);
+    }
+    if (data->type == AssetType_Map)
+    {
+        auto mapComponent = m_entity->addComponent<MapComponent>();
+        mapComponent->loadTrenchBroomMap(data->path);
     }
     else if (data->type == AssetType_Audio)
     {

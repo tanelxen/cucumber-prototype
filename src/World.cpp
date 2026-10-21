@@ -17,11 +17,13 @@
 #include "AnimatorComponent.h"
 #include "MeshComponent.h"
 #include "Q3BspComponent.h"
+#include "MapComponent.h"
 #include "RigidbodyComponent.h"
 
 #include "RenderDevice.h"
 
 #include "q3/Q3BspMesh.h"
+#include "trenchbroom/MapMesh.h"
 
 #include "PhysicsCommon.h"
 #include "PhysicsSystem.h"
@@ -233,9 +235,14 @@ void WorldScene::prepareRenderViews()
 
 void WorldScene::collectRenderCommands(RenderView& view)
 {
-    if (m_bsp != nullptr && m_bsp->mesh != nullptr && Layers::Static & view.cullingMask)
+//    if (m_bsp != nullptr && m_bsp->mesh != nullptr && Layers::Static & view.cullingMask)
+//    {
+//        m_bsp->mesh->draw(view);
+//    }
+    
+    if (m_map != nullptr && m_map->mesh != nullptr && Layers::Static & view.cullingMask)
     {
-        m_bsp->mesh->draw(view);
+        m_map->mesh->draw(view);
     }
     
     for (auto& entity : m_entities)
@@ -320,9 +327,14 @@ void WorldScene::registerComponent(Component *component)
     
     m_allComponents.push_back(component);
     
-    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
+//    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
+//    {
+//        m_bsp = bsp;
+//    }
+    
+    if (auto* map = dynamic_cast<MapComponent*>(component))
     {
-        m_bsp = bsp;
+        m_map = map;
     }
 }
 
@@ -342,9 +354,14 @@ void WorldScene::unregisterComponent(Component *component)
         m_globalColliders.erase(std::remove(m_globalColliders.begin(), m_globalColliders.end(), collider), m_globalColliders.end());
     }
     
-    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
+//    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
+//    {
+//        m_bsp = nullptr;
+//    }
+    
+    if (auto* map = dynamic_cast<MapComponent*>(component))
     {
-        m_bsp = nullptr;
+        m_map = nullptr;
     }
 }
 

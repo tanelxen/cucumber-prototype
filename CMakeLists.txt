@@ -64,6 +64,9 @@ set(SRC_COMMON
         src/PhysicsSystem.h
         src/PhysicsContactListener.cpp
         src/PhysicsContactListener.h
+        
+        src/TextureManager.cpp
+        src/TextureManager.h
 )
 
 set(SRC_SCENE
@@ -98,6 +101,8 @@ set(SRC_COMPONENTS
         src/CollisionComponent.h
         src/Q3BspComponent.cpp
         src/Q3BspComponent.h
+        src/MapComponent.cpp
+        src/MapComponent.h
         src/RigidbodyComponent.cpp
         src/RigidbodyComponent.h
 )
@@ -115,6 +120,8 @@ set(SRC_RENDERER
         src/IndexBuffer.h
         src/FrameBuffer.cpp
         src/FrameBuffer.h
+        src/Texture.cpp
+        src/Texture.h
         src/Mesh.cpp
         src/Mesh.h
         src/Shader.cpp
@@ -174,6 +181,13 @@ set(SRC_Q3
         src/q3/TextureAtlas.h
 )
 
+set(SRC_TRENCHBROOM
+        src/trenchbroom/MapAsset.cpp
+        src/trenchbroom/MapAsset.h
+        src/trenchbroom/MapMesh.cpp
+        src/trenchbroom/MapMesh.h
+)
+
 set(SRC_IMGUI
         vendor/imgui/backends/imgui_impl_glfw.cpp
         vendor/imgui/backends/imgui_impl_opengl3.cpp
@@ -187,6 +201,7 @@ add_executable( ${PROJECT_NAME}
         ${SRC_RENDERER}
         ${SRC_PANELS}
         ${SRC_GameUI}
+        ${SRC_TRENCHBROOM}
         ${SRC_Q3}
         ${SRC_IMGUI}
 )
@@ -196,6 +211,7 @@ source_group("Scene" FILES ${SRC_SCENE})
 source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
+source_group("Trenchbroom" FILES ${SRC_TRENCHBROOM})
 source_group("Quake 3" FILES ${SRC_Q3})
 source_group("Game UI" FILES ${SRC_GameUI})
 source_group("imgui" FILES ${SRC_IMGUI})

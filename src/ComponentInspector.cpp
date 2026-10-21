@@ -20,9 +20,12 @@
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
 #include "MeshComponent.h"
+#include "MapComponent.h"
 #include "ProjectManager.h"
 
 #include "Mesh.h"
+#include "trenchbroom/MapMesh.h"
+
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -80,9 +83,9 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     bool isChangedY = false;
     bool isChangedZ = false;
     
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.20f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.1f, 0.15f, 1.0f });
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.8f, 0.0f, 0.25f, 0.3f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.8f, 0.0f, 0.25f, 0.4f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.8f, 0.0f, 0.25f, 0.7f });
     
     ImGui::PushFont(boldFont);
     if (ImGui::Button("X", buttonSize)) {
@@ -100,9 +103,9 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     ImGui::PopItemWidth();
     ImGui::SameLine();
     
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.3f, 0.8f, 0.3f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.2f, 0.7f, 0.2f, 1.0f });
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.25f, 0.8f, 0.25f, 0.3f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.25f, 0.8f, 0.25f, 0.4f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.25f, 0.8f, 0.25f, 0.7f });
     
     ImGui::PushFont(boldFont);
     if (ImGui::Button("Y", buttonSize)) {
@@ -120,9 +123,9 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     ImGui::PopItemWidth();
     ImGui::SameLine();
     
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.2f, 0.35f, 0.9f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 1.0f });
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.25f, 0.8f, 0.3f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.1f, 0.25f, 0.8f, 0.4f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.25f, 0.8f, 0.7f });
     
     ImGui::PushFont(boldFont);
     if (ImGui::Button("Z", buttonSize)) {
@@ -302,6 +305,46 @@ static void DrawMeshComponent(MeshComponent* comp)
     }
 }
 
+static void DrawMapComponent(MapComponent* comp)
+{
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Source");
+    ImGui::SameLine();
+    
+    char pathBuffer[256];
+    std::snprintf(pathBuffer, sizeof(pathBuffer), "%s", comp->path.c_str());
+    ImGui::InputText("##Path", pathBuffer, sizeof(pathBuffer), ImGuiInputTextFlags_ReadOnly);
+    
+    ImGui::PushStyleColor(ImGuiCol_DragDropTarget, IM_COL32(0, 0, 0, 0));
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM", ImGuiDragDropFlags_AcceptBeforeDelivery))
+        {
+            AssetDragPayload* info = static_cast<AssetDragPayload*>(payload->Data);
+            
+            const bool isModel = info->type == AssetType_Map;
+            
+            const ImVec2 fieldMin = ImGui::GetItemRectMin();
+            const ImVec2 fieldMax = ImGui::GetItemRectMax();
+            const ImU32 color = isModel ? IM_COL32(80, 190, 110, 230) : IM_COL32(220, 100, 70, 230);
+            ImGui::GetWindowDrawList()->AddRect(fieldMin, fieldMax, color, 0.0f, 0, 1.0f);
+            
+            if (payload->IsDelivery() && isModel)
+            {
+                comp->loadTrenchBroomMap(info->path);
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::PopStyleColor();
+    
+    
+    if (ImGui::Button("Reload"))
+    {
+        comp->reload();
+    }
+}
+
 static void DrawCollisionComponent(CollisionComponent* comp)
 {
     //    ImGui::DragFloat3("Mins", &comp->m_mins.x, 1.f);
@@ -421,6 +464,11 @@ void RegisterComponentsUI()
     inspector.Register<MeshComponent>("Mesh", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<MeshComponent*>(c);
         DrawMeshComponent(comp);
+    });
+    
+    inspector.Register<MapComponent>("Trenchbroom Map", [](Component* c, InspectorPanel* p) {
+        auto* comp = static_cast<MapComponent*>(c);
+        DrawMapComponent(comp);
     });
     
     inspector.Register<AnimatorComponent>("Animator", [](Component* c, InspectorPanel* p) {

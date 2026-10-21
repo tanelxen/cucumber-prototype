@@ -24,6 +24,7 @@ class RenderView;
 class Camera;
 
 class Q3BspComponent;
+class MapComponent;
 
 enum class SceneType
 {
@@ -101,5 +102,6 @@ private:
     Viewport* m_pGameplayViewport = nullptr; // Храним только на время симуляции
     CameraComponent* m_pActiveCameraComponent = nullptr; // Указатель на текущий компонент
     
-    Q3BspComponent* m_bsp = nullptr;
+//    Q3BspComponent* m_bsp = nullptr;
+    MapComponent* m_map = nullptr;
 };

@@ -13,6 +13,8 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
+#include <iostream>
+
 CollisionComponent::~CollisionComponent()
 {
     DestroyPhysicsBody();
@@ -20,6 +22,7 @@ CollisionComponent::~CollisionComponent()
 
 void CollisionComponent::awake()
 {
+    std::cout << "CollisionComponent::awake()" << std::endl;
     CreatePhysicsBody();
 }
 

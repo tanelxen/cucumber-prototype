@@ -79,6 +79,34 @@ out vec4 FragColor;
 
 vec3 adjustExposure(vec3 color, float value);
 
+const float lightaxis[3] = float[](0.5f, 0.75f, 1.0f);
+
+float getFakeLight(vec3 normal)
+{
+    int i;
+    float f;
+
+    // axial plane
+    for ( i = 0; i < 3; i++ ) {
+        if (abs(normal[i]) > 0.9) {
+            f = lightaxis[i];
+            return f;
+        }
+    }
+    
+    // between two axial planes
+    for (i = 0; i < 3; i++) {
+        if (abs(normal[i]) < 0.1) {
+            f = ( lightaxis[( i + 1 ) % 3] + lightaxis[( i + 2 ) % 3] ) / 2;
+            return f;
+        }
+    }
+    
+    // other
+    f = ( lightaxis[0] + lightaxis[1] + lightaxis[2] ) / 3;
+    return f;
+}
+
 void main()
 {
     vec4 baseColor = vec4(1.0);
@@ -117,6 +145,9 @@ void main()
     baseColor.rgb = baseColor.rgb * overbight;
     //baseColor.rgb = pow(baseColor.rgb, vec3(1.0f/1.2f));
 #endif
+
+    float fakeLight = getFakeLight(v_Normal);
+    baseColor.rgb = baseColor.rgb * fakeLight * 2.0f;
     
     FragColor = baseColor * color * vec4(ambient, 1);
 

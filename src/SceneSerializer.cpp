@@ -21,6 +21,7 @@
 #include "AudioComponent.h"
 #include "MeshComponent.h"
 #include "Q3BspComponent.h"
+#include "MapComponent.h"
 #include "RigidbodyComponent.h"
 
 #include "ModelLoader.h"
@@ -408,6 +409,14 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
             newComp = entity->addComponent<Q3BspComponent>();
             auto meshComp = static_cast<Q3BspComponent*>(newComp);
             meshComp->loadQ3BSP(ProjectManager::Get().assetsPath() / path);
+        }
+        else if (compName == "MapComponent")
+        {
+            std::string path = compData.at("source_map");
+            
+            newComp = entity->addComponent<MapComponent>();
+            auto meshComp = static_cast<MapComponent*>(newComp);
+            meshComp->loadTrenchBroomMap(path);
         }
         else if (compName == "RigidbodyComponent")
         {

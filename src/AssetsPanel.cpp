@@ -33,6 +33,7 @@ AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(IC
     m_extensionMap[".json"]  = AssetType_Scene;
     m_extensionMap[".as"]   = AssetType_Script;
     m_extensionMap[".glsl"]  = AssetType_Script;
+    m_extensionMap[".map"]  = AssetType_Map;
     
     m_icons[AssetType_Folder]  = loadTextureFromFile("resources/icons/folder.png");
     m_icons[AssetType_Unknown] = loadTextureFromFile("resources/icons/file_unknown.png");
