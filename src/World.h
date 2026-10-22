@@ -9,6 +9,9 @@
 
 #include "UID.h"
 
+#include "CameraManager.h"
+#include "ViewDesc.h"
+
 #include <string>
 #include <vector>
 #include <memory>
@@ -20,8 +23,8 @@ class Entity;
 class Component;
 class CollisionComponent;
 class CameraComponent;
-class RenderView;
-class Camera;
+
+//struct GPUTimeLight;
 
 class Q3BspComponent;
 class MapComponent;
@@ -40,11 +43,8 @@ public:
     
     void update(float dt);
     
-    void prepareRenderViews();
-    void collectRenderCommands(RenderView& view);
-    
     bool isSimulationMode() { return m_isSimulationMode; }
-    void startSimulation(Viewport* viewport);
+    void startSimulation();
     void stopSimulation();
     
     void clear();
@@ -68,8 +68,6 @@ public:
     Entity* findEntityByName(const std::string& name);
     Entity* findEntityByUID(const UID& uid);
     
-    std::vector<CameraComponent*> getCameraComponents();
-    
 public:
     SceneType m_type = SceneType::Level; // По умолчанию сцена — это уровень
     std::string m_filePath = "";         // Путь к файлу на диске
@@ -77,12 +75,16 @@ public:
     bool isPrefabContext() const { return m_type == SceneType::Prefab; }
     
 public:
-    void switchCamera(CameraComponent* newCameraComponent);
+    CameraManager& cameras() { return m_cameras; }
+    const CameraManager& cameras() const { return m_cameras; }
+        
+    // Оставлены как тонкие обёртки, чтобы не ломать скрипты/редактор:
+    void switchCamera(CameraComponent* c)     { m_cameras.setPrimary(c); }
+    void setPrimaryCamera(CameraComponent* c) { m_cameras.setPrimary(c); }
+    std::vector<CameraComponent*> getCameraComponents() { return m_cameras.all(); }
+    bool hasActiveSceneCamera() const { return m_isSimulationMode && m_cameras.hasActive(); }
     
-    bool hasActiveSceneCamera() const {
-        // Возвращает true, если мы в симуляции и нашли хоть одну рабочую камеру на сцене
-        return m_isSimulationMode && m_pActiveCameraComponent != nullptr;
-    }
+    MapComponent* getMap() const { return m_map; }
     
 private:
     std::vector<Component*> m_globalUpdatables;
@@ -99,9 +101,9 @@ private:
     
     bool m_isSimulationMode = false;
     
-    Viewport* m_pGameplayViewport = nullptr; // Храним только на время симуляции
-    CameraComponent* m_pActiveCameraComponent = nullptr; // Указатель на текущий компонент
-    
 //    Q3BspComponent* m_bsp = nullptr;
     MapComponent* m_map = nullptr;
+    
+//    std::vector<GPUTimeLight> collectLights();
+    CameraManager m_cameras;
 };

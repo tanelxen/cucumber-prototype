@@ -7,6 +7,10 @@
 
 #pragma once
 
+#include <memory>
+
+class Renderer;
+
 struct Application
 {
     Application();
@@ -19,6 +23,7 @@ struct Application
 private:
     struct GLFWwindow* m_pWindow = nullptr;
     class UIManager* m_pUIManager = nullptr;
+    std::unique_ptr<Renderer> m_pRenderer;
     bool m_cursorEnabled = true;
     
     void updateInputState();

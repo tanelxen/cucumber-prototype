@@ -4,12 +4,22 @@
 //
 //  Created by Fedor Artemenkov on 19.03.26.
 //
+//  Этап 3 + очистка + этап 4 (тени вынесены в ShadowSystem):
+//   - виды из пула, сортировка команд по ключу;
+//   - GLState: нет избыточных gl-вызовов и нет glGet*/glIsEnabled;
+//   - per-view uniform'ы (VP, позиция камеры, тени) ставятся один раз при смене программы, а не на каждую команду;
+//   - uniform'ы по location, шейдер выбирается только при смене (pipeline, features);
+//   - сэмплеры привязаны к юнитам при линковке (исправляет баг с s_lightMap).
+//
 
 #include "RenderDevice.h"
 
+#include "GLState.h"
+#include "RenderTarget.h"
+#include "ShadowSystem.h"
+
 #include "Shader.h"
 #include "ShaderVariant.h"
-#include "Camera.h"
 
 #include "Sky.h"
 #include "Grid.h"
@@ -18,13 +28,13 @@
 #include "GizmoRender.h"
 #include "GameUI.h"
 
-#include "Viewport.h"
-#include "FrameBuffer.h"
-
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
 
-#include <stdio.h>
+#include <algorithm>
+#include <array>
+#include <cstdio>
+#include <numeric>
 #include <vector>
 
 //static Sky g_sky;
@@ -34,11 +44,10 @@ static Grid g_grid;
 
 namespace RenderDevice {
     
-//    std::vector<RenderCommand> opaquePass;
-//    std::vector<RenderCommand> transparentPass;
-    
-    // Хранилище проходов для текущего кадра
-    static std::vector<RenderView> registeredViews;
+    // Пул видов: между кадрами сохраняет ёмкость векторов команд
+    static std::vector<RenderView> viewPool;
+    static size_t viewCount = 0;
+    static std::vector<uint32_t> viewOrder;
     
     static Shader generic;
     static ShaderVariant flat_shader;
@@ -46,6 +55,28 @@ namespace RenderDevice {
     
     handle_t whiteTextureId;
     handle_t normalTextureId;
+    
+    static GLuint lightingUBO = 0;
+    struct UBOLightData {
+        glm::vec4 position;  // w = type (0=dir, 1=point)
+        glm::vec4 direction; // w = range
+        glm::vec4 color;     // w = intensity
+        glm::vec4 parameters; // x = spot angle in degrees
+    };
+    
+    struct UBOLightingBlock {
+        UBOLightData lights[MaxLightsPerView];
+        int lightCount;
+        float padding[3];    // Выравнивание по std140 (16 байт)
+    };
+    
+    // Всё, что нужно проходу отрисовки и одинаково для всех его команд
+    struct PassContext {
+        glm::mat4 viewProj;
+        glm::vec3 cameraPos;
+        bool hasShadows;
+        std::array<glm::mat4, 4> lightSpace;   // [0] — солнце вида, [1..3] — прожекторы
+    };
     
     void init()
     {
@@ -76,6 +107,14 @@ namespace RenderDevice {
         
 //        g_sky.init();
         g_grid.init();
+        
+        glGenBuffers(1, &lightingUBO);
+        glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof(UBOLightingBlock), nullptr, GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 1, lightingUBO); // Привязываем к binding point = 1
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        
+        GLState::invalidate();
     }
     
     handle_t getWhiteTexture() { return whiteTextureId; }
@@ -110,6 +149,8 @@ namespace RenderDevice {
         
         glBindTexture(GL_TEXTURE_2D, 0);
         
+        GLState::invalidate(); // привязки текстур изменены мимо кэша
+        
         return id;
     }
     
@@ -137,207 +178,325 @@ namespace RenderDevice {
         return id;
     }
     
-    void draw(glm::mat4& viewProj, const std::vector<RenderCommand>& commands)
+    // -----------------------------------------------------------------------------------------
+    // Основной проход
+    // -----------------------------------------------------------------------------------------
+    
+    static ShaderVariant* resolveShader(const RenderCommand& cmd, bool hasShadows)
     {
-        handle_t lastVAO = -1;
-        handle_t lastIBO = -1;
-        handle_t lastProgram = -1;
-        handle_t lastBaseTexture = -1;
-        handle_t lastLightmap = -1;
-        
-        for (auto cmd : commands)
+        switch (cmd.pipeline)
         {
-            ShaderVariant* shader;
-            
-            switch (cmd.pipeline)
-            {
-                case PipelineType::Generic:
-                    shader = generic.getVariant(cmd.featureMask);
-                    break;
-                    
-                case PipelineType::FlatShaded:
-                    shader = &flat_shader;
-                    break;
-                    
-                case PipelineType::Grid:
-                    shader = &grid_shader;
-                    break;
-            }
-            
-            if (lastProgram != shader->getProgramId())
-            {
-                shader->bind();
-                lastProgram = shader->getProgramId();
-            }
-            
-            shader->setUniform("uModel", cmd.transform);
-            shader->setUniform("uVP", viewProj);
-            
-            cmd.reverseWinding ? glCullFace(GL_FRONT) : glCullFace(GL_BACK);
-            
-            switch (cmd.blendMode)
-            {
-                case BlendMode::Opaque:
-                    glEnable(GL_CULL_FACE);
-                    glDisable(GL_BLEND);
-                    glDisable(GL_POLYGON_OFFSET_FILL);
-                    break;
-                    
-                case BlendMode::Mask:
-                    glDisable(GL_CULL_FACE);
-                    glDisable(GL_BLEND);
-                    glDisable(GL_POLYGON_OFFSET_FILL);
-                    break;
-                    
-                case BlendMode::Add:
-                    glDisable(GL_CULL_FACE);
-                    glEnable(GL_BLEND);
-                    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-                    glEnable(GL_POLYGON_OFFSET_FILL);
-                    glPolygonOffset(cmd.lightMap == 0 ? -16 : -8, 1);
-                    break;
-                    
-                case BlendMode::Transparent:
-                    glDisable(GL_CULL_FACE);
-                    glEnable(GL_BLEND);
-                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                    glEnable(GL_POLYGON_OFFSET_FILL);
-                    glPolygonOffset(cmd.lightMap == 0 ? -16 : -8, 1);
-                    break;
-            }
-            
-            if (cmd.featureMask & ShaderFeature::HasAlbedoMap && lastBaseTexture != cmd.baseTexture)
-            {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, cmd.baseTexture);
+            case PipelineType::Generic:
+                return generic.getVariant(cmd.featureMask | (hasShadows ? ShaderFeature::HasShadows : 0));
                 
-                lastBaseTexture = cmd.baseTexture;
-            }
-            
-            if (cmd.featureMask & ShaderFeature::HasLightMap && lastLightmap != cmd.lightMap)
-            {
-                shader->setUniform("s_lightMap", 1);
+            case PipelineType::FlatShaded:
+                return &flat_shader;
                 
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, cmd.lightMap);
+            case PipelineType::Grid:
+                return &grid_shader;
+        }
+        return nullptr;
+    }
+    
+    // Uniform'ы, одинаковые для всех команд вида. Значения живут в программе, поэтому достаточно
+    // выставить их один раз после выбора программы.
+    static void applyViewUniforms(const ShaderVariant& shader, const PassContext& ctx, const RenderCommand& cmd)
+    {
+        const ShaderVariant::Locations& loc = shader.locations();
+        
+        shader.setUniformAt(loc.vp, ctx.viewProj);
+        shader.setUniformAt(loc.viewPos, ctx.cameraPos);
+        
+        // Слот тени каждого источника приходит в UBO (LightData.parameters.y), здесь только матрицы 2D-карт
+        if (ctx.hasShadows && cmd.pipeline == PipelineType::Generic)
+        {
+            shader.setUniformAt(loc.lightSpaceMatrices, ctx.lightSpace.data(), static_cast<int>(ctx.lightSpace.size()));
+        }
+        
+        if (cmd.featureMask & ShaderFeature::HasSpherical)
+        {
+            shader.setUniformAt(loc.sh, shCoefficients.data(), static_cast<int>(shCoefficients.size()));
+        }
+
+    }
+    
+    static void applyRenderState(const RenderCommand& cmd)
+    {
+        GLState::cullFace(cmd.reverseWinding ? GL_FRONT : GL_BACK);
+        
+        switch (cmd.blendMode)
+        {
+            case BlendMode::Opaque:
+                GLState::cull(true);
+                GLState::blend(false);
+                GLState::polygonOffset(false);
+                break;
                 
-                lastLightmap = cmd.lightMap;
-            }
-            
-            if (cmd.pipeline != PipelineType::Grid)
-            {
-                shader->setUniform("color", cmd.color);
-            }
-            
-            if (cmd.featureMask & ShaderFeature::HasSkinning && cmd.bones != nullptr)
-            {
-                shader->setUniform("uBones[0]", *cmd.bones);
-            }
-            
-            if (cmd.featureMask & ShaderFeature::HasSpherical)
-            {
-                shader->setUniform("u_SH[0]", shCoefficients);
-            }
-            
-            if (lastVAO != cmd.vao)
-            {
-                glBindVertexArray(cmd.vao);
-                lastVAO = cmd.vao;
-            }
-            
-            auto bufferOffset = cmd.start * sizeof(uint32_t);
-            glDrawElements(GL_TRIANGLES, cmd.count, GL_UNSIGNED_INT, (void *)bufferOffset);
+            case BlendMode::Mask:
+                GLState::cull(false);
+                GLState::blend(false);
+                GLState::polygonOffset(false);
+                break;
+                
+            case BlendMode::Add:
+                GLState::cull(false);
+                GLState::blend(true);
+                GLState::blendFunc(GL_SRC_ALPHA, GL_ONE);
+                GLState::polygonOffset(true, cmd.lightMap == 0 ? -16.0f : -8.0f, 1.0f);
+                break;
+                
+            case BlendMode::Transparent:
+                GLState::cull(false);
+                GLState::blend(true);
+                GLState::blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                GLState::polygonOffset(true, cmd.lightMap == 0 ? -16.0f : -8.0f, 1.0f);
+                break;
         }
     }
     
-    void submitView(const RenderView& view)
+    // Команды уже отсортированы (RenderView::sortCommands): одинаковые программы/текстуры/VAO идут подряд.
+    static void drawPass(const PassContext& ctx, const std::vector<RenderCommand>& commands)
     {
-        registeredViews.push_back(view);
-    }
-    
-    void flush()
-    {
-        if (registeredViews.empty()) return;
+        ShaderVariant* shader = nullptr;
+        PipelineType lastPipeline = PipelineType::Generic;
+        FeatureMask lastMask = 0;
         
-        // 1. Сортируем зарегистрированные проходы по их depth
-        std::sort(registeredViews.begin(), registeredViews.end(), [](const RenderView& a, const RenderView& b) {
-            return a.depth < b.depth;
-        });
+        unsigned int lastProgram = 0xFFFFFFFFu;
+        glm::mat4 lastTransform;
+        glm::vec4 lastColor;
+        bool transformValid = false;
+        bool colorValid = false;
         
-        // 2. Прогоняем каждый проход рендера
-        for (const auto& view : registeredViews)
+        for (const RenderCommand& cmd : commands)
         {
-            if (view.targetFrameBuffer)
+            // Шейдер переопределяем только при смене (pipeline, features)
+            if (!shader || cmd.pipeline != lastPipeline || cmd.featureMask != lastMask)
             {
-                view.targetFrameBuffer->bind();
-            }
-            else
-            {
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                shader = resolveShader(cmd, ctx.hasShadows);
+                if (!shader || !shader->isValid())
+                {
+                    shader = nullptr;
+                    continue;
+                }
+                lastPipeline = cmd.pipeline;
+                lastMask = cmd.featureMask;
+                
+                if (shader->getProgramId() != lastProgram)
+                {
+                    lastProgram = shader->getProgramId();
+                    GLState::useProgram(lastProgram);
+                    transformValid = false;
+                    colorValid = false;
+                }
+                
+                applyViewUniforms(*shader, ctx, cmd);
             }
             
-            // Настройка очистки буферов
-            if (view.clearDepthOnly)
+            const ShaderVariant::Locations& loc = shader->locations();
+            const float alphaCutoff = cmd.blendMode == BlendMode::Mask ? 0.5f : 0.0f;
+            shader->setUniformAt(loc.alphaCutoff, alphaCutoff);
+            
+            if (!transformValid || std::memcmp(&lastTransform, &cmd.transform, sizeof(glm::mat4)) != 0)
             {
-                glEnable(GL_DEPTH_TEST);
-                glClear(GL_DEPTH_BUFFER_BIT);
+                shader->setUniformAt(loc.model, cmd.transform);
+                lastTransform = cmd.transform;
+                transformValid = true;
             }
-            else
+            
+            applyRenderState(cmd);
+            
+            if (cmd.featureMask & ShaderFeature::HasAlbedoMap)
             {
-                glEnable(GL_DEPTH_TEST);
-                glDepthFunc(GL_LESS);
-                glClearColor(0.01, 0.01, 0.01, 1);
+                GLState::bindTexture2D(0, cmd.baseTexture);
+            }
+            
+            if (cmd.featureMask & ShaderFeature::HasLightMap)
+            {
+                GLState::bindTexture2D(1, cmd.lightMap);
+            }
+            
+            if (cmd.pipeline != PipelineType::Grid && (!colorValid || cmd.color != lastColor))
+            {
+                shader->setUniformAt(loc.color, cmd.color);
+                lastColor = cmd.color;
+                colorValid = true;
+            }
+            
+            if ((cmd.featureMask & ShaderFeature::HasSkinning) && cmd.bones != nullptr)
+            {
+                shader->setUniformAt(loc.bones, *cmd.bones);
+            }
+            
+            GLState::bindVAO(cmd.vao);
+            
+            const auto bufferOffset = cmd.start * sizeof(uint32_t);
+            glDrawElements(GL_TRIANGLES, cmd.count, GL_UNSIGNED_INT, (void*)bufferOffset);
+        }
+    }
+    
+    // -----------------------------------------------------------------------------------------
+    // Кадр
+    // -----------------------------------------------------------------------------------------
+    
+    RenderView& acquireView(const ViewDesc& desc)
+    {
+        if (viewCount == viewPool.size())
+        {
+            viewPool.emplace_back();
+        }
+        
+        RenderView& view = viewPool[viewCount++];
+        view.reset(desc);
+        return view;
+    }
+    
+    static void uploadLights(const RenderView& view)
+    {
+        UBOLightingBlock uboBlock{};
+        uboBlock.lightCount = std::min((int)view.lights.size(), (int)MaxLightsPerView);
+        
+        for (int i = 0; i < uboBlock.lightCount; i++) {
+            const auto& src = view.lights[i];
+            uboBlock.lights[i].position  = glm::vec4(src.position, (float)src.type);
+            uboBlock.lights[i].direction = glm::vec4(src.direction, src.range);
+            uboBlock.lights[i].color     = glm::vec4(src.color, src.intensity);
+            uboBlock.lights[i].parameters = glm::vec4(glm::cos(glm::radians(src.spotAngle)),
+                                                      static_cast<float>(src.shadowSlot),
+                                                      src.bakedStatic ? 1.0f : 0.0f, 0.0f);
+        }
+        
+        glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(UBOLightingBlock), &uboBlock);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+    
+    static void renderView(RenderView& view, ShadowSystem& shadows)
+    {
+        view.sortCommands();
+        
+        // ---- Тени ----
+        // Точечные и прожекторные карты уже готовы (ShadowSystem::renderQueued, раз за кадр и с кэшем).
+        // Здесь только солнце: оно зависит от камеры этого вида. Оверлейные виды берут уже готовую карту.
+        const bool hasShadows = shadows.ready() && std::any_of(view.lights.begin(), view.lights.end(),
+            [](const GPUTimeLight& l) { return l.shadowSlot >= 0; });
+        
+        shadows.renderSun(view.sun);
+        
+        // ---- Цель ----
+        const ViewDesc& desc = view.desc;
+        
+        if (desc.target)
+        {
+            desc.target->bind();
+        }
+        else
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, desc.size.x, desc.size.y);
+        }
+        GLState::invalidate(); // RenderTarget::bind работает мимо кэша
+        
+        // ---- Очистка ----
+        GLState::depthTest(true);
+        GLState::depthFunc(GL_LESS);
+        GLState::depthMask(true);
+        
+        switch (desc.clear)
+        {
+            case ClearMode::ColorDepth:
+                glClearColor(desc.clearColor.x, desc.clearColor.y, desc.clearColor.z, desc.clearColor.w);
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            }
-            
-            if (view.drawSkybox && !view.clearDepthOnly)
-            {
-//                g_sky.draw(view.viewMatrix, view.projectionMatrix);
-            }
-            
-            if (view.drawGrid)
-            {
-                g_grid.draw(view.viewMatrix, view.projectionMatrix);
-            }
-            
-            glm::mat4x4 viewProj = view.projectionMatrix * view.viewMatrix;
-            
-            // Отрисовываем накопленную геометрию сцены
-            glDepthMask(GL_TRUE);
-            draw(viewProj, view.opaquePass);
-            
-            glDepthMask(GL_FALSE);
-            draw(viewProj, view.transparentPass);
-            glDepthMask(GL_TRUE);
-            
-            // Отрисовка сопутствующих систем
-            SpriteRenderer::Flush(view.viewMatrix, view.projectionMatrix);
-            DecalManager::Flush(view.viewMatrix, view.projectionMatrix);
-            
-            if (view.drawGizmos)
-            {
-                GizmoRender::Get().Flush(view.viewMatrix, view.projectionMatrix);
-            }
-            
-            // FIXME: Resize должен быть не тут
-            if (view.cullingMask & Layers::UI)
-            {
-                int width = view.targetFrameBuffer->getWidth();
-                int height = view.targetFrameBuffer->getHeight();
-                GameUI::Resize(width, height);
-                GameUI::Flush();
-            }
-            
-            if (view.targetFrameBuffer)
-            {
-                view.targetFrameBuffer->unbind();
-            }
+                break;
+                
+            case ClearMode::Depth:
+                glClear(GL_DEPTH_BUFFER_BIT);
+                break;
+                
+            case ClearMode::None:
+                break;
         }
         
-        // Возвращаем дефолтный буфер и очищаем команды
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        registeredViews.clear();
+        if ((desc.flags & ViewFlag::Sky) && desc.clear == ClearMode::ColorDepth)
+        {
+//            g_sky.draw(desc.camera.view, desc.camera.proj);
+        }
         
+        if (desc.flags & ViewFlag::Grid)
+        {
+            g_grid.draw(desc.camera.view, desc.camera.proj);
+            GLState::invalidate();
+        }
+        
+        // ---- Сцена ----
+        uploadLights(view);
+        
+        PassContext ctx;
+        ctx.viewProj = desc.camera.viewProj();
+        ctx.cameraPos = desc.camera.position;
+        ctx.hasShadows = hasShadows;
+        ctx.lightSpace = shadows.lightSpaceMatrices(view.sun);
+        
+        if (hasShadows)
+        {
+            shadows.bindForSampling();
+        }
+        
+        GLState::depthMask(true);
+        drawPass(ctx, view.opaquePass);
+        
+        GLState::depthMask(false);
+        drawPass(ctx, view.transparentPass);
+        GLState::depthMask(true);
+        
+        // ---- Сопутствующие системы (мимо GLState) ----
+        SpriteRenderer::Flush(desc.camera.view, desc.camera.proj);
+        DecalManager::Flush(desc.camera.view, desc.camera.proj);
+        
+        if (desc.flags & ViewFlag::Debug)
+        {
+            GizmoRender::Get().Flush(desc.camera.view, desc.camera.proj);
+        }
+        
+        // FIXME: Resize должен быть не тут
+        if (desc.flags & ViewFlag::GameUI)
+        {
+            GameUI::Resize(desc.size.x, desc.size.y);
+            GameUI::Flush();
+        }
+        
+        GLState::invalidate();
+        
+        if (desc.target)
+        {
+            desc.target->unbind();
+        }
+    }
+    
+    void flush(ShadowSystem& shadows)
+    {
+        if (viewCount > 0)
+        {
+            // Порядок видов: стабильная сортировка индексов (RenderView тяжёлые, их не двигаем)
+            viewOrder.resize(viewCount);
+            std::iota(viewOrder.begin(), viewOrder.end(), 0u);
+            std::stable_sort(viewOrder.begin(), viewOrder.end(), [](uint32_t a, uint32_t b) {
+                return viewPool[a].desc.order < viewPool[b].desc.order;
+            });
+            
+            GLState::invalidate();
+            
+            for (uint32_t index : viewOrder)
+            {
+                renderView(viewPool[index], shadows);
+            }
+            
+            // Возвращаем дефолтный буфер, виды возвращаются в пул
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            GLState::invalidate();
+            viewCount = 0;
+        }
+        
+        // Очереди чистим ВСЕГДА, даже когда видов нет (все панели свёрнуты): иначе гизмо и спрайты копились бы вечно
         GizmoRender::Get().Clear();
         SpriteRenderer::Clear();
         GameUI::Clear();

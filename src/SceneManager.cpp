@@ -137,7 +137,7 @@ void SceneManager::exitPrefabEditMode()
 // =================================================================
 // РЕЖИМ СИМУЛЯЦИИ (PLAY MODE)
 // =================================================================
-void SceneManager::startSimulation(class Viewport* viewport)
+void SceneManager::startSimulation()
 {
     if (!m_activeScene || m_activeScene->isSimulationMode()) return;
     
@@ -148,7 +148,7 @@ void SceneManager::startSimulation(class Viewport* viewport)
     SceneSerializer::SaveSceneToMemory(m_activeScene.get(), s_levelSnapshot);
     
     // 2. Включаем режим игры на текущей сцене
-    m_activeScene->startSimulation(viewport);
+    m_activeScene->startSimulation();
 }
 
 void SceneManager::stopSimulation()

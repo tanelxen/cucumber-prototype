@@ -22,10 +22,6 @@ add_subdirectory( vendor/ImGuizmo )
 set(SRC_COMMON
         src/main.cpp
 
-        src/Camera.cpp
-        src/Camera.h
-        src/CameraController.cpp
-        src/CameraController.h
         src/Grid.cpp
         src/Grid.h
         
@@ -40,10 +36,6 @@ set(SRC_COMMON
         src/ModelLoader.h
         src/Skeleton.h
         src/Animation.h
-
-
-        src/Viewport.cpp
-        src/Viewport.h
         
         src/Sky.cpp
         src/Sky.h
@@ -67,6 +59,9 @@ set(SRC_COMMON
         
         src/TextureManager.cpp
         src/TextureManager.h
+        
+        src/Bounds.h
+        src/SpatialGrid.h
 )
 
 set(SRC_SCENE
@@ -79,6 +74,10 @@ set(SRC_SCENE
         src/SceneSerializer.h
         src/SceneManager.cpp
         src/SceneManager.h
+        src/CameraManager.cpp
+        src/CameraManager.h
+        src/SceneExtractor.cpp
+        src/SceneExtractor.h
 )
 
 set(SRC_COMPONENTS
@@ -105,6 +104,8 @@ set(SRC_COMPONENTS
         src/MapComponent.h
         src/RigidbodyComponent.cpp
         src/RigidbodyComponent.h
+        src/LightComponent.cpp
+        src/LightComponent.h
 )
 
 set(SRC_RENDERER
@@ -118,8 +119,8 @@ set(SRC_RENDERER
         src/VertexLayout.h
         src/IndexBuffer.cpp
         src/IndexBuffer.h
-        src/FrameBuffer.cpp
-        src/FrameBuffer.h
+        src/RenderTarget.cpp
+        src/RenderTarget.h
         src/Texture.cpp
         src/Texture.h
         src/Mesh.cpp
@@ -136,6 +137,20 @@ set(SRC_RENDERER
         src/ParticleSystem.h
         src/DecalManager.cpp
         src/DecalManager.h
+        
+        src/Renderer.cpp
+        src/Renderer.h
+        src/IViewProvider.h
+        src/GameViewProducer.cpp
+        src/GameViewProducer.h
+        src/ViewDesc.h
+        src/RenderScene.cpp
+        src/RenderScene.h
+        src/ViewBuilder.cpp
+        src/ViewBuilder.h
+        src/ShadowSystem.cpp
+        src/ShadowSystem.h
+        src/ShadowTypes.h
 )
 
 set(SRC_GameUI
@@ -163,6 +178,11 @@ set(SRC_PANELS
         src/MaterialPanel.h
         src/HierarchyPanel.cpp
         src/HierarchyPanel.h
+        
+        src/EditorCamera.cpp
+        src/EditorCamera.h
+        src/EditorViewport.cpp
+        src/EditorViewport.h
 )
 
 set(SRC_Q3
@@ -186,6 +206,18 @@ set(SRC_TRENCHBROOM
         src/trenchbroom/MapAsset.h
         src/trenchbroom/MapMesh.cpp
         src/trenchbroom/MapMesh.h
+        src/trenchbroom/MapMeshBuilder.cpp
+        src/trenchbroom/MapMeshBuilder.h
+        src/trenchbroom/LightmapBaker.cpp
+        src/trenchbroom/LightmapBaker.h
+        src/trenchbroom/LightmapBakeService.cpp
+        src/trenchbroom/LightmapBakeService.h
+        src/trenchbroom/LightmapCache.cpp
+        src/trenchbroom/LightmapCache.h
+        src/trenchbroom/LightmapController.cpp
+        src/trenchbroom/LightmapController.h
+        src/trenchbroom/Parallel.h
+        src/trenchbroom/Half.h
 )
 
 set(SRC_IMGUI
@@ -251,12 +283,24 @@ include(FetchContent)
 FetchContent_Declare(
     angelscript
     GIT_REPOSITORY https://github.com/anjo76/angelscript
-    GIT_TAG        master
+    GIT_TAG        v2.38.0
     SOURCE_SUBDIR  sdk/angelscript/projects/cmake
+    UPDATE_DISCONNECTED ON # Запрещает CMake лезть в сеть при каждом сохранении CMakeLists.txt
 )
 
 # Скачиваем и подключаем подпроект одной командой
 FetchContent_MakeAvailable(angelscript)
+
+FetchContent_Declare(
+    nanort
+    GIT_REPOSITORY https://github.com/lighttransport/nanort.git
+    GIT_TAG        cdf474ae9176b87a9334c858bb06c9e028ed0e0d
+    SOURCE_SUBDIR  header-only
+    GIT_SHALLOW    TRUE
+    UPDATE_DISCONNECTED ON
+)
+
+FetchContent_MakeAvailable(nanort)
 
 # 2. Создаем переменные для удобства путей
 set(AS_ADDON_DIR "${angelscript_SOURCE_DIR}/sdk/add_on")
@@ -281,18 +325,19 @@ target_include_directories(angelscript_addons PUBLIC ${angelscript_SOURCE_DIR}/s
 
 
 ############################# JOLT ####################################
+# Опции сборки Jolt ставим ДО объявления, чтобы они закешировались
+set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
+set(TARGET_SAMPLES OFF CACHE INTERNAL "")
+set(PROFILER_IMPLEMENTATION "None" CACHE INTERNAL "")
+
 # Загружаем Jolt Physics
 FetchContent_Declare(
     JoltPhysics
     GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics
-    GIT_TAG        master
+    GIT_TAG        v5.6.0
     SOURCE_SUBDIR  Build
+    UPDATE_DISCONNECTED ON # Не проверяем обновления в сети без явной команды
 )
-
-# Опции сборки Jolt перед его добавлением
-set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
-set(TARGET_SAMPLES OFF CACHE INTERNAL "")
-set(PROFILER_IMPLEMENTATION "None" CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(JoltPhysics)
 ############################# JOLT ####################################
@@ -302,10 +347,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     vendor/glm
     #vendor/ImGuizmo
     ${angelscript_SOURCE_DIR}/sdk/angelscript/include
+    ${nanort_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR}
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw imgui ImGuizmo miniaudio angelscript angelscript_addons Jolt)
+target_link_libraries(${PROJECT_NAME} PRIVATE glad glfw ImGuizmo miniaudio angelscript_addons Jolt)
 
 
 

@@ -9,7 +9,6 @@
 
 #include <string>
 #include <vector>
-#include "../vendor/json_fwd.hpp"
 #include "UID.h"
 
 class WorldScene;

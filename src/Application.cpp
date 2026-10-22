@@ -7,6 +7,8 @@
 
 #include "Application.h"
 
+#include "Renderer.h"
+
 #include "RenderDevice.h"
 #include "AudioSystem.h"
 #include "GizmoRender.h"
@@ -19,8 +21,11 @@
 #include "UIManager.h"
 #include "World.h"
 #include "Input.h"
+#include "ViewDesc.h"
 
 #include "PhysicsSystem.h"
+
+#include "trenchbroom/LightmapBakeService.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -84,6 +89,9 @@ Application::~Application()
         m_pUIManager->saveProjectSettings();
         delete m_pUIManager;
     }
+    
+    if (m_pRenderer) m_pRenderer->shutdown();
+    
     glfwDestroyWindow(m_pWindow);
     glfwTerminate();
 }
@@ -130,14 +138,14 @@ void Application::run()
         if (activeScene)
         {
             activeScene->update(elapsedTime);
-            activeScene->prepareRenderViews();
         }
         
         ParticleSystem::Update(elapsedTime);
         DecalManager::Update(elapsedTime);
         
-        m_pUIManager->preRender();
-        RenderDevice::flush();
+        LightmapBakeService::Get().update();
+        
+        m_pRenderer->renderFrame(activeScene ? &*activeScene : nullptr, *m_pUIManager);
         
         m_pUIManager->draw();
 
@@ -171,6 +179,10 @@ void Application::setCursorEnabled(bool state)
 void Application::initSubSystems()
 {
     RenderDevice::init();
+    
+    m_pRenderer = std::make_unique<Renderer>();   // настройки теней: Renderer(ShadowSettings{...})
+    m_pRenderer->init();                          // создаёт карты теней, нужен GL
+    
     GizmoRender::Get().Initialize();
     
     AudioSystem::Get().Initialize();
@@ -180,4 +192,20 @@ void Application::initSubSystems()
     GameUI::Init();
     
     PhysicsSystem::Get().Init();
+}
+
+static void UpdateAudioListener(const std::vector<ViewDesc>& views)
+{
+    for (const ViewDesc& v : views)
+    {
+        if (!(v.flags & ViewFlag::AudioListener)) continue;
+        
+        ma_engine* engine = AudioSystem::Get().GetEngine();
+        const glm::vec3& p = v.camera.position;
+        const glm::vec3& f = v.camera.forward;
+        ma_engine_listener_set_position(engine, 0, p.x, p.y, p.z);
+        ma_engine_listener_set_direction(engine, 0, f.x, f.y, f.z);
+        ma_engine_listener_set_world_up(engine, 0, 0, 1, 0);
+        return;
+    }
 }

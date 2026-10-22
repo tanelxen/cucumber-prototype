@@ -6,55 +6,140 @@
 //
 
 #include "ShaderVariant.h"
+
 #include <glad/glad.h>
+
 #include <cstdio>
-
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
+#include <utility>
 
-ShaderVariant::ShaderVariant()
+namespace
 {
-    m_programId = 0;
+    unsigned int CompileShader(unsigned int type, const char* source)
+    {
+        const unsigned int id = glCreateShader(type);
+
+        glShaderSource(id, 1, &source, nullptr);
+        glCompileShader(id);
+
+        GLint status = GL_FALSE;
+        glGetShaderiv(id, GL_COMPILE_STATUS, &status);
+
+        if (status == GL_FALSE)
+        {
+            GLint length = 0;
+            glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+
+            std::vector<char> message(static_cast<size_t>(length > 1 ? length : 1));
+            glGetShaderInfoLog(id, static_cast<GLsizei>(message.size()), nullptr, message.data());
+
+            printf("Failed to compile %s shader:\n%s\n",
+                   (type == GL_VERTEX_SHADER) ? "vertex" : "fragment", message.data());
+
+            glDeleteShader(id);
+            return 0;
+        }
+
+        return id;
+    }
 }
 
-ShaderVariant::ShaderVariant(ShaderVariant &&other) noexcept
+ShaderVariant::ShaderVariant() = default;
+
+ShaderVariant::ShaderVariant(ShaderVariant&& other) noexcept
+    : m_programId(std::exchange(other.m_programId, 0u)),
+      m_uniformCache(std::move(other.m_uniformCache)),
+      m_locations(other.m_locations)
 {
-    m_programId = other.m_programId;
-    other.m_programId = 0;
+    other.m_uniformCache.clear();
+    other.m_locations = Locations{};
 }
 
-ShaderVariant &ShaderVariant::operator=(ShaderVariant &&other) noexcept
+ShaderVariant& ShaderVariant::operator=(ShaderVariant&& other) noexcept
 {
-    m_programId = other.m_programId;
-    other.m_programId = 0;
+    if (this != &other)
+    {
+        destroy();
 
+        m_programId = std::exchange(other.m_programId, 0u);
+        m_uniformCache = std::move(other.m_uniformCache);
+        m_locations = other.m_locations;
+
+        other.m_uniformCache.clear();
+        other.m_locations = Locations{};
+    }
     return *this;
 }
 
 ShaderVariant::~ShaderVariant()
 {
-    glDeleteShader(m_programId);
+    destroy();
 }
 
-static unsigned int compile_shader(unsigned int type, const char* source);
-
-void ShaderVariant::init(const char *vert, const char *frag)
+void ShaderVariant::destroy()
 {
-    m_programId = glCreateProgram();
+    if (m_programId)
+    {
+        glDeleteProgram(m_programId);
+        m_programId = 0;
+    }
+    m_uniformCache.clear();
+    m_locations = Locations{};
+}
 
-    unsigned int vs = compile_shader(GL_VERTEX_SHADER, vert);
-    unsigned int fs = compile_shader(GL_FRAGMENT_SHADER, frag);
+void ShaderVariant::init(const char* vert, const char* frag)
+{
+    destroy();
 
-    glAttachShader(m_programId, vs);
-    glAttachShader(m_programId, fs);
-    glLinkProgram(m_programId);
-    glValidateProgram(m_programId);
+    const unsigned int vs = CompileShader(GL_VERTEX_SHADER, vert);
+    const unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, frag);
 
+    if (vs == 0 || fs == 0)
+    {
+        if (vs) glDeleteShader(vs);
+        if (fs) glDeleteShader(fs);
+        return; // программа остаётся пустой (isValid() == false), ошибка уже в логе
+    }
+
+    const unsigned int program = glCreateProgram();
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
+
+    glDetachShader(program, vs);
+    glDetachShader(program, fs);
     glDeleteShader(vs);
     glDeleteShader(fs);
-    
+
+    GLint linked = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    if (linked == GL_FALSE)
+    {
+        GLint length = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+
+        std::vector<char> message(static_cast<size_t>(length > 1 ? length : 1));
+        glGetProgramInfoLog(program, static_cast<GLsizei>(message.size()), nullptr, message.data());
+
+        printf("Failed to link shader program:\n%s\n", message.data());
+        glDeleteProgram(program);
+        return;
+    }
+
+    m_programId = program;
+
+    // Блок освещения -> binding point 1 (тот же индекс, что и в glBindBufferBase)
+    const GLuint blockIndex = glGetUniformBlockIndex(m_programId, "LightingBlock");
+    if (blockIndex != GL_INVALID_INDEX)
+    {
+        glUniformBlockBinding(m_programId, blockIndex, 1);
+    }
+
     fetchAllActiveUniforms();
+    resolveLocations();
+    bindSamplerUnits();
 }
 
 void ShaderVariant::bind() const
@@ -67,7 +152,7 @@ void ShaderVariant::unbind() const
     glUseProgram(0);
 }
 
-void ShaderVariant::init(const char *filepath)
+void ShaderVariant::init(const char* filepath)
 {
     enum ShaderSourceType {
         SRC_NONE = -1,
@@ -76,7 +161,7 @@ void ShaderVariant::init(const char *filepath)
     };
 
     std::ifstream stream(filepath);
-    
+
     if (!stream.is_open())
     {
         std::cerr << "Error: Failed to open the file at path: " << filepath << std::endl;
@@ -96,7 +181,6 @@ void ShaderVariant::init(const char *filepath)
             if (line.find("vertex") != std::string::npos)
             {
                 currentType = SRC_VERTEX;
-
             }
             else if (line.find("fragment") != std::string::npos)
             {
@@ -113,123 +197,164 @@ void ShaderVariant::init(const char *filepath)
         }
     }
 
-    init(vertexStream.str().c_str(), fragmentStream.str().c_str());
-}
-
-void ShaderVariant::setUniform(const std::string& name, const glm::vec3& vector) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniform3fv(location, 1, (const float*) &vector);
-    }
-}
-
-void ShaderVariant::setUniform(const std::string& name, const glm::vec4& vector) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniform4fv(location, 1, (const float*) &vector);
-    }
-}
-
-void ShaderVariant::setUniform(const std::string &name, const glm::mat4& matrix) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniformMatrix4fv(location, 1, GL_FALSE, (const float*) &matrix);
-    }
-}
-
-void ShaderVariant::setUniform(const std::string &name, const std::vector<glm::vec3> &vectors) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniform3fv(location, (GLsizei)(vectors.size()), &(vectors[0][0]));
-    }
-}
-
-void ShaderVariant::setUniform(const std::string &name, const std::vector<glm::mat4> &matrices) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniformMatrix4fv(location, (GLsizei)(matrices.size()), GL_FALSE, &(matrices[0][0][0]));
-    }
-}
-
-void ShaderVariant::setUniform(const std::string &name, bool value) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniform1i(location, value);
-    }
-}
-
-void ShaderVariant::setUniform(const std::string &name, float value) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniform1f(location, value);
-    }
-}
-
-void ShaderVariant::setUniform(const std::string &name, int value) const
-{
-    GLint location = getUniformLocation(name);
-    if (location != -1) {
-        glUniform1i(location, value);
-    }
+    const std::string vertexSource = vertexStream.str();
+    const std::string fragmentSource = fragmentStream.str();
+    init(vertexSource.c_str(), fragmentSource.c_str());
 }
 
 int ShaderVariant::getUniformLocation(const std::string& name) const
 {
-    auto it = m_uniformCache.find(name);
-    if (it != m_uniformCache.end()) {
-        return it->second;
-    }
-    return -1;
+    const auto it = m_uniformCache.find(name);
+    return it != m_uniformCache.end() ? it->second : -1;
 }
 
 void ShaderVariant::fetchAllActiveUniforms()
 {
-    GLint count;
+    GLint count = 0;
     glGetProgramiv(m_programId, GL_ACTIVE_UNIFORMS, &count);
-    
-    GLint size;
-    GLenum type;
-    const GLsizei bufSize = 64;
+
+    constexpr GLsizei bufSize = 128;
     GLchar name[bufSize];
-    GLsizei length;
-    
-    for (GLint i = 0; i < count; i++)
+
+    for (GLint i = 0; i < count; ++i)
     {
-        glGetActiveUniform(m_programId, (GLuint)i, bufSize, &length, &size, &type, name);
-        GLint location = glGetUniformLocation(m_programId, name);
-        m_uniformCache[name] = location;
+        GLint size = 0;
+        GLenum type = 0;
+        GLsizei length = 0;
+        glGetActiveUniform(m_programId, static_cast<GLuint>(i), bufSize, &length, &size, &type, name);
+
+        const GLint location = glGetUniformLocation(m_programId, name);
+        if (location != -1) m_uniformCache[name] = location; // члены uniform-блоков (location == -1) не нужны
     }
 }
 
-static unsigned int compile_shader(unsigned int type, const char* source)
+void ShaderVariant::resolveLocations()
 {
-    unsigned int id = glCreateShader(type);
+    m_locations.model = getUniformLocation("uModel");
+    m_locations.vp = getUniformLocation("uVP");
+    m_locations.viewPos = getUniformLocation("uViewPos");
+    m_locations.color = getUniformLocation("color");
+    m_locations.bones = getUniformLocation("uBones[0]");
+    m_locations.sh = getUniformLocation("u_SH[0]");
+    m_locations.lightSpaceMatrices = getUniformLocation("uLightSpaceMatrices[0]");
+    m_locations.shadowLightIndices = getUniformLocation("uShadowLightIndices[0]");
+    m_locations.shadowLightTypes = getUniformLocation("uShadowLightTypes[0]");
+    m_locations.alphaCutoff = getUniformLocation("uAlphaCutoff");
+}
 
-    glShaderSource(id, 1, &source, nullptr);
-    glCompileShader(id);
+// Фиксированные текстурные юниты
+void ShaderVariant::bindSamplerUnits()
+{
+    static const struct { const char* name; int unit; } kSamplers[] = {
+        { "s_lightMap", 1 },
+        { "s_shadowMap", 2 },
+        { "s_pointShadowMap", 3 },
+    };
 
-    int result;
-    glGetShaderiv(id, GL_COMPILE_STATUS, &result);
-
-    if (result == GL_FALSE)
+    for (const auto& sampler : kSamplers)
     {
-        int length;
-        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
-
-        char message[1024];
-        glGetShaderInfoLog(id, length, &length, message);
-
-        printf("Failed to compile %s shader:\n", (type == GL_VERTEX_SHADER) ? "vertex" : "fragment");
-        printf("%s\n", message);
-        return 0;
+        const int loc = getUniformLocation(sampler.name);
+        if (loc != -1) glProgramUniform1i(m_programId, loc, sampler.unit);
     }
+}
 
-    return id;
+// ---------------------------------------------------------------------------------------------
+// По имени
+// ---------------------------------------------------------------------------------------------
+
+void ShaderVariant::setUniform(const std::string& name, const glm::vec3& vector) const
+{
+    setUniformAt(getUniformLocation(name), vector);
+}
+
+void ShaderVariant::setUniform(const std::string& name, const glm::vec4& vector) const
+{
+    setUniformAt(getUniformLocation(name), vector);
+}
+
+void ShaderVariant::setUniform(const std::string& name, const glm::mat4& matrix) const
+{
+    setUniformAt(getUniformLocation(name), matrix);
+}
+
+void ShaderVariant::setUniform(const std::string& name, const std::vector<glm::vec3>& vectors) const
+{
+    if (vectors.empty()) return;
+    setUniformAt(getUniformLocation(name), vectors.data(), static_cast<int>(vectors.size()));
+}
+
+void ShaderVariant::setUniform(const std::string& name, const std::vector<glm::mat4>& matrices) const
+{
+    setUniformAt(getUniformLocation(name), matrices);
+}
+
+void ShaderVariant::setUniform(const std::string& name, const std::vector<int>& values) const
+{
+    if (values.empty()) return;
+    setUniformAt(getUniformLocation(name), values.data(), static_cast<int>(values.size()));
+}
+
+void ShaderVariant::setUniform(const std::string& name, bool value) const
+{
+    setUniformAt(getUniformLocation(name), static_cast<int>(value));
+}
+
+void ShaderVariant::setUniform(const std::string& name, float value) const
+{
+    setUniformAt(getUniformLocation(name), value);
+}
+
+void ShaderVariant::setUniform(const std::string& name, int value) const
+{
+    setUniformAt(getUniformLocation(name), value);
+}
+
+// ---------------------------------------------------------------------------------------------
+// По location
+// ---------------------------------------------------------------------------------------------
+
+void ShaderVariant::setUniformAt(int loc, const glm::vec3& value) const
+{
+    if (loc != -1) glUniform3fv(loc, 1, &value[0]);
+}
+
+void ShaderVariant::setUniformAt(int loc, const glm::vec4& value) const
+{
+    if (loc != -1) glUniform4fv(loc, 1, &value[0]);
+}
+
+void ShaderVariant::setUniformAt(int loc, const glm::mat4& value) const
+{
+    if (loc != -1) glUniformMatrix4fv(loc, 1, GL_FALSE, &value[0][0]);
+}
+
+void ShaderVariant::setUniformAt(int loc, const glm::mat4* values, int count) const
+{
+    if (loc != -1 && values && count > 0) glUniformMatrix4fv(loc, count, GL_FALSE, &values[0][0][0]);
+}
+
+void ShaderVariant::setUniformAt(int loc, const glm::vec3* values, int count) const
+{
+    if (loc != -1 && values && count > 0) glUniform3fv(loc, count, &values[0][0]);
+}
+
+void ShaderVariant::setUniformAt(int loc, const int* values, int count) const
+{
+    if (loc != -1 && values && count > 0) glUniform1iv(loc, count, values);
+}
+
+void ShaderVariant::setUniformAt(int loc, const std::vector<glm::mat4>& values) const
+{
+    if (values.empty()) return;
+    setUniformAt(loc, values.data(), static_cast<int>(values.size()));
+}
+
+void ShaderVariant::setUniformAt(int loc, float value) const
+{
+    if (loc != -1) glUniform1f(loc, value);
+}
+
+void ShaderVariant::setUniformAt(int loc, int value) const
+{
+    if (loc != -1) glUniform1i(loc, value);
 }

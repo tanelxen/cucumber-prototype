@@ -8,22 +8,22 @@
 #pragma once
 
 #include "Component.h"
-#include "Viewport.h"
-#include "Camera.h"
-#include "World.h"
+
+class RenderTarget;
 
 struct CameraComponent : public Component
 {
     CameraComponent();
     
-    Camera m_camera;
-    bool m_isCurrent = true;
+    bool m_isPrimary = false;
+    bool m_isOverlay = false;
+    uint32_t cameraStackId = 0;
     
-    Viewport* m_customViewport = nullptr;
+    RenderTarget* m_renderTarget = nullptr;
     
-    bool clearDepthOnly = false;        // Нужно для оверлей-камер (оружие)
-    uint32_t cullingMask = 0xFFFFFFFF;  // Какие слои рендерить
-    float depth = 0.0f;                 // Очередь отрисовки (чем больше, тем позже рисуется)
+    bool clearDepthOnly = false;        // Сохраняет цвет предыдущего вида, очищая depth для оверлея.
+    uint32_t cullingMask = 0xFFFFFFFF;  // Какие слои рендерить, например только слой оружия.
+    float depth = 0.0f;                 // Стек камер: меньшее значение рендерится раньше.
     
     float fov = 55.0f;
     
@@ -31,7 +31,10 @@ struct CameraComponent : public Component
     
     void save(nlohmann::json& j) const override
     {
-        j["current"] = m_isCurrent;
+        j["enabled"] = enabled;
+        j["primary"] = m_isPrimary;
+        j["overlay"] = m_isOverlay;
+        j["cameraStackId"] = cameraStackId;
         
         j["clearDepthOnly"] = clearDepthOnly;
         j["cullingMask"] = cullingMask;
@@ -42,14 +45,37 @@ struct CameraComponent : public Component
     
     void load(const nlohmann::json& j) override
     {
-        if(j.contains("current"))
+        if (j.contains("enabled"))
         {
-            m_isCurrent = j.at("current");
+            enabled = j.at("enabled");
+        }
+        else if (j.contains("current"))
+        {
+            enabled = j.at("current");
         }
         
         if(j.contains("clearDepthOnly"))
         {
             clearDepthOnly = j.at("clearDepthOnly");
+        }
+
+        if (j.contains("overlay"))
+        {
+            m_isOverlay = j.at("overlay");
+        }
+        else if (j.contains("current"))
+        {
+            m_isOverlay = clearDepthOnly;
+        }
+
+        if (j.contains("primary"))
+        {
+            m_isPrimary = j.at("primary");
+        }
+
+        if (j.contains("cameraStackId"))
+        {
+            cameraStackId = j.at("cameraStackId");
         }
         
         if(j.contains("cullingMask"))
@@ -67,8 +93,6 @@ struct CameraComponent : public Component
             fov = j.value("fov", 55.f);
         }
     }
-    
-    void update(float dt) override;
     
     void gizmo() override;
 };

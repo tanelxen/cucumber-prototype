@@ -20,7 +20,7 @@ struct MeshComponent : public Component
     std::shared_ptr<Mesh> mesh;
     std::vector<std::shared_ptr<Material>> materials;
     
-    uint32_t layer = Layers::Default;
+    uint32_t layer = RenderLayers::Default;
     
     const std::string getTypeName() const override { return "MeshComponent"; }
     

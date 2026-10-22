@@ -112,7 +112,7 @@ void VertexArray::setVertexBuffer(const VertexBuffer* vertexBuffer)
         
         glEnableVertexAttribArray(location);
         
-        if (IsInteger(element.type))
+        if (IsInteger(element.type) && !element.normalized)
         {
             glVertexAttribIPointer(
                                   location,

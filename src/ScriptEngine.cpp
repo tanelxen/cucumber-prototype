@@ -12,6 +12,7 @@
 #include "TransformComponent.h"
 #include "MovementComponent.h"
 #include "CollisionComponent.h"
+#include "LightComponent.h"
 
 #include "Entity.h"
 #include "Input.h"
@@ -137,6 +138,7 @@ void RegisterAudioComponent(asIScriptEngine* engine);
 void RegisterAnimatorComponent(asIScriptEngine* engine);
 void RegisterMovementComponent(asIScriptEngine* engine);
 void RegisterCollisionComponent(asIScriptEngine* engine);
+void RegisterLightComponent(asIScriptEngine *engine);
 void RegisterEntity(asIScriptEngine* engine);
 
 void RegisterInputSystem(asIScriptEngine* engine);
@@ -170,6 +172,7 @@ void ScriptEngine::RegisterEngineAPI()
     RegisterAnimatorComponent(m_asEngine);
     RegisterMovementComponent(m_asEngine);
     RegisterCollisionComponent(m_asEngine);
+    RegisterLightComponent(m_asEngine);
     
     RegisterEntity(m_asEngine);
     m_asEngine->RegisterGlobalFunction("ref@ _GetScript(Entity@ entity, const string &in name)", asFUNCTION(GetScriptOnEntity), asCALL_CDECL);
@@ -397,6 +400,11 @@ static float length(const glm::vec3& v)
     return glm::length(v);
 }
 
+static float my_sin(float a)
+{
+    return sin(a);
+}
+
 void RegisterMath(asIScriptEngine* engine)
 {
     int r;
@@ -471,6 +479,7 @@ void RegisterMath(asIScriptEngine* engine)
     engine->RegisterGlobalFunction("int max(int, int)", asFUNCTION(max_int), asCALL_CDECL);
     engine->RegisterGlobalFunction("float min(float, float)", asFUNCTION(min_float), asCALL_CDECL);
     engine->RegisterGlobalFunction("float max(float, float)", asFUNCTION(max_float), asCALL_CDECL);
+    engine->RegisterGlobalFunction("float sin(float)", asFUNCTION(my_sin), asCALL_CDECL);
     engine->SetDefaultNamespace("");
 }
 
@@ -527,6 +536,12 @@ void RegisterAudioComponent(asIScriptEngine* engine)
     engine->RegisterObjectMethod("AudioComponent", "void Play()", asMETHOD(AudioComponent, play), asCALL_THISCALL);
     
     engine->RegisterGlobalFunction("void PlaySound(const string &in)", asFUNCTION(PlaySound), asCALL_CDECL);
+}
+
+void RegisterLightComponent(asIScriptEngine *engine)
+{
+    engine->RegisterObjectType("LightComponent", 0, asOBJ_REF | asOBJ_NOCOUNT);
+    engine->RegisterObjectProperty("LightComponent", "float intensity", asOFFSET(LightComponent, intensity));
 }
 
 void RegisterAnimatorComponent(asIScriptEngine* engine)
@@ -640,7 +655,11 @@ void RegisterEntity(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Entity", "CollisionComponent@ GetCollider()",
                                  asMETHODPR(Entity, getComponent<CollisionComponent>, (), CollisionComponent*),
                                  asCALL_THISCALL);
-    
+
+    engine->RegisterObjectMethod("Entity", "LightComponent@ GetLight()",
+                                asMETHODPR(Entity, getComponent<LightComponent>, (), LightComponent *),
+                                 asCALL_THISCALL);
+
     engine->RegisterObjectMethod("Entity", "void AddImpulse(const Vector3 &in force, const Vector3 &in point)",
                                  asMETHODPR(Entity, addImpulse, (const glm::vec3&, const glm::vec3&), void),
                                  asCALL_THISCALL);

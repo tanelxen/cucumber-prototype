@@ -4,288 +4,247 @@
 //
 //  Created by Fedor Artemenkov on 21.10.26.
 //
+//  Геометрия карты нарезана на поверхности "ячейка сетки x текстура".
+//  У каждой поверхности свой AABB. Отсечением и построением команд MapMesh не
+//  занимается: поверхности отдаются в RenderScene как статические объекты
+//  (SceneExtractor).
+//
 
 #include "MapMesh.h"
-#include "MapAsset.h"
 
-#include "Camera.h"
-#include "Shader.h"
-
-#include "TextureManager.h"
-#include "VertexBuffer.h"
-#include "VertexArray.h"
+#include "GLState.h"
 #include "IndexBuffer.h"
-
-#include "ProjectManager.h"
+#include "MapAsset.h"
+#include "RenderDevice.h"
+#include "TextureManager.h"
+#include "VertexArray.h"
+#include "VertexBuffer.h"
+#include "q3/Q3Shaders.h"
 
 #include <glad/glad.h>
-#include "../vendor/stb_image.h"
 
-#include <algorithm>
 #include <iostream>
+#include <string>
+#include <unordered_map>
 
-static inline glm::vec3 Quake2OpenGL(const glm::vec3& in)
+namespace
 {
-    return { in.x, in.z, -in.y };
-}
-
-// Пересечение трех плоскостей для генерации вершин браша
-static bool GetMapPlaneIntersection(const MapPlane& p1, const MapPlane& p2, const MapPlane& p3, glm::vec3& outPoint)
-{
-    glm::vec3 cross12 = glm::cross(p1.normal, p2.normal);
-    float denom = glm::dot(cross12, p3.normal);
-    
-    if (std::abs(denom) < 1e-4f) return false;
-    
-    outPoint = (glm::cross(p2.normal, p3.normal) * p1.distance +
-                glm::cross(p3.normal, p1.normal) * p2.distance +
-                cross12 * p3.distance) / denom;
-    return true;
-}
-
-// Проверка: находится ли сгенерированная вершина внутри выпуклого объема браша
-static bool IsPointInsideMapBrush(const glm::vec3& point, const MapBrush& brush)
-{
-    for (const auto& side : brush.sides)
-    {
-        // В стандартных .map файлах нормали смотрят СНАРУЖИ браша.
-        // Точка внутри, если проекция на нормаль меньше или равна дистанции плоскости (+ погрешность)
-        if (glm::dot(side.plane.normal, point) - side.plane.distance > 0.005f) {
-            return false;
-        }
-    }
-    return true;
-}
-
-static glm::vec2 CalculateValve220UV(const glm::vec3& pos, const MapTextureInfo& tex, int texWidth, int texHeight)
-{
-    // защита от нулевого масштаба (TrenchBroom трактует 0 как 1)
-    const float sx = tex.scaleX != 0.0f ? tex.scaleX : 1.0f;
-    const float sy = tex.scaleY != 0.0f ? tex.scaleY : 1.0f;
-    
-    const float u = glm::dot(pos, tex.uAxis) / sx + tex.uShift;
-    const float v = glm::dot(pos, tex.vAxis) / sy + tex.vShift;
-    
-    return { u / float(texWidth), v / float(texHeight) };
+Quake3Shaders s_q3shaders;
+uint64_t s_nextRevision = 1;
 }
 
 MapMesh::MapMesh() = default;
-MapMesh::~MapMesh() = default;
 
-void MapMesh::buildFromMapAsset(const MapAsset& mapData)
+MapMesh::~MapMesh()
 {
-    if (mapData.entities.empty()) return;
-    
-    struct TemporaryMeshData {
-        std::vector<VertexPosition> positions;
-        std::vector<VertexShading> shading;
-        std::vector<uint32_t> indices;
-    };
-    
-    std::unordered_map<std::string, TemporaryMeshData> groupMap;
-    const auto& worldspawn = mapData.entities[0]; // worldspawn
-    
-    for (const auto& brush : worldspawn.brushes)
+    if (m_lightmapTexture != 0)
     {
-        if (brush.sides.size() < 4) continue;
-        
-        for (size_t i = 0; i < brush.sides.size(); ++i)
-        {
-            const auto& faceSide = brush.sides[i];
-            std::vector<glm::vec3> facePoints;
-            
-            // 1. Пересечение плоскостей для генерации точек выпуклого многоугольника
-            for (size_t j = 0; j < brush.sides.size(); ++j) {
-                if (i == j) continue;
-                for (size_t k = j + 1; k < brush.sides.size(); ++k) {
-                    if (i == k) continue;
-                    
-                    glm::vec3 pt;
-                    if (GetMapPlaneIntersection(faceSide.plane, brush.sides[j].plane, brush.sides[k].plane, pt)) {
-                        if (IsPointInsideMapBrush(pt, brush)) {
-                            if (std::find_if(facePoints.begin(), facePoints.end(), [&](const glm::vec3& v) {
-                                return glm::distance(v, pt) < 0.005f;
-                            }) == facePoints.end()) {
-                                facePoints.push_back(pt);
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (facePoints.size() < 3) continue;
-            
-
-            // 2. Сортировка вершин многоугольника грани по часовой стрелке вокруг нормали
-            glm::vec3 center(0.0f);
-            for (const auto& p : facePoints) center += p;
-            center /= static_cast<float>(facePoints.size());
-            
-            glm::vec3 n = faceSide.plane.normal;
-            
-            // Создаем локальный 2D-базис (касательные векторы) на плоскости грани
-            glm::vec3 uAxis = glm::normalize(faceSide.texture.uAxis);
-            // Если uAxis параллелен нормали или обнулен, генерируем искусственный перпендикуляр
-            if (std::abs(glm::dot(uAxis, n)) > 0.9f || glm::length(uAxis) < 0.001f) {
-                uAxis = (std::abs(n.z) < 0.9f) ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
-            }
-            glm::vec3 vAxis = glm::normalize(glm::cross(n, uAxis));
-            uAxis = glm::cross(vAxis, n);
-            
-            // Сортируем с использованием функции atan2 для вычисления угла
-            std::sort(facePoints.begin(), facePoints.end(), [&](const glm::vec3& a, const glm::vec3& b) {
-                glm::vec3 ca = a - center;
-                glm::vec3 cb = b - center;
-                
-                // Проецируем 3D смещения на наши локальные 2D оси U и V
-                float angleA = std::atan2(glm::dot(ca, vAxis), glm::dot(ca, uAxis));
-                float angleB = std::atan2(glm::dot(cb, vAxis), glm::dot(cb, uAxis));
-                
-                // Для обхода по часовой стрелке используем '>', для против — '<'
-                return angleA > angleB;
-            });
-            
-            
-            std::string texturePath = faceSide.texture.textureName;
-            if (texturePath == "__TB_empty" || texturePath == "skip" || texturePath == "clip") {
-                continue;
-            }
-            
-            int texWidth = 256;
-            int texHeight = 256;
-            
-            auto textureAsset = TextureManager::Get().loadTexture("wolf/textures/" + texturePath);
-            if (textureAsset) {
-                texWidth = textureAsset->getWidth();
-                texHeight = textureAsset->getHeight();
-            }
-            
-            auto& meshData = groupMap[texturePath];
-            uint32_t startIndexOffset = static_cast<uint32_t>(meshData.positions.size());
-            
-            // 3. Заполнение векторов VertexPosition и VertexShading
-            for (const auto& q3Pos : facePoints)
-            {
-                VertexPosition pos;
-                pos.position = Quake2OpenGL(q3Pos);
-                
-                VertexShading shading;
-                shading.normal = Quake2OpenGL(faceSide.plane.normal);
-                shading.texCoord = CalculateValve220UV(q3Pos, faceSide.texture, texWidth, texHeight);
-                
-                meshData.positions.push_back(pos);
-                meshData.shading.push_back(shading);
-            }
-            
-            // 4. Триангуляция (Triangle Fan)
-            for (size_t t = 1; t < facePoints.size() - 1; ++t)
-            {
-                meshData.indices.push_back(startIndexOffset);
-                meshData.indices.push_back(startIndexOffset + t);
-                meshData.indices.push_back(startIndexOffset + t + 1);
-            }
-        }
+        const GLuint texture = m_lightmapTexture;
+        glDeleteTextures(1, &texture);
     }
-    
-    // Линеаризация собранных данных для отправки на GPU
-    std::vector<VertexPosition> finalPositions;
-    std::vector<VertexShading> finalShading;
-    std::vector<uint32_t> finalIndices;
-    
-    uint32_t currentMaterialSlot = 0;
-    uint32_t currentIndexOffset = 0;
-    
-    m_surfaces.clear();
-    m_materials.clear();
-    
-    for (auto& [texName, data] : groupMap)
-    {
-        if (data.indices.empty()) continue;
-        
-        // Настройка материала
-        Material mat;
-        mat.m_name = texName;
-        mat.blendMode = BlendMode::Opaque;
-        
-        auto textureAsset = TextureManager::Get().loadTexture("wolf/textures/" + texName);
-        if (textureAsset) {
-            mat.albedoMap = textureAsset->getHandle();
-        } else {
-            mat.albedoMap = 0;
-        }
-        m_materials.push_back(mat);
-        
-        // Настройка саб-меша
-        Surface surface;
-        surface.m_name = "surface_" + texName;
-        surface.materialSlot = currentMaterialSlot;
-        surface.startIndex = currentIndexOffset;
-        surface.count = static_cast<uint32_t>(data.indices.size());
-        m_surfaces.push_back(surface);
-        
-        uint32_t vertexOffset = static_cast<uint32_t>(finalPositions.size());
-        finalPositions.insert(finalPositions.end(), data.positions.begin(), data.positions.end());
-        finalShading.insert(finalShading.end(), data.shading.begin(), data.shading.end());
-        
-        for (auto idx : data.indices) {
-            finalIndices.push_back(vertexOffset + idx);
-        }
-        
-        currentIndexOffset += surface.count;
-        currentMaterialSlot++;
-    }
-    
-    // 5. Ручная инициализация буферов на GPU (в точности как в setVertexData / setIndices)
-    m_vao = std::make_unique<VertexArray>();
-    
-    // Stream 0: Position
-    m_posBuffer = std::make_unique<VertexBuffer>(finalPositions.data(), finalPositions.size() * sizeof(VertexPosition));
-    m_posBuffer->setLayout({
-        { VertexAttributeLocation::Position, ShaderDataType::Float3 }
-    });
-    m_vao->setVertexBuffer(m_posBuffer.get());
-    
-    // Stream 1: Shading
-    m_shadingBuffer = std::make_unique<VertexBuffer>(finalShading.data(), finalShading.size() * sizeof(VertexShading));
-    m_shadingBuffer->setLayout({
-        { VertexAttributeLocation::Normal, ShaderDataType::Float3 },
-        { VertexAttributeLocation::TexCoord, ShaderDataType::Float2 }
-    });
-    m_vao->setVertexBuffer(m_shadingBuffer.get());
-    
-    // Index Buffer
-    m_indexBuffer = std::make_unique<IndexBuffer>(finalIndices.data(), finalIndices.size());
-    m_vao->setIndexBuffer(m_indexBuffer.get());
-    
-    std::cout << "[MapMesh] Autonomously created GPU Buffers. Vertices: " << finalPositions.size() << std::endl;
 }
 
-void MapMesh::draw(RenderView& view) const
+unsigned int MapMesh::vaoId() const
 {
-    if (!m_vao) return;
-    
-    for (const auto& surface : m_surfaces)
+    return m_vao ? m_vao->getID() : 0;
+}
+
+bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& unwrapSettings)
+{
+    m_vao.reset();
+    m_posBuffer.reset();
+    m_shadingBuffer.reset();
+    m_lightmapBuffer.reset();
+    m_indexBuffer.reset();
+    m_surfaces.clear();
+    m_materials.clear();
+    m_surfaceBounds.clear();
+    m_positions.clear();
+    m_normals.clear();
+    m_indices.clear();
+    m_lightmapTexCoords.clear();
+    m_lightmapAtlasSize = 0;
+
+    if (m_lightmapTexture != 0)
     {
-        const auto& material = m_materials[surface.materialSlot];
-        uint32_t features = 0;
-        
-        if (material.albedoMap > 0)
-        {
-            features |= ShaderFeature::HasAlbedoMap;
-        }
-        
-        RenderCommand cmd = {
-            .vao = m_vao->getID(),
-            .start = surface.startIndex,
-            .count = surface.count,
-            
-            .pipeline = PipelineType::Generic,
-            .featureMask = features,
-            .baseTexture = material.albedoMap,
-            .blendMode = material.blendMode,
-            .reverseWinding = true
-        };
-        
-        view.submit(cmd);
+        const GLuint texture = m_lightmapTexture;
+        glDeleteTextures(1, &texture);
+        m_lightmapTexture = 0;
     }
+
+    m_revision = s_nextRevision++;
+    if (mapData.entities.empty())
+    {
+        std::cerr << "[MapMesh] Map has no worldspawn entity" << std::endl;
+        return false;
+    }
+
+    const auto scriptsPath = mapData.m_basepath / "scripts";
+    s_q3shaders.initFromDir(scriptsPath.string().c_str());
+
+    struct TextureInfo
+    {
+        int width = 256;
+        int height = 256;
+        RenderDevice::handle_t handle = 0;
+    };
+    std::unordered_map<std::string, TextureInfo> textureCache;
+    const auto getTexture = [&](const std::string& name) -> const TextureInfo&
+    {
+        auto it = textureCache.find(name);
+        if (it != textureCache.end()) return it->second;
+
+        TextureInfo info;
+        auto textureAsset = TextureManager::Get().loadTexture("wolf/textures/" + name);
+        if (textureAsset)
+        {
+            info.width = textureAsset->getWidth();
+            info.height = textureAsset->getHeight();
+            info.handle = textureAsset->getHandle();
+        }
+        return textureCache.emplace(name, info).first->second;
+    };
+
+    MapMeshBuildResult build;
+    std::string error;
+    const auto resolveDimensions = [&](const std::string& name) {
+        const auto& texture = getTexture(name);
+        return glm::ivec2(texture.width, texture.height);
+    };
+    if (!MapMeshBuilder::build(mapData, unwrapSettings, resolveDimensions, build, error))
+    {
+        std::cerr << "[MapMesh] Failed to build map mesh: " << error << std::endl;
+        return false;
+    }
+
+    std::unordered_map<std::string, uint32_t> materialSlotByTexture;
+    m_surfaces.reserve(build.surfaces.size());
+    m_surfaceBounds.reserve(build.surfaces.size());
+    for (const auto& buildSurface : build.surfaces)
+    {
+        auto slotIt = materialSlotByTexture.find(buildSurface.materialName);
+        if (slotIt == materialSlotByTexture.end())
+        {
+            std::string mapParam = buildSurface.materialName;
+            BlendMode blendMode = BlendMode::Opaque;
+            s_q3shaders.getBaseTextureName("textures/" + buildSurface.materialName, mapParam, blendMode);
+
+            Material material;
+            material.m_name = buildSurface.materialName;
+            material.blendMode = blendMode;
+            material.albedoMap = getTexture(buildSurface.materialName).handle;
+
+            slotIt = materialSlotByTexture.emplace(
+                buildSurface.materialName, static_cast<uint32_t>(m_materials.size())).first;
+            m_materials.push_back(std::move(material));
+        }
+
+        Surface surface;
+        surface.m_name = "surface_" + buildSurface.materialName;
+        surface.materialSlot = slotIt->second;
+        surface.startIndex = buildSurface.startIndex;
+        surface.count = buildSurface.count;
+        m_surfaces.push_back(std::move(surface));
+        m_surfaceBounds.push_back(buildSurface.bounds);
+    }
+
+    m_lightmapAtlasSize = build.lightmapAtlasSize;
+    m_positions = std::move(build.positions);
+    m_indices = std::move(build.indices);
+    m_lightmapTexCoords = std::move(build.lightmapTexCoords);
+    m_normals.reserve(build.shading.size());
+    for (const auto& shading : build.shading)
+    {
+        m_normals.push_back(shading.normal);
+    }
+
+    m_vao = std::make_unique<VertexArray>();
+
+    m_posBuffer = std::make_unique<VertexBuffer>(
+        m_positions.data(), m_positions.size() * sizeof(VertexPosition));
+    m_posBuffer->setLayout({
+        {VertexAttributeLocation::Position, ShaderDataType::Float3}
+    });
+    m_vao->setVertexBuffer(m_posBuffer.get());
+
+    m_shadingBuffer = std::make_unique<VertexBuffer>(
+        build.shading.data(), build.shading.size() * sizeof(VertexShading));
+    m_shadingBuffer->setLayout({
+        {VertexAttributeLocation::Normal, ShaderDataType::Float3},
+        {VertexAttributeLocation::TexCoord, ShaderDataType::Float2}
+    });
+    m_vao->setVertexBuffer(m_shadingBuffer.get());
+
+    m_lightmapBuffer = std::make_unique<VertexBuffer>(
+        m_lightmapTexCoords.data(), m_lightmapTexCoords.size() * sizeof(glm::vec2));
+    m_lightmapBuffer->setLayout({
+        {VertexAttributeLocation::TexCoord2, ShaderDataType::Float2}
+    });
+    m_vao->setVertexBuffer(m_lightmapBuffer.get());
+
+    m_indexBuffer = std::make_unique<IndexBuffer>(m_indices.data(), m_indices.size());
+    m_vao->setIndexBuffer(m_indexBuffer.get());
+
+    uploadLightmapTexture(nullptr); // черная текстура
+    
+    std::cout << "[MapMesh] Created GPU buffers. Vertices: " << m_positions.size() << ", surfaces: " << m_surfaces.size() << std::endl;
+    return true;
+}
+
+void MapMesh::uploadLightmapTexture(const uint16_t* halfRgb)
+{
+    const GLuint previousTexture = m_lightmapTexture;
+    
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    
+    if (halfRgb)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, m_lightmapAtlasSize, m_lightmapAtlasSize, 0, GL_RGB, GL_HALF_FLOAT, halfRgb);
+    }
+    else
+    {
+        uint16_t white[3] = { 0x3C00, 0x3C00, 0x3C00 };
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1, 1, 0, GL_RGB, GL_HALF_FLOAT, white);
+    }
+    
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    m_lightmapTexture = texture;
+    if (previousTexture != 0)
+    {
+        glDeleteTextures(1, &previousTexture);
+    }
+    
+    GLState::invalidate();
+}
+
+bool MapMesh::updateLightmapTexture(const std::vector<uint16_t>& halfRgb, std::string& error)
+{
+    if (m_lightmapAtlasSize <= 0)
+    {
+        error = "Map mesh has no lightmap atlas";
+        return false;
+    }
+    
+    const size_t expected = static_cast<size_t>(m_lightmapAtlasSize) * m_lightmapAtlasSize * 3;
+    
+    if (halfRgb.size() != expected)
+    {
+        error = "Lightmap pixel data does not match the atlas size";
+        return false;
+    }
+    
+    uploadLightmapTexture(halfRgb.data());
+    m_revision = s_nextRevision++;   // RenderScene перестроит статику с новым хэндлом текстуры
+    error.clear();
+    
+    return true;
 }

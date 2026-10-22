@@ -18,77 +18,9 @@
 Mesh::Mesh() = default;
 Mesh::~Mesh() = default;
 
-void Mesh::draw(RenderView& view, glm::mat4& transform) const
+unsigned int Mesh::getVAOId() const
 {
-    for (const auto& surface : m_surfaces)
-    {
-        auto& material = m_materials[surface.materialSlot];
-        
-        uint32_t features = 0;
-        
-        if (material.albedoMap > 0)
-        {
-            features |= ShaderFeature::HasAlbedoMap;
-        }
-        
-//        if (m_useAmbientLight)
-//        {
-//            features |= ShaderFeature::HasSpherical;
-//        }
-        
-        RenderCommand cmd = {
-            .vao = m_vao->getID(),
-            .start = surface.startIndex,
-            .count = surface.count,
-            
-            .pipeline = PipelineType::Generic,
-            .featureMask = features,
-            .baseTexture = material.albedoMap,
-            .blendMode = material.blendMode,
-            .color = material.tintColor,
-            
-            .transform = transform
-        };
-        
-        view.submit(cmd);
-    }
-}
-
-void Mesh::draw(RenderView& view, glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const
-{
-    for (const auto& surface : m_surfaces)
-    {
-        auto& material = m_materials[surface.materialSlot];
-        
-        uint32_t features = ShaderFeature::HasSkinning;
-        
-        if (material.albedoMap > 0)
-        {
-            features |= ShaderFeature::HasAlbedoMap;
-        }
-        
-//        if (m_useAmbientLight)
-//        {
-//            features |= ShaderFeature::HasSpherical;
-//        }
-        
-        RenderCommand cmd = {
-            .vao = m_vao->getID(),
-            .start = surface.startIndex,
-            .count = surface.count,
-            
-            .pipeline = PipelineType::Generic,
-            .featureMask = features,
-            .baseTexture = material.albedoMap,
-            .blendMode = material.blendMode,
-            .color = material.tintColor,
-            
-            .transform = transform,
-            .bones = &bonesPalette
-        };
-        
-        view.submit(cmd);
-    }
+    return m_vao ? m_vao->getID() : 0;
 }
 
 void Mesh::setIndices(const std::vector<uint32_t> &indices)
@@ -127,6 +59,12 @@ void Mesh::setVertexData(const std::vector<VertexPosition>& positions,
             { VertexAttributeLocation::BoneWeights, ShaderDataType::UByte4, true }
         });
         m_vao->setVertexBuffer(m_skinningBuffer.get());
+    }
+    
+    m_bounds = AABB{};
+    for (const auto& v : positions)
+    {
+        m_bounds.expand(v.position);
     }
 }
 

@@ -14,7 +14,6 @@
 #include "MaterialPanel.h"
 #include "AssetsPanel.h"
 #include "HierarchyPanel.h"
-#include "Viewport.h"
 
 #include "SceneManager.h"
 #include "World.h"
@@ -32,6 +31,8 @@
 
 #include "../vendor/stb_image.h"
 
+#include <glad/glad.h>
+
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -43,19 +44,19 @@ static ImTextureID s_projectIcon = 0;
 
 UIManager::UIManager()
 {
-    m_pMainView = new Viewport();
-    m_pMainView->init();
-    
     const char* home = std::getenv("HOME");
     const std::string defaultLocation = home
     ? (std::filesystem::path(home) / "Projects").string()
     : std::filesystem::current_path().string();
-    std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s",
-                  defaultLocation.c_str());
+    std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s", defaultLocation.c_str());
     
-    m_pViewportPanel = new ViewportPanel("Perspective");
-    m_pViewportPanel->setViewport(m_pMainView);
+    m_pViewportPanel = new ViewportPanel(ICON_MDI_CAMERA " Viewport", 0);
+    m_viewportPanels.push_back(m_pViewportPanel);
     m_pViewportPanel->m_manager = this;
+    
+//    auto m_pViewportPanel2 = new ViewportPanel(ICON_MDI_CAMERA " Viewport2", 1);
+//    m_viewportPanels.push_back(m_pViewportPanel2);
+//    m_pViewportPanel2->m_manager = this;
     
     m_pHierarchyPanel = new HierarchyPanel();
     m_pHierarchyPanel->m_manager = this;
@@ -71,6 +72,7 @@ UIManager::UIManager()
     m_pMaterialPanel->isVisible = false;
     
     m_panels.push_back(m_pViewportPanel);
+//    m_panels.push_back(m_pViewportPanel2);
     m_panels.push_back(m_pHierarchyPanel);
     m_panels.push_back(m_pInspectorPanel);
     m_panels.push_back(m_pMaterialPanel);
@@ -95,9 +97,12 @@ void UIManager::update(float dt)
     }
 }
 
-void UIManager::preRender()
+void UIManager::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
 {
-    m_pViewportPanel->preRender();
+    for (auto* panel : m_viewportPanels)
+    {
+        panel->collectViews(scene, out);
+    }
 }
 
 void UIManager::draw()
@@ -612,7 +617,11 @@ void UIManager::drawPanels()
 void UIManager::setEntity(Entity *entity)
 {
     m_pInspectorPanel->setEntity(entity);
-    m_pViewportPanel->setEntity(entity);
+    
+    for (auto* panel : m_viewportPanels)
+    {
+        panel->setEntity(entity);
+    }
 }
 
 void UIManager::setMaterial(Material* material)

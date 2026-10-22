@@ -8,6 +8,7 @@
 #pragma once
 
 #include "RenderDevice.h"
+#include "Bounds.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -64,8 +65,12 @@ public:
     void setIndices(const std::vector<uint32_t>& indices);
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
-    void draw(RenderView& view, glm::mat4& transform) const;
-    void draw(RenderView& view, glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const;
+//    void draw(RenderView& view, glm::mat4& transform) const;
+//    void draw(RenderView& view, glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const;
+    
+    unsigned int getVAOId() const;
+    
+    const AABB& getBounds() const { return m_bounds; }
     
     std::string m_name;
     std::vector<Surface> m_surfaces;
@@ -81,4 +86,7 @@ private:
     std::unique_ptr<VertexBuffer> m_skinningBuffer;
     
     std::unique_ptr<IndexBuffer>  m_indexBuffer;
+    
+private:
+    AABB m_bounds;
 };

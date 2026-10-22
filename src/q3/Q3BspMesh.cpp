@@ -18,7 +18,6 @@
 
 #include "Q3BspMesh.h"
 #include "Q3BSPAsset.h"
-#include "Camera.h"
 #include "Shader.h"
 #include "TextureAtlas.h"
 
@@ -234,7 +233,7 @@ void Q3BspMesh::draw(RenderView& view)
             .reverseWinding = true,
         };
         
-        view.submit(cmd);
+//        view.submit(cmd);
     }
     
     for (auto surface : m_vertexlit)
@@ -260,7 +259,7 @@ void Q3BspMesh::draw(RenderView& view)
             .reverseWinding = true,
         };
         
-        view.submit(cmd);
+//        view.submit(cmd);
     }
 }
 

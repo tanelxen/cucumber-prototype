@@ -6,11 +6,16 @@
 //
 
 #include "MapComponent.h"
+#include "Entity.h"
+#include "LightComponent.h"
 #include "ProjectManager.h"
 #include "PhysicsSystem.h"
+#include "World.h"
 
 #include "trenchbroom/MapAsset.h"
+#include "trenchbroom/LightmapBaker.h"
 #include "trenchbroom/MapMesh.h"
+#include "trenchbroom/MapMeshBuilder.h"
 
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
@@ -63,8 +68,18 @@ bool MapComponent::loadTrenchBroomMap(const std::filesystem::path& filepath)
     }
     
     // Инициализируем графический меш
-    mesh = std::make_shared<MapMesh>();
-    mesh->buildFromMapAsset(mapData);
+    auto loadedMesh = std::make_shared<MapMesh>();
+    LightmapUnwrapSettings unwrapSettings;
+    unwrapSettings.texelsPerUnit = lightmapTexelsPerUnit;
+    if (!loadedMesh->buildFromMapAsset(mapData, unwrapSettings))
+    {
+        bakeStatus = "Map mesh build failed";
+        return false;
+    }
+    mesh = std::move(loadedMesh);
+    bakeStatus.clear();
+    
+    lightmap.attach(mesh, lightmapCachePath(), unwrapSettings.padding);
     
     // --- ИНТЕГРАЦИЯ С JOLT ЧЕРЕЗ БРАШИ ---
     destroyPhysicsBody();
@@ -157,6 +172,83 @@ bool MapComponent::loadTrenchBroomMap(const std::filesystem::path& filepath)
     return true;
 }
 
+bool MapComponent::rebuildLightmapUVs()
+{
+    if (path == "<no map>")
+    {
+        bakeStatus = "Cannot rebuild lightmap UVs: no map is loaded";
+        return false;
+    }
+
+    MapAsset mapData;
+    if (!mapData.loadFromFile(ProjectManager::Get().assetsPath() / path))
+    {
+        bakeStatus = "Cannot rebuild lightmap UVs: failed to load map";
+        return false;
+    }
+
+    auto rebuiltMesh = std::make_shared<MapMesh>();
+    LightmapUnwrapSettings unwrapSettings;
+    unwrapSettings.texelsPerUnit = lightmapTexelsPerUnit;
+    if (!rebuiltMesh->buildFromMapAsset(mapData, unwrapSettings))
+    {
+        bakeStatus = "Cannot rebuild lightmap UVs: map mesh build failed";
+        return false;
+    }
+
+    mesh = std::move(rebuiltMesh);
+    lightmap.attach(mesh, lightmapCachePath(), unwrapSettings.padding);
+    bakeStatus = "Lightmap UVs rebuilt; bake lighting again";
+    
+    return true;
+}
+
+bool MapComponent::bakeLighting()
+{
+    if (!mesh || !owner || !owner->scene)
+    {
+        bakeStatus = "Cannot bake lighting: map is not loaded into a scene";
+        return false;
+    }
+    
+    return lightmap.startBake(collectBakeLights());
+}
+
+std::vector<LightmapBakeLight> MapComponent::collectBakeLights()
+{
+    std::vector<LightmapBakeLight> bakeLights;
+    
+    for (const auto& entity : owner->scene->m_entities)
+    {
+        if (!entity || !entity->m_isActive) continue;
+        const auto* component = entity->getComponent<LightComponent>();
+        if (!component || !component->enabled
+            || (component->mode != LightMode::Baked
+                && component->mode != LightMode::BakedAndRealtime))
+        {
+            continue;
+        }
+        
+        LightmapBakeLight light;
+        light.type = static_cast<LightmapBakeLightType>(component->type);
+        light.position = entity->getTransform().getWorldPosition();
+        light.direction = entity->getTransform().getWorldRotation() * glm::vec3(0.0f, 0.0f, -1.0f);
+        light.color = component->color;
+        light.intensity = component->intensity;
+        light.range = component->range;
+        light.spotAngle = component->spotAngle;
+        bakeLights.push_back(light);
+    }
+    
+    return bakeLights;
+}
+
+bool MapComponent::isLightmapOutdated()
+{
+    if (!mesh || !owner || !owner->scene) return false;
+    return lightmap.isOutdated(collectBakeLights());
+}
+
 void MapComponent::destroyPhysicsBody()
 {
     if (!m_bodyID.IsInvalid())
@@ -176,6 +268,7 @@ MapComponent::~MapComponent()
 void MapComponent::save(nlohmann::json& j) const
 {
     j["source_map"] = path;
+    j["lightmap_texels_per_unit"] = lightmapTexelsPerUnit;
 }
 
 void MapComponent::load(const nlohmann::json& j)
@@ -183,6 +276,10 @@ void MapComponent::load(const nlohmann::json& j)
     if (j.contains("source_map"))
     {
         path = j.at("source_map");
+    }
+    if (j.contains("lightmap_texels_per_unit"))
+    {
+        lightmapTexelsPerUnit = j.at("lightmap_texels_per_unit");
     }
 }
 
@@ -192,4 +289,9 @@ void MapComponent::reload()
     {
         loadTrenchBroomMap(path);
     }
+}
+
+std::filesystem::path MapComponent::lightmapCachePath() const
+{
+    return ProjectManager::Get().assetsPath() / (path + ".lightmap");
 }

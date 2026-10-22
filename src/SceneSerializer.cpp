@@ -19,6 +19,7 @@
 #include "ScriptComponent.h"
 #include "CameraComponent.h"
 #include "AudioComponent.h"
+#include "LightComponent.h"
 #include "MeshComponent.h"
 #include "Q3BspComponent.h"
 #include "MapComponent.h"
@@ -348,6 +349,7 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
         const nlohmann::json& compData = compNode.at("data");
         
         Component* newComp = nullptr;
+        bool componentDataLoaded = false;
         
         // Фабрика компонентов по их текстовому имени
         if (compName == "TransformComponent")
@@ -402,6 +404,10 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
         {
             newComp = entity->addComponent<CollisionComponent>();
         }
+        else if (compName == "LightComponent")
+        {
+            newComp = entity->addComponent<LightComponent>();
+        }
         else if (compName == "BSPMeshComponent")
         {
             std::string path = compData.at("source_bsp");
@@ -416,6 +422,8 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
             
             newComp = entity->addComponent<MapComponent>();
             auto meshComp = static_cast<MapComponent*>(newComp);
+            meshComp->load(compData);
+            componentDataLoaded = true;
             meshComp->loadTrenchBroomMap(path);
         }
         else if (compName == "RigidbodyComponent")
@@ -424,7 +432,7 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
         }
         
         // Загружаем уникальное состояние
-        if (newComp)
+        if (newComp && !componentDataLoaded)
         {
             newComp->load(compData);
         }

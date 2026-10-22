@@ -15,12 +15,11 @@
 #include "CollisionComponent.h"
 #include "CameraComponent.h"
 #include "AnimatorComponent.h"
+#include "LightComponent.h"
 #include "MeshComponent.h"
 #include "Q3BspComponent.h"
 #include "MapComponent.h"
 #include "RigidbodyComponent.h"
-
-#include "RenderDevice.h"
 
 #include "q3/Q3BspMesh.h"
 #include "trenchbroom/MapMesh.h"
@@ -48,7 +47,7 @@ void WorldScene::clear()
         entity->destroy();
     }
     
-    g_UIManager->setEntity(nullptr);
+    g_UIManager->setEntity(nullptr); // HACK
 }
 
 void WorldScene::awake()
@@ -99,31 +98,15 @@ void WorldScene::update(float dt)
     
     cleanupDeadComponents();
     cleanupDeadEntities();
+    m_cameras.rebuild();
 }
 
-void WorldScene::startSimulation(Viewport* viewport)
+void WorldScene::startSimulation()
 {
-    m_pGameplayViewport = viewport;
     m_isSimulationMode = true;
     Input::setGameInputRoutingEnabled(true);
     
-    // 1. Ищем дефолтную камеру игрока
-    for (auto* component : m_allComponents)
-    {
-        if (auto* cameraComp = dynamic_cast<CameraComponent*>(component))
-        {
-            if (cameraComp->m_isCurrent)
-            {
-                m_pActiveCameraComponent = cameraComp;
-                
-                if (m_pGameplayViewport) {
-                    m_pGameplayViewport->setCamera(&cameraComp->m_camera);
-                }
-                
-                break;
-            }
-        }
-    }
+    m_cameras.rebuild();
     
     // 2. Запускаем старт всех скриптов
     for (auto* component : m_allComponents)
@@ -136,150 +119,6 @@ void WorldScene::stopSimulation()
 {
     m_isSimulationMode = false;
     Input::setGameInputRoutingEnabled(false);
-    m_pActiveCameraComponent = nullptr;
-    m_pGameplayViewport = nullptr;
-}
-
-void WorldScene::prepareRenderViews()
-{
-    if (!m_isSimulationMode || !m_pGameplayViewport) return;
-    
-    // === ШАГ А: Системные проходы (Кастомные текстуры, Мониторы, Зеркала) ===
-    // Пример: Рендеринг камеры-монитора, установленной на уровне
-    /*
-     for (auto* monitor : m_uiMonitors) {
-     RenderView monitorView;
-     monitorView.viewMatrix = monitor->GetView();
-     monitorView.projectionMatrix = monitor->GetProj();
-     monitorView.targetFrameBuffer = monitor->GetTargetFBO(); // Рендерим в текстуру материала
-     monitorView.cullingMask = monitor->layerMask;
-     
-     collectRenderCommands(monitorView);
-     RenderDevice::submitView(monitorView);
-     }
-     */
-    
-    // === ШАГ Б: Проходы для карт теней (Shadow Mapping) ===
-    /*
-     RenderView shadowView;
-     shadowView.viewMatrix = glm::lookAt(lightPos, lightTarget, up);
-     shadowView.projectionMatrix = glm::ortho(-2048, 2048, -2048, 2048);
-     shadowView.targetFrameBuffer = RenderDevice::getShadowMapFBO(); // Кастомный FBO глубины
-     shadowView.clearDepthOnly = false;
-     shadowView.drawSkybox = false; // Для теней небо не нужно
-     shadowView.drawGrid = false;
-     
-     collectRenderCommands(shadowView);
-     RenderDevice::submitView(shadowView);
-     */
-    
-    // === ШАГ В: Игровые камеры (Simulation Mode) ===
-    if (m_isSimulationMode)
-    {
-        std::vector<CameraComponent*> sceneCameras = getCameraComponents();
-        std::vector<CameraComponent*> activeCameras;
-        
-        for(auto* cam : sceneCameras) {
-            if (cam->m_isCurrent) activeCameras.push_back(cam);
-        }
-        
-        // Если в режиме симуляции разработчик забыл поставить камеру — падаем на дефолтное поведение редактора
-        if (activeCameras.empty())
-        {
-            m_pActiveCameraComponent = nullptr; // Сигнализируем, что камеры нет
-            return; // Управление проходом заберет себе ViewportPanel в preRender()
-        }
-        
-        // Сортируем стек камер по depth (чтобы оверлей оружия рисовался позже мира)
-        std::sort(activeCameras.begin(), activeCameras.end(), [](CameraComponent* a, CameraComponent* b) {
-            return a->depth < b->depth;
-        });
-        
-        // Создаем проход для каждой камеры
-        for (auto* cameraComp : activeCameras)
-        {
-            // 1. ОПРЕДЕЛЯЕМ ЦЕЛЕВОЙ ВЬЮПОРТ ДЛЯ ЭТОЙ КАМЕРЫ
-            // Если у камеры есть свой кастомный вьюпорт (например, для Render-to-Texture монитора),
-            // она использует его. Иначе — падает на главный игровой вьюпорт.
-            Viewport* targetViewport = cameraComp->m_customViewport ? cameraComp->m_customViewport : m_pGameplayViewport;
-            
-            // Защита на случай, если вообще никакой вьюпорт не доступен
-            if (!targetViewport) continue;
-            
-            // 2. СИНХРОНИЗАЦИЯ: Камера настраивает свой аспект строго под тот вьюпорт, в который рисует!
-            cameraComp->m_camera.setAspectRatio(targetViewport->getAspectRatio());
-            
-            RenderView gameView;
-            
-            // 3. Копируем матрицы и параметры из компонента
-            gameView.viewMatrix       = cameraComp->m_camera.view;
-            gameView.projectionMatrix = cameraComp->m_camera.projection;
-            gameView.clearDepthOnly   = cameraComp->clearDepthOnly;
-            gameView.cullingMask     = cameraComp->cullingMask;
-            gameView.depth           = cameraComp->depth;
-            
-            // 4. Настройки вывода берем ИМЕННО из целевого вьюпорта
-            gameView.targetFrameBuffer = targetViewport->getFrameBuffer();
-            gameView.drawSkybox        = targetViewport->drawSkybox;
-            
-            gameView.drawGrid          = false;
-            gameView.drawGizmos        = false;
-            
-            // 5. Собираем команды сцены
-            collectRenderCommands(gameView);
-            RenderDevice::submitView(gameView);
-        }
-    }
-}
-
-
-void WorldScene::collectRenderCommands(RenderView& view)
-{
-//    if (m_bsp != nullptr && m_bsp->mesh != nullptr && Layers::Static & view.cullingMask)
-//    {
-//        m_bsp->mesh->draw(view);
-//    }
-    
-    if (m_map != nullptr && m_map->mesh != nullptr && Layers::Static & view.cullingMask)
-    {
-        m_map->mesh->draw(view);
-    }
-    
-    for (auto& entity : m_entities)
-    {
-        if (!entity->m_isActive) continue;
-        
-        auto meshComp = entity->getComponent<MeshComponent>();
-        
-        if (meshComp && meshComp->mesh)
-        {
-            // Проверяем слой конкретного МЕША
-            if ((meshComp->layer & view.cullingMask) == 0)
-            {
-                continue; // Этот меш текущая камера не видит, пропускаем
-            }
-            
-            auto worldMatrix = entity->getTransform().getWorldMatrix();
-            
-            auto animator = entity->getComponent<AnimatorComponent>();
-            
-            if (!animator || animator->m_clips.empty())
-            {
-                meshComp->mesh->draw(view, worldMatrix);
-            }
-            else
-            {
-                meshComp->mesh->draw(view, worldMatrix, animator->getFinalBoneMatrices());
-            }
-        }
-        
-//        auto bspComp = entity->getComponent<BSPMeshComponent>();
-//        
-//        if (bspComp && bspComp->mesh)
-//        {
-//            bspComp->mesh->draw(view);
-//        }
-    }
 }
 
 Entity* WorldScene::findEntityByName(const std::string &name)
@@ -325,6 +164,10 @@ void WorldScene::registerComponent(Component *component)
         m_globalColliders.push_back(collider);
     }
     
+    if (auto* camera = dynamic_cast<CameraComponent*>(component)) {
+        m_cameras.add(camera);
+    }
+    
     m_allComponents.push_back(component);
     
 //    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
@@ -352,6 +195,10 @@ void WorldScene::unregisterComponent(Component *component)
     // А нужен ли тут dynamic_cast???
     if (auto* collider = dynamic_cast<CollisionComponent*>(component)) {
         m_globalColliders.erase(std::remove(m_globalColliders.begin(), m_globalColliders.end(), collider), m_globalColliders.end());
+    }
+    
+    if (auto* camera = dynamic_cast<CameraComponent*>(component)) {
+        m_cameras.remove(camera);
     }
     
 //    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
@@ -395,37 +242,6 @@ void WorldScene::cleanupDeadEntities()
                          m_entities.end()
                          );
     }
-}
-
-std::vector<CameraComponent*> WorldScene::getCameraComponents()
-{
-    std::vector<CameraComponent*> cameraComponents;
-    
-    for (auto& entity : m_entities)
-    {
-        if (!entity->m_isActive) continue;
-        
-        entity->getComponents(cameraComponents);
-    }
-    
-    return cameraComponents;
-}
-
-void WorldScene::switchCamera(CameraComponent* newCameraComponent)
-{
-    if (!m_isSimulationMode || !m_pGameplayViewport || !newCameraComponent) return;
-    
-    // 1. Снимаем флаг со старой камеры
-    if (m_pActiveCameraComponent) {
-        m_pActiveCameraComponent->m_isCurrent = false;
-    }
-    
-    // 2. Делаем новую камеру активной
-    m_pActiveCameraComponent = newCameraComponent;
-    m_pActiveCameraComponent->m_isCurrent = true;
-    
-    // 3. Отдаем Вьюпорту новую математическую камеру!
-    m_pGameplayViewport->setCamera(&newCameraComponent->m_camera);
 }
 
 #include <Jolt/Physics/Collision/RayCast.h>

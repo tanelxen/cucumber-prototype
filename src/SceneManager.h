@@ -32,7 +32,7 @@ public:
     void exitPrefabEditMode();
     
     // Режим Симуляции (Play Mode)
-    void startSimulation(class Viewport* viewport);
+    void startSimulation();
     void stopSimulation();
     
 private:

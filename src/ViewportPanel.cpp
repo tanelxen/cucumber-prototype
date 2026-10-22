@@ -2,198 +2,240 @@
 //  ViewportPanel.cpp
 //  Cucumber
 //
-//  Created by Fedor Artemenkov on 17.07.26.
-//
 
 #include "ViewportPanel.h"
-#include "Viewport.h"
 
-#include "RenderDevice.h"
-
-#include "CameraController.h"
-#include "Camera.h"
+#include "GameViewProducer.h"
+#include "RenderTarget.h"
 
 #include "SceneManager.h"
 #include "World.h"
 #include "Entity.h"
 #include "Input.h"
 
-#include <glad/glad.h>
-#include <imgui.h>
+#include "../vendor/IconsMaterialDesignIcons.h"
 
+#include <imgui.h>
 #include <ImGuizmo.h>
 
 static bool DrawPlayButton();
 static bool DrawStopButton();
 
-static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const ImVec2& contentPos, const ImVec2& contentSize);
-
-ViewportPanel::ViewportPanel(const std::string &name) : EditorPanel(name)
+namespace
 {
-    m_pCamera = new Camera();
-    
-    m_pCameraController = new CameraController(m_pCamera);
-    m_pCameraController->position = {0, 128, 128};
+    ViewportPanel* s_mouseOwner = nullptr;   // единственная панель, которой сейчас принадлежит мышь
 }
 
-void ViewportPanel::setViewport(Viewport *viewport)
+static void DrawGizmo(Entity* selectedNode, const CameraData& camera, const ImVec2& contentPos,
+                      const ImVec2& contentSize, int id, bool enabled);
+
+ViewportPanel::ViewportPanel(const std::string& name, uint32_t id)
+    : EditorPanel(name), m_viewport(id)
 {
-    m_viewport = viewport;
-    m_viewport->setCamera(m_pCamera);
 }
 
-void ViewportPanel::setEntity(Entity *entity)
+ViewportPanel::~ViewportPanel()
+{
+    if (s_mouseOwner == this)
+    {
+        s_mouseOwner = nullptr;
+    }
+}
+
+void ViewportPanel::setEntity(Entity* entity)
 {
     m_entity = entity;
 }
 
 void ViewportPanel::setEditorCameraPosition(const glm::vec3& position)
 {
-    m_pCameraController->position = position;
+    m_viewport.camera().position = position;
 }
 
 glm::vec3 ViewportPanel::getEditorCameraPosition() const
 {
-    return m_pCameraController->position;
+    return m_viewport.camera().position;
+}
+
+void ViewportPanel::syncCursor()
+{
+    // Курсором управляем только по смене состояния — иначе несколько панелей и игра дерутся за него.
+    const bool capturing = m_viewport.camera().isCapturingMouse();
+    if (capturing == m_cursorCaptured) return;
+
+    m_cursorCaptured = capturing;
+    Input::setCursorEnabled(!capturing);
+}
+
+void ViewportPanel::updateOwnership()
+{
+    const bool capturing = m_viewport.camera().isCapturingMouse();
+    
+    if (capturing && !s_mouseOwner)              s_mouseOwner = this;
+    else if (!capturing && s_mouseOwner == this) s_mouseOwner = nullptr;
+    
+    syncCursor();
 }
 
 void ViewportPanel::update(float dt)
 {
-    if (!isVisible)
+    m_viewport.applyPendingSize();
+
+    auto scene = SceneManager::Get().getActiveScene();
+    const bool simulating = scene && scene->isSimulationMode();
+
+    // Симуляцию могли остановить откуда угодно (другая панель, меню).
+    if (m_isPlayViewport && !simulating)
+    {
+        m_isPlayViewport = false;
+        Input::setGameInputState({});
+    }
+
+    EditorCamera& camera = m_viewport.camera();
+    const Input::State physicalInput = Input::getState();
+    
+    // Фронт нажатия ПКМ — считаем всегда, даже если панель скрыта, чтобы состояние не устаревало.
+    const bool rmbDown = physicalInput.isRightMouseButtonPressed();
+    const bool rmbPressedNow = rmbDown && !m_prevRightMouse;
+    m_prevRightMouse = rmbDown;
+    
+    if (!isVisible || !m_windowOpen)
     {
         m_hasImageBounds = false;
-        if (m_isGameplayInputSource) Input::setGameInputState({});
-        if (m_pCameraController->isFlyMode())
+        if (m_isPlayViewport) Input::setGameInputState({});
+        if (camera.isCapturingMouse())
         {
-            m_pCameraController->update(dt, {});
+            camera.update(dt, {}, 0.0f, 1, false);   // отпускаем захват
+            updateOwnership();
         }
         return;
     }
-
-    const Input::State physicalInput = Input::getState();
-    const ImVec2 mousePosition = ImGui::GetIO().MousePos;
     
-    const bool mouseInImage = m_hasImageBounds &&
-    mousePosition.x >= m_imageLeft && mousePosition.x < m_imageRight &&
-    mousePosition.y >= m_imageTop && mousePosition.y < m_imageBottom;
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const bool mouseInImage = m_hasImageBounds && m_isHovered &&
+    mouse.x >= m_imageLeft && mouse.x < m_imageRight &&
+    mouse.y >= m_imageTop && mouse.y < m_imageBottom;
     
-    const bool gameCursorCaptured = m_isGameplayInputSource && !Input::isCursorEnabled();
-    const bool cameraInputAvailable = mouseInImage || m_pCameraController->isFlyMode();
-    const Input::State panelInput = (cameraInputAvailable || gameCursorCaptured) ? physicalInput : Input::State{};
-
-    if (m_isGameplayInputSource)
+    const bool cursorLocked = !Input::isCursorEnabled();
+    const bool iOwn = (s_mouseOwner == this);
+    const bool mouseFree = (s_mouseOwner == nullptr);
+    
+    const bool hoverInput = mouseFree && !cursorLocked && mouseInImage;   // обычное наведение
+    const bool editorInput = iOwn || hoverInput;
+    const bool gameCursorCaptured = m_isPlayViewport && mouseFree && cursorLocked;
+    
+    const Input::State panelInput = (editorInput || gameCursorCaptured) ? physicalInput : Input::State{};
+    
+    if (m_isPlayViewport)
     {
         Input::setGameInputState(panelInput);
     }
-
-    auto activeScene = SceneManager::Get().getActiveScene();
-    if (!activeScene)
-    {
-        if (m_isGameplayInputSource) Input::setGameInputState({});
-        return;
-    }
-
-    if (m_isGameplayInputSource && !activeScene->isSimulationMode())
-    {
-        m_isGameplayInputSource = false;
-    }
     
-    if (m_isGameplayInputSource &&
-        activeScene->isSimulationMode() &&
-        activeScene->hasActiveSceneCamera())
-    {
-        return;
-    }
+    if (!scene) return;
     
-    if (cameraInputAvailable)
+    if (m_isPlayViewport && scene->hasActiveSceneCamera()) return;
+    
+    if (editorInput)
     {
-        m_pCameraController->update(dt, panelInput);
+        const bool canStartCapture = hoverInput && rmbPressedNow;
+        const float wheel = hoverInput ? ImGui::GetIO().MouseWheel : 0.0f;
+        
+        camera.update(dt, panelInput, wheel, m_viewport.size().y, canStartCapture);
+        updateOwnership();
     }
 }
 
-void ViewportPanel::preRender()
+void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
 {
-    auto activeScene = SceneManager::Get().getActiveScene();
-    if (!activeScene) return;
-    
-    // Умный пропуск: Если сцена в режиме симуляции САМА сгенерировала игровые проходы
-    // в наш FBO (m_viewport), то панели редактора генерировать свой проход НЕ НАДО.
-    if (activeScene->isSimulationMode() && activeScene->hasActiveSceneCamera())
+    // Свёрнутые / скрытые панели вообще не рендерим.
+    if (!isVisible || !m_windowOpen) return;
+
+    const bool simulating = scene.isSimulationMode();
+
+    if (simulating && m_isPlayViewport)
     {
-        return;
+        GameViewParams params;
+        params.target = &m_viewport.target();
+        params.size = m_viewport.size();
+        params.baseViewId = m_viewport.id() * 64;
+        params.drawSkybox = m_viewport.drawSkybox;
+
+        if (ProduceGameViews(scene.cameras(), params, out)) return;
+        // В сцене нет игровой камеры — показываем редакторскую (как раньше).
     }
-    
-    // РЕДАКТОРНЫЙ РЕЖИМ (или фоллбэк, если в игре нет камеры):
-    // Строим обычный кадр от камеры вьюпорта
-    RenderView editorPass = m_viewport->createRenderView();
-    activeScene->collectRenderCommands(editorPass);
-    RenderDevice::submitView(editorPass);
+
+    const bool audioListener = simulating ? m_isPlayViewport : m_focused;
+    m_viewport.produceEditorView(out, audioListener);
 }
 
 void ViewportPanel::draw()
 {
-    auto activeScene = SceneManager::Get().getActiveScene();
-    if (!activeScene) return;
-    
+    auto scene = SceneManager::Get().getActiveScene();
+    if (!scene) return;
+
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
-    ImGui::Begin(m_name.c_str());
-    
-    ImGui::Checkbox("Grid", &m_viewport->drawGrid);
+    m_windowOpen = ImGui::Begin(m_name.c_str());
+
+    if (!m_windowOpen)
+    {
+        m_hasImageBounds = false;
+        m_focused = false;
+        ImGui::End();
+        ImGui::PopStyleVar();
+        return;
+    }
+
+    m_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+
+    EditorCamera& camera = m_viewport.camera();
+
+    // --- Тулбар ---
+    ImGui::Checkbox("Grid", &m_viewport.drawGrid);
     ImGui::SameLine();
-    ImGui::Checkbox("Gizmos", &m_viewport->drawGizmos);
+    ImGui::Checkbox("Gizmos", &m_viewport.drawGizmos);
     ImGui::SameLine();
-    ImGui::Checkbox("Sky", &m_viewport->drawSkybox);
-    
+    ImGui::Checkbox("Sky", &m_viewport.drawSkybox);
+    ImGui::SameLine();
+
+    int mode = static_cast<int>(camera.mode());
+    ImGui::SetNextItemWidth(110);
+    if (ImGui::Combo("##ViewMode", &mode, "Perspective\0Top\0Front\0Side\0"))
+    {
+        camera.setMode(static_cast<EditorViewMode>(mode));
+    }
+
     ImGui::SameLine(ImGui::GetWindowWidth() - 48);
-    
-    if (activeScene->isSimulationMode())
+
+    if (scene->isSimulationMode())
     {
         if (DrawStopButton())
         {
-            m_isGameplayInputSource = false;
+            m_isPlayViewport = false;
             Input::setGameInputState({});
             SceneManager::Get().stopSimulation();
-            m_viewport->setCamera(m_pCamera);
         }
     }
-    else
+    else if (DrawPlayButton())
     {
-        if (DrawPlayButton())
-        {
-            m_isGameplayInputSource = true;
-            SceneManager::Get().startSimulation(m_viewport);
-        }
+        m_isPlayViewport = true;
+        SceneManager::Get().startSimulation();
     }
-    
-    float fbo_width = (float)m_viewport->getWidth();
-    float fbo_height = (float)m_viewport->getHeight();
-    
-    ImVec2 current_avail_size = ImGui::GetContentRegionAvail();
-    
-    if (current_avail_size.x != fbo_width || current_avail_size.y != fbo_height)
+
+    // --- Размер: пока зажата ЛКМ (тянут разделитель окон) не реаллоцируем цель ---
+    const ImVec2 avail = ImGui::GetContentRegionAvail();
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
     {
-        if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
-        {
-            m_isResizing = true;
-            m_pendingWidth = current_avail_size.x;
-            m_pendingHeight = current_avail_size.y;
-        }
-        else
-        {
-            m_viewport->resize((int)current_avail_size.x, (int)current_avail_size.y);
-            m_isResizing = false;
-        }
+        m_viewport.requestSize(static_cast<int>(avail.x), static_cast<int>(avail.y),
+                               ImGui::GetIO().DisplayFramebufferScale.x);
     }
-    
-    ImVec2 contentPos = ImGui::GetCursorScreenPos();
-    ImVec2 contentSize = ImGui::GetContentRegionAvail();
-    
-    ImGui::Image((ImTextureID)(intptr_t)m_viewport->getTexture(),
-                 current_avail_size,
+
+    const ImVec2 contentPos = ImGui::GetCursorScreenPos();
+
+    ImGui::Image((ImTextureID)(intptr_t)m_viewport.target().texture(),
+                 avail,
                  ImVec2(0, 1),
-                 ImVec2(1, 0)
-                 );
-    
+                 ImVec2(1, 0));
+
     const ImVec2 viewportMin = ImGui::GetItemRectMin();
     const ImVec2 viewportMax = ImGui::GetItemRectMax();
     m_isHovered = ImGui::IsItemHovered();
@@ -202,18 +244,19 @@ void ViewportPanel::draw()
     m_imageRight = viewportMax.x;
     m_imageBottom = viewportMax.y;
     m_hasImageBounds = viewportMax.x > viewportMin.x && viewportMax.y > viewportMin.y;
-    
-    if (m_pCameraController->isFlyMode())
+
+    if (camera.isCapturingMouse())
     {
         ImGui::SetWindowFocus();
     }
     
-    if (activeScene->isSimulationMode() == false)
+    if (!scene->isSimulationMode())
     {
-        auto camera = m_viewport->getCamera();
-        DrawGizmo(m_entity, camera->view, camera->projection, contentPos, contentSize);
+        const bool gizmoEnabled = (s_mouseOwner == nullptr) && Input::isCursorEnabled();
+        DrawGizmo(m_entity, camera.build(m_viewport.aspect()), contentPos, avail,
+                  static_cast<int>(m_viewport.id()), gizmoEnabled);
     }
-    
+
     ImGui::End();
     ImGui::PopStyleVar();
 }
@@ -311,41 +354,35 @@ static bool DrawStopButton()
     return pressed;
 }
 
-static void DrawGizmo(Entity* selectedNode, const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, const ImVec2& contentPos, const ImVec2& contentSize)
+static void DrawGizmo(Entity* selectedNode, const CameraData& camera, const ImVec2& contentPos,
+                      const ImVec2& contentSize, int id, bool enabled)
 {
     ImGuizmo::AllowAxisFlip(false);
-    
+
     if (!selectedNode) return;
-    
-    // 1. Инициализация ImGuizmo для текущего кадра
-    ImGuizmo::SetOrthographic(false); // true, если у вас ортографическая камера
+
+    ImGuizmo::SetOrthographic(camera.ortho);
     ImGuizmo::BeginFrame();
+    ImGuizmo::Enable(enabled);
     ImGuizmo::SetDrawlist();
     
-    ImVec2 current_avail_size = ImGui::GetContentRegionAvail();
-    
-    // 2. Задаем область рисования гизмо (должна совпадать с размерами окна вашего вьюпорта)
+    ImGuizmo::PushID(id);
     ImGuizmo::SetRect(contentPos.x, contentPos.y, contentSize.x, contentSize.y);
-    
-    // 3. Получаем ТЕКУЩУЮ мировую матрицу объекта
+
     auto& transform = selectedNode->getTransform();
-    glm::mat4 worldMatrix = transform.getWorldMatrix(); // Заберет из кэша или посчитает
-    
-    // Вспомогательный массив, так как ImGuizmo принимает сырые float*
-    const float* viewPtr = &viewMatrix[0][0];
-    const float* projPtr = &projectionMatrix[0][0];
+    glm::mat4 worldMatrix = transform.getWorldMatrix();
+
+    const float* viewPtr = &camera.view[0][0];
+    const float* projPtr = &camera.proj[0][0];
     float* matrixPtr = &worldMatrix[0][0];
-    
-    // 4. Отрисовка и манипуляция гизмо
-    // Эта функция сама проверяет ввод мыши и модифицирует matrixPtr (worldMatrix)
-    
-    float snap[3] = {16.f, 16.f, 16.f};
-    ImGuizmo::Manipulate(viewPtr, projPtr, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, matrixPtr, NULL, snap);
-    
-    // 5. Если пользователь потянул за стрелочку — применяем изменения
+
+    float snap[3] = { 8.f, 8.f, 8.f };
+    ImGuizmo::Manipulate(viewPtr, projPtr, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, matrixPtr, nullptr, snap);
+
     if (ImGuizmo::IsUsing())
     {
-        // Передаем измененную мировую матрицу обратно в трансформ
         transform.setWorldMatrix(worldMatrix);
     }
+    
+    ImGuizmo::PopID();
 }

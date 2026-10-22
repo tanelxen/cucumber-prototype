@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "IViewProvider.h"
+
 #include <vector>
 #include <filesystem>
 #include <string>
@@ -17,13 +19,14 @@ class InspectorPanel;
 class AssetsPanel;
 class HierarchyPanel;
 class MaterialPanel;
-class Viewport;
 
 class WorldScene;
+struct ViewDesc;
+
 class Material;
 class Entity;
 
-class UIManager
+class UIManager : public IViewProvider
 {
 public:
     UIManager();
@@ -34,15 +37,13 @@ public:
     void setEntity(Entity* entity);
     void setMaterial(Material* material);
     
-    Viewport* getMainViewport() { return m_pMainView; }
-    
     void update(float dt);
-    void preRender();
     void draw();
     void saveProjectSettings();
     
     ViewportPanel* m_pViewportPanel;
-    Viewport* m_pMainView;
+    
+    void collectViews(WorldScene& scene, std::vector<ViewDesc>& out) override;
     
 private:
     InspectorPanel* m_pInspectorPanel;
@@ -56,7 +57,9 @@ private:
     void drawProjectLauncher();
     bool openProjectPath(const std::filesystem::path& path);
     
+    std::vector<ViewportPanel*> m_viewportPanels;
     std::vector<EditorPanel*> m_panels;
+    
     bool m_showProjectLauncher = true;
     char m_projectNameBuffer[128] = "MyProject";
     char m_projectLocationBuffer[1024] = {};

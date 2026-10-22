@@ -16,6 +16,7 @@
 #include "CameraComponent.h"
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
+#include "LightComponent.h"
 #include "MeshComponent.h"
 #include "MapComponent.h"
 
@@ -217,6 +218,7 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
     {
         if (ImGui::MenuItem("Mesh"))            { m_entity->addComponent<MeshComponent>(); }
         if (ImGui::MenuItem("Sound"))           { m_entity->addComponent<AudioComponent>(); }
+        if (ImGui::MenuItem("Light"))           { m_entity->addComponent<LightComponent>(); }
         if (ImGui::MenuItem("Camera"))          { m_entity->addComponent<CameraComponent>(); }
         if (ImGui::MenuItem("Movement"))        { m_entity->addComponent<MovementComponent>(); }
         if (ImGui::MenuItem("Collision"))       { m_entity->addComponent<CollisionComponent>(); }

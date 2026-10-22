@@ -10,6 +10,7 @@
 #include "InspectorPanel.h"
 #include "AssetsPanel.h"
 #include "UIManager.h"
+#include "SceneManager.h"
 
 #include "TransformComponent.h"
 #include "RigidbodyComponent.h"
@@ -19,12 +20,12 @@
 #include "CameraComponent.h"
 #include "ScriptComponent.h"
 #include "AudioComponent.h"
+#include "LightComponent.h"
 #include "MeshComponent.h"
 #include "MapComponent.h"
 #include "ProjectManager.h"
 
 #include "Mesh.h"
-#include "trenchbroom/MapMesh.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -343,6 +344,37 @@ static void DrawMapComponent(MapComponent* comp)
     {
         comp->reload();
     }
+    
+    ImGui::SameLine();
+
+    if (comp->isBaking())
+    {
+        ImGui::ProgressBar(comp->bakeProgress());
+        if (ImGui::Button("Cancel")) comp->cancelBake();
+    }
+    else if (ImGui::Button("Bake lighting"))
+    {
+        comp->bakeLighting();
+    }
+    
+    if (comp->isLightmapOutdated())
+    {
+        ImGui::TextColored(ImVec4(1, 0.7f, 0.2f, 1), "Lightmap is outdated");
+    }
+    
+    ImGui::DragFloat("Lightmap texels per unit", &comp->lightmapTexelsPerUnit, 0.01f, 0.01f, 16.0f, "%.3f");
+    ImGui::TextDisabled("Rebuild UVs after changing this value.");
+    
+    if (ImGui::Button("Rebuild Lightmap UVs"))
+    {
+        comp->rebuildLightmapUVs();
+    }
+    
+    if (!comp->bakeStatus.empty())
+    {
+//        ImGui::TextWrapped("%s", comp->bakeStatus.c_str());
+        ImGui::TextUnformatted(comp->bakeStatus.c_str());
+    }
 }
 
 static void DrawCollisionComponent(CollisionComponent* comp)
@@ -452,8 +484,48 @@ static void DrawAudioComponent(AudioComponent* comp)
     }
 }
 
-void RegisterComponentsUI()
+static void DrawLightComponent(LightComponent *comp)
 {
+    static constexpr const char* lightTypeNames[] = {
+        "Directional",
+        "Point",
+        "Spot"
+    };
+
+    int type = static_cast<int>(comp->type);
+    if (ImGui::Combo("Type", &type, lightTypeNames, IM_ARRAYSIZE(lightTypeNames)))
+    {
+        comp->type = static_cast<LightType>(type);
+    }
+
+    static constexpr const char* lightModeNames[] = {
+        "Realtime",
+        "Baked",
+        "Baked + Realtime"
+    };
+    int mode = static_cast<int>(comp->mode);
+    if (ImGui::Combo("Mode", &mode, lightModeNames, IM_ARRAYSIZE(lightModeNames)))
+    {
+        comp->mode = static_cast<LightMode>(mode);
+    }
+
+    ImGui::ColorEdit3("Color", &comp->color.x);
+    ImGui::DragFloat("Intensity", &comp->intensity, 0.1f, 0.0f, 100000.0f, "%.2f");
+    ImGui::Checkbox("Cast Shadows", &comp->castShadows);
+
+    if (comp->type != LightType::Directional)
+    {
+        ImGui::DragFloat("Range", &comp->range, 1.0f, 0.01f, 100000.0f, "%.2f");
+        ImGui::DragFloat("Linear Attenuation", &comp->linear, 0.001f, 0.0f, 1000.0f, "%.4f");
+        ImGui::DragFloat("Quadratic Attenuation", &comp->quadratic, 0.001f, 0.0f, 1000.0f, "%.4f");
+    }
+    if (comp->type == LightType::Spot)
+    {
+        ImGui::SliderFloat("Spot Angle", &comp->spotAngle, 1.0f, 89.0f, "%.1f deg");
+    }
+}
+
+  void RegisterComponentsUI() {
     auto& inspector = ComponentInspector::Get();
     
     inspector.Register<TransformComponent>("Transform", [](Component* c, InspectorPanel* p) {
@@ -544,10 +616,30 @@ void RegisterComponentsUI()
         auto* comp = static_cast<RigidbodyComponent*>(c);
         DrawRigidbodyComponent(comp);
     });
-    
+
+    inspector.Register<LightComponent>("Light", [](Component *c, InspectorPanel *p) {
+          auto *comp = static_cast<LightComponent *>(c);
+          DrawLightComponent(comp);
+    });
+
     inspector.Register<CameraComponent>("Camera", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<CameraComponent*>(c);
+        ImGui::Checkbox("Enabled##Camera", &comp->enabled);
         ImGui::DragFloat("Field of view##Camera", &comp->fov, 10.f, 30.0f, 100.0f, "%.0f");
+        ImGui::InputScalar("Camera Stack##Camera", ImGuiDataType_U32, &comp->cameraStackId);
+        ImGui::Checkbox("Overlay Camera", &comp->m_isOverlay);
+        if (!comp->m_isOverlay)
+        {
+            if (ImGui::Button("Make Primary##Camera"))
+            {
+                if (auto* scene = SceneManager::Get().getActiveScene())
+                {
+                    scene->setPrimaryCamera(comp);
+                }
+            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted(comp->m_isPrimary ? "Primary" : "Secondary");
+        }
         DrawCollisionBits("Culling Mask", comp->cullingMask);
         ImGui::Checkbox("Clear Depth Only", &comp->clearDepthOnly);
         ImGui::DragFloat("Depth##Camera", &comp->depth, 1.f, 0.0f, 100.0f, "%.0f");
