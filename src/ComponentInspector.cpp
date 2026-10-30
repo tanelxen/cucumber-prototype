@@ -30,6 +30,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+#include <cstring>
+
 #include "../vendor/tinyfiledialogs.h"
 
 void ComponentInspector::Render(Component* component, InspectorPanel* panel)
@@ -525,7 +527,124 @@ static void DrawLightComponent(LightComponent *comp)
     }
 }
 
-  void RegisterComponentsUI() {
+static void DrawScriptProperties(ScriptComponent* component)
+{
+    if (!component || !ImGui::TreeNode("Variables")) return;
+
+    const auto& properties = component->getScriptProperties();
+    if (ImGui::BeginTable("ScriptProperties", 2, ImGuiTableFlags_SizingStretchProp))
+    {
+        ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthStretch, 0.4f);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.6f);
+
+        for (const ScriptPropertyDescriptor& property : properties)
+        {
+            if (property.hidden || property.kind == ScriptPropertyKind::Unsupported) continue;
+
+            if (!property.header.empty())
+            {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), "%s",
+                                   property.header.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Separator();
+            }
+
+            nlohmann::json value = component->getPropertyValue(property.name);
+            if (value.is_null() && property.kind != ScriptPropertyKind::Reference) continue;
+
+            ImGui::PushID(property.name.c_str());
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(property.name.c_str());
+            ImGui::TableSetColumnIndex(1);
+
+            switch (property.kind)
+            {
+                case ScriptPropertyKind::Float:
+                {
+                    float current = value.get<float>();
+                    const bool changed = property.hasRange
+                        ? ImGui::SliderFloat("##value", &current, property.rangeMin, property.rangeMax)
+                        : ImGui::DragFloat("##value", &current, 0.05f);
+                    if (changed) component->setPropertyValue(property.name, current);
+                    break;
+                }
+                case ScriptPropertyKind::Integer:
+                {
+                    int current = value.get<int>();
+                    const bool changed = property.hasRange
+                        ? ImGui::SliderInt("##value", &current,
+                                           static_cast<int>(property.rangeMin),
+                                           static_cast<int>(property.rangeMax))
+                        : ImGui::DragInt("##value", &current);
+                    if (changed) component->setPropertyValue(property.name, current);
+                    break;
+                }
+                case ScriptPropertyKind::Boolean:
+                {
+                    bool current = value.get<bool>();
+                    if (ImGui::Checkbox("##value", &current))
+                        component->setPropertyValue(property.name, current);
+                    break;
+                }
+                case ScriptPropertyKind::String:
+                {
+                    std::string current = value.get<std::string>();
+                    char buffer[512] = {};
+                    std::strncpy(buffer, current.c_str(), sizeof(buffer) - 1);
+                    if (ImGui::InputText("##value", buffer, sizeof(buffer)))
+                        component->setPropertyValue(property.name, std::string(buffer));
+                    break;
+                }
+                case ScriptPropertyKind::Reference:
+                {
+                    const bool hasReference = value.is_object();
+                    const std::string buttonLabel = hasReference
+                        ? value.value("display", "Linked " + property.typeName)
+                        : "None (" + property.typeName + ")";
+                    ImGui::PushStyleColor(ImGuiCol_Button,
+                                          hasReference ? ImVec4(0.2f, 0.4f, 0.2f, 1.0f)
+                                                       : ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+                    ImGui::Button((buttonLabel + "##value").c_str(),
+                                  ImVec2(ImGui::GetContentRegionAvail().x, 0));
+                    ImGui::PopStyleColor();
+
+                    if (ImGui::BeginDragDropTarget())
+                    {
+                        if (const ImGuiPayload* payload =
+                                ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY"))
+                        {
+                            Entity* target = *static_cast<Entity**>(payload->Data);
+                            component->setPropertyReference(property.name, target);
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                    if (ImGui::BeginPopupContextItem("script_reference_context"))
+                    {
+                        if (ImGui::MenuItem("Clear Reference"))
+                            component->clearPropertyReference(property.name);
+                        ImGui::EndPopup();
+                    }
+                    break;
+                }
+                case ScriptPropertyKind::Unsupported:
+                    break;
+            }
+
+            if (!property.tooltip.empty() && ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", property.tooltip.c_str());
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+
+    ImGui::TreePop();
+}
+
+void RegisterComponentsUI() {
     auto& inspector = ComponentInspector::Get();
     
     inspector.Register<TransformComponent>("Transform", [](Component* c, InspectorPanel* p) {
@@ -598,7 +717,7 @@ static void DrawLightComponent(LightComponent *comp)
                 std::system(command.c_str());
             }
             
-            comp->drawProperties();
+            DrawScriptProperties(comp);
         }
     });
     

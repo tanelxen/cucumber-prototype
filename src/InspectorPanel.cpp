@@ -20,12 +20,11 @@
 #include "MeshComponent.h"
 #include "MapComponent.h"
 
-#include "ScriptEngine.h"
+#include "ScriptRuntime.h"
 
 #include <imgui.h>
 
 #include "../vendor/IconsMaterialDesignIcons.h"
-#include "imgui_internal.h"
 
 #include <fstream>
 #include <iostream>
@@ -60,39 +59,10 @@ void InspectorPanel::draw()
     ImGui::End();
 }
 
-// Функция возвращает имена всех скриптовых классов, наследующих MonoBehaviour
+// Функция возвращает имена всех скриптовых классов, наследующих EntityScript
 std::vector<std::string> GetAvailableScriptClasses()
 {
-    std::vector<std::string> scriptClasses;
-    
-    // Получаем наш единый модуль
-    asIScriptModule* mod = ScriptEngine::get().GetRawEngine()->GetModule("Game", asGM_ONLY_IF_EXISTS);
-    if (!mod) return scriptClasses;
-    
-    // Находим базовый тип MonoBehaviour для проверки наследования
-    asITypeInfo* baseType = mod->GetTypeInfoByName("MonoBehaviour");
-    if (!baseType) return scriptClasses;
-    
-    // Обходим все типы (классы), объявленные в модуле
-    asUINT typeCount = mod->GetObjectTypeCount();
-    
-    for (asUINT i = 0; i < typeCount; i++)
-    {
-        asITypeInfo* type = mod->GetObjectTypeByIndex(i);
-        if (!type) continue;
-        
-        // Нам нужны только классы (не enums/интерфейсы) и они не должны быть абстрактными
-        if (type->GetFlags() & asOBJ_SCRIPT_OBJECT && !(type->GetFlags() & asOBJ_ABSTRACT))
-        {
-            
-            // Проверяем, наследуется ли этот класс от MonoBehaviour
-            if (type->DerivesFrom(baseType)) {
-                scriptClasses.push_back(type->GetName());
-            }
-        }
-    }
-    
-    return scriptClasses;
+    return GetScriptRuntime().getAvailableScriptClasses();
 }
 
 InspectorPanel::AssetDragResult InspectorPanel::RenderAssetDropZone(const char* str_id, const ImVec2& size, float targetLineY, uint32_t allowedTypes)

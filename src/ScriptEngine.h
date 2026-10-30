@@ -7,7 +7,8 @@
 
 #pragma once
 
-#include <angelscript.h>
+#include "ScriptRuntime.h"
+
 #include <vector>
 #include <string>
 #include <iostream>
@@ -39,17 +40,12 @@ public:
         return instance;
     }
     
-    bool init(const std::string& scriptsFolder);
+    bool init(const std::string& scriptsFolder,
+              const ScriptRuntimeOptions& options = ScriptRuntimeOptions{});
     bool CompileAllScripts(const std::string& scriptsFolder);
     void HotReloadAllScripts(const std::string& scriptsFolder);
     
 //    bool LoadModule(const std::string& moduleName, const std::string& scriptPath);
-    
-    std::vector<std::string> GetMetadataForTypeProperty(int typeId, int varIdx);
-    
-    asIScriptEngine* GetRawEngine() { return m_asEngine; }
-    asIScriptContext* GetContext() { return m_Context; }
-    
     
     // Добавляем доступ к вектору логов
     const std::vector<ScriptLogMessage>& GetLogMessages() const { return m_LogMessages; }
@@ -63,12 +59,6 @@ public:
     
 private:
     ScriptEngine() = default;
-    
-    void RegisterEngineAPI();
-    static void MessageCallback(const asSMessageInfo* msg, void* param);
-    
-    asIScriptEngine* m_asEngine = nullptr;
-    asIScriptContext* m_Context = nullptr;
     
     std::vector<ScriptLogMessage> m_LogMessages;
 };

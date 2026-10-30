@@ -46,6 +46,10 @@ set(SRC_COMMON
         
         src/ScriptEngine.cpp
         src/ScriptEngine.h
+        src/AngelScriptBackend.cpp
+        src/AngelScriptRuntime.cpp
+        src/AngelScriptRuntime.h
+        src/ScriptRuntime.h
         
         src/UID.cpp
         src/UID.h
