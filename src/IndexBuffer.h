@@ -14,7 +14,6 @@ class IndexBuffer
 {
 public:
     IndexBuffer(const uint32_t* indices, uint32_t count);
-//    IndexBuffer(const uint16_t* indices, uint32_t count);
     
     ~IndexBuffer();
     
@@ -22,7 +21,6 @@ public:
     void unbind() const;
     
     uint32_t getCount() const { return m_count; }
-//    uint32_t getComponentType() const { return m_componentType; }
     
     const uint32_t getID() const { return m_id; }
     

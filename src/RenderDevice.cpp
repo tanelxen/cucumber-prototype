@@ -21,8 +21,6 @@
 #include "Shader.h"
 #include "ShaderVariant.h"
 
-#include "Sky.h"
-#include "Grid.h"
 #include "SpriteRenderer.h"
 #include "DecalManager.h"
 #include "GizmoRender.h"
@@ -36,11 +34,6 @@
 #include <cstdio>
 #include <numeric>
 #include <vector>
-
-//static Sky g_sky;
-
-// Вообще отрисовку сетки надо перенести в GizmoRenderer, но пока что тут
-static Grid g_grid;
 
 namespace RenderDevice {
     
@@ -104,9 +97,6 @@ namespace RenderDevice {
             unsigned char pixels[4] = { 128, 128, 255, 255 };
             normalTextureId = makeTexture(1, 1, true, true, pixels);
         }
-        
-//        g_sky.init();
-        g_grid.init();
         
         glGenBuffers(1, &lightingUBO);
         glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
@@ -423,7 +413,7 @@ namespace RenderDevice {
         
         if (desc.flags & ViewFlag::Grid)
         {
-            g_grid.draw(desc.camera.view, desc.camera.proj);
+            GizmoRender::Get().DrawGrid(desc.camera.view, desc.camera.proj);
             GLState::invalidate();
         }
         

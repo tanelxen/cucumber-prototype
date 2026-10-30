@@ -21,9 +21,6 @@ add_subdirectory( vendor/ImGuizmo )
 
 set(SRC_COMMON
         src/main.cpp
-
-        src/Grid.cpp
-        src/Grid.h
         
         src/Application.cpp
         src/Application.h
@@ -36,9 +33,6 @@ set(SRC_COMMON
         src/ModelLoader.h
         src/Skeleton.h
         src/Animation.h
-        
-        src/Sky.cpp
-        src/Sky.h
         
         vendor/tinyfiledialogs.c
         
@@ -102,8 +96,6 @@ set(SRC_COMPONENTS
         src/MovementComponent.h
         src/CollisionComponent.cpp
         src/CollisionComponent.h
-        src/Q3BspComponent.cpp
-        src/Q3BspComponent.h
         src/MapComponent.cpp
         src/MapComponent.h
         src/RigidbodyComponent.cpp
@@ -178,8 +170,6 @@ set(SRC_PANELS
         src/ComponentInspector.h
         src/AssetsPanel.cpp
         src/AssetsPanel.h
-        src/MaterialPanel.cpp
-        src/MaterialPanel.h
         src/HierarchyPanel.cpp
         src/HierarchyPanel.h
         
@@ -189,23 +179,9 @@ set(SRC_PANELS
         src/EditorViewport.h
 )
 
-set(SRC_Q3
-        src/q3/Q3BSPAsset.cpp
-        src/q3/Q3BSPAsset.h
-        src/q3/Q3BSPTypes.h
-        src/q3/Q3BspMesh.cpp
-        src/q3/Q3BspMesh.h
-        src/q3/Q3Bezier.cpp
-        src/q3/Q3Bezier.h
-        src/q3/Q3LightGrid.cpp
-        src/q3/Q3LightGrid.h
-        src/q3/Q3Shaders.cpp
-        src/q3/Q3Shaders.h
-        src/q3/TextureAtlas.cpp
-        src/q3/TextureAtlas.h
-)
-
 set(SRC_TRENCHBROOM
+        src/trenchbroom/Q3Shaders.cpp
+        src/trenchbroom/Q3Shaders.h
         src/trenchbroom/MapAsset.cpp
         src/trenchbroom/MapAsset.h
         src/trenchbroom/MapMesh.cpp
@@ -238,7 +214,6 @@ add_executable( ${PROJECT_NAME}
         ${SRC_PANELS}
         ${SRC_GameUI}
         ${SRC_TRENCHBROOM}
-        ${SRC_Q3}
         ${SRC_IMGUI}
 )
 

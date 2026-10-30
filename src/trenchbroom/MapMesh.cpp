@@ -19,7 +19,7 @@
 #include "TextureManager.h"
 #include "VertexArray.h"
 #include "VertexBuffer.h"
-#include "q3/Q3Shaders.h"
+#include "Q3Shaders.h"
 
 #include <glad/glad.h>
 
@@ -185,7 +185,8 @@ bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSet
     m_indexBuffer = std::make_unique<IndexBuffer>(m_indices.data(), m_indices.size());
     m_vao->setIndexBuffer(m_indexBuffer.get());
 
-    uploadLightmapTexture(nullptr); // черная текстура
+    // белая текстура
+    uploadLightmapTexture(nullptr);
     
     std::cout << "[MapMesh] Created GPU buffers. Vertices: " << m_positions.size() << ", surfaces: " << m_surfaces.size() << std::endl;
     return true;

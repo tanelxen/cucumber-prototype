@@ -23,10 +23,6 @@ class Entity;
 class Component;
 class CollisionComponent;
 class CameraComponent;
-
-//struct GPUTimeLight;
-
-class Q3BspComponent;
 class MapComponent;
 
 enum class SceneType
@@ -101,9 +97,7 @@ private:
     
     bool m_isSimulationMode = false;
     
-//    Q3BspComponent* m_bsp = nullptr;
     MapComponent* m_map = nullptr;
     
-//    std::vector<GPUTimeLight> collectLights();
     CameraManager m_cameras;
 };

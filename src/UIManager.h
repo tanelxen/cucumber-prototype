@@ -18,7 +18,6 @@ class ViewportPanel;
 class InspectorPanel;
 class AssetsPanel;
 class HierarchyPanel;
-class MaterialPanel;
 
 class WorldScene;
 struct ViewDesc;
@@ -48,7 +47,6 @@ public:
 private:
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
-    MaterialPanel* m_pMaterialPanel;
     HierarchyPanel* m_pHierarchyPanel;
     
 private:

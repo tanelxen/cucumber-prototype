@@ -21,7 +21,6 @@
 #include "AudioComponent.h"
 #include "LightComponent.h"
 #include "MeshComponent.h"
-#include "Q3BspComponent.h"
 #include "MapComponent.h"
 #include "RigidbodyComponent.h"
 
@@ -407,14 +406,6 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
         else if (compName == "LightComponent")
         {
             newComp = entity->addComponent<LightComponent>();
-        }
-        else if (compName == "BSPMeshComponent")
-        {
-            std::string path = compData.at("source_bsp");
-            
-            newComp = entity->addComponent<Q3BspComponent>();
-            auto meshComp = static_cast<Q3BspComponent*>(newComp);
-            meshComp->loadQ3BSP(ProjectManager::Get().assetsPath() / path);
         }
         else if (compName == "MapComponent")
         {

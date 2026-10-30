@@ -86,12 +86,6 @@ public:
         auto it = std::find_if(m_clips.begin(), m_clips.end(), [&clipName](const std::shared_ptr<AnimationClip>& clip) {
             return clip->name == clipName;
         });
-        
-//        if (it != m_clips.end())
-//        {
-//            int index = static_cast<int>(it - m_clips.begin());
-//            play(index);
-//        }
     }
     
 public:

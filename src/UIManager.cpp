@@ -11,7 +11,6 @@
 
 #include "ViewportPanel.h"
 #include "InspectorPanel.h"
-#include "MaterialPanel.h"
 #include "AssetsPanel.h"
 #include "HierarchyPanel.h"
 
@@ -67,15 +66,10 @@ UIManager::UIManager()
     m_pAssetsPanel = new AssetsPanel();
     m_pAssetsPanel->m_manager = this;
     
-    m_pMaterialPanel = new MaterialPanel();
-    m_pMaterialPanel->m_manager = this;
-    m_pMaterialPanel->isVisible = false;
-    
     m_panels.push_back(m_pViewportPanel);
 //    m_panels.push_back(m_pViewportPanel2);
     m_panels.push_back(m_pHierarchyPanel);
     m_panels.push_back(m_pInspectorPanel);
-    m_panels.push_back(m_pMaterialPanel);
     m_panels.push_back(m_pAssetsPanel);
     
     g_UIManager = this;
@@ -622,11 +616,6 @@ void UIManager::setEntity(Entity *entity)
     {
         panel->setEntity(entity);
     }
-}
-
-void UIManager::setMaterial(Material* material)
-{
-    m_pMaterialPanel->setMaterial(material);
 }
 
 static void DrawScriptConsoleWindow()

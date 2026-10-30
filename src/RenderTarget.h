@@ -2,10 +2,7 @@
 //  RenderTarget.h
 //  Cucumber
 //
-//  Замена FrameBuffer. Отличия:
-//   - цвет в GL_SRGB8_ALPHA8 (GL_FRAMEBUFFER_SRGB реально работает, нет бэндинга в тёмном);
-//   - масштаб (retina) приходит снаружи, а не зашит в класс;
-//   - не делает glGet* и не хранит сохранённый viewport: viewport выставляет bind().
+//  Created by Fedor Artemenkov on 24.10.26.
 //
 
 #pragma once

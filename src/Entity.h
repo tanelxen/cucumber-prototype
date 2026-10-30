@@ -64,14 +64,6 @@ public:
         return rawPtr;
     }
     
-    // Получение ПЕРВОГО попавшегося компонента типа
-//    template<typename T>
-//    T* getComponent() const
-//    {
-//        auto it = m_componentMap.find(typeid(T));
-//        return (it != m_componentMap.end()) ? static_cast<T*>(it->second) : nullptr;
-//    }
-    
     template<typename T>
     T* getComponent()
     {

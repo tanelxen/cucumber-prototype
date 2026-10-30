@@ -53,3 +53,97 @@ float AudioComponent::GetCurrentTime() const
     // Если лупинг выключен, miniaudio останавливает трек на его максимальной длине
     return absoluteTimeInSeconds > totalLength ? totalLength : absoluteTimeInSeconds;
 }
+
+void AudioComponent::save(nlohmann::json& j) const
+{
+    j = nlohmann::json{ {"source", path} };
+}
+
+void AudioComponent::load(const nlohmann::json& j)
+{
+    path = j.at("source");
+}
+
+void AudioComponent::init(const std::string& filePath)
+{
+    destroy(); // Очищаем старый звук, если он был
+    
+    ma_uint32 flags = 0;
+    
+    ma_result result = ma_sound_init_from_file(AudioSystem::Get().GetEngine(),
+                                               filePath.c_str(),
+                                               flags,
+                                               nullptr, // Группа микширования (опционально)
+                                               nullptr, // Процесс уведомлений (опционально)
+                                               &m_sound
+                                               );
+    
+    if (result != MA_SUCCESS) {
+        std::cerr << "Failed to load sound: " << filePath << std::endl;
+        return;
+    }
+    
+    // Временно отключаем пространственность
+    ma_sound_set_spatialization_enabled(&m_sound, false);
+    
+    m_isInitialized = true;
+    
+    m_length = GetLength();
+}
+
+void AudioComponent::play()
+{
+    if (!m_isInitialized) return;
+    ma_sound_start(&m_sound);
+}
+
+void AudioComponent::stop()
+{
+    if (!m_isInitialized) return;
+    ma_sound_stop(&m_sound);
+}
+
+void AudioComponent::setLooping(bool loop)
+{
+    if (!m_isInitialized) return;
+    ma_sound_set_looping(&m_sound, loop ? MA_TRUE : MA_FALSE);
+}
+
+void AudioComponent::setVolume(float volume)
+{
+    // volume от 0.0f до 1.0f+
+    if (!m_isInitialized) return;
+    ma_sound_set_volume(&m_sound, volume);
+}
+
+void AudioComponent::destroy()
+{
+    if (m_isInitialized) {
+        ma_sound_uninit(&m_sound);
+        m_isInitialized = false;
+    }
+}
+
+float AudioComponent::GetLength() const
+{
+    if (!m_isInitialized) return 0.0f;
+    ma_uint64 length = 0;
+    ma_sound_get_length_in_pcm_frames(const_cast<ma_sound*>(&m_sound), &length);
+    
+    ma_uint32 sampleRate = ma_engine_get_sample_rate(AudioSystem::Get().GetEngine());
+    return (float)length / (float)sampleRate;
+}
+
+void AudioComponent::SetCurrentTime(float seconds)
+{
+    if (!m_isInitialized) return;
+    ma_uint32 sampleRate = ma_engine_get_sample_rate(AudioSystem::Get().GetEngine());
+    ma_uint64 frameIndex = (ma_uint64)(seconds * sampleRate);
+    ma_sound_seek_to_pcm_frame(&m_sound, frameIndex);
+}
+
+bool AudioComponent::IsPlaying() const
+{
+    if (!m_isInitialized) return false;
+    return ma_sound_is_playing(&m_sound) == MA_TRUE;
+}

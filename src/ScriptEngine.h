@@ -31,9 +31,6 @@ struct ScriptLogMessage {
 class ScriptEngine
 {
 public:
-//    ScriptEngine();
-//    ~ScriptEngine();
-    
     static ScriptEngine& get()
     {
         static ScriptEngine instance;
@@ -44,8 +41,6 @@ public:
               const ScriptRuntimeOptions& options = ScriptRuntimeOptions{});
     bool CompileAllScripts(const std::string& scriptsFolder);
     void HotReloadAllScripts(const std::string& scriptsFolder);
-    
-//    bool LoadModule(const std::string& moduleName, const std::string& scriptPath);
     
     // Добавляем доступ к вектору логов
     const std::vector<ScriptLogMessage>& GetLogMessages() const { return m_LogMessages; }

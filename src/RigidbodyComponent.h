@@ -49,49 +49,8 @@ struct RigidbodyComponent : public Component
     
     void addImpulse(const glm::vec3& force, const glm::vec3& point);
     
-    void save(nlohmann::json& j) const override
-    {
-        j["boxHalfExtents"] = { boxHalfExtents.x, boxHalfExtents.y, boxHalfExtents.z };
-        j["restitution"] = restitution;
-        
-        switch (motionType)
-        {
-            case PhysicsMotionType::Static:
-                j["motion_type"] = "static";
-                break;
-                
-            case PhysicsMotionType::Dynamic:
-                j["motion_type"] = "dynamic";
-                break;
-                
-            case PhysicsMotionType::Kinematic:
-                j["motion_type"] = "kinematic";
-                break;
-        }
-    }
-    
-    void load(const nlohmann::json& j) override
-    {
-        if(j.contains("boxHalfExtents"))
-        {
-            auto vector = j.at("boxHalfExtents").get<std::vector<float>>();
-            boxHalfExtents = glm::vec3(vector[0], vector[1], vector[2]);
-        }
-        
-        if(j.contains("restitution"))
-        {
-            restitution = j.at("restitution").get<float>();
-        }
-        
-        if(j.contains("motion_type"))
-        {
-            std::string str = j.at("motion_type");
-            
-            if (str == "static") motionType = PhysicsMotionType::Static;
-            else if (str == "dynamic") motionType = PhysicsMotionType::Dynamic;
-            else if (str == "kinematic") motionType = PhysicsMotionType::Kinematic;
-        }
-    }
+    void save(nlohmann::json& j) const override;
+    void load(const nlohmann::json& j) override;
     
     void gizmo() override;
     

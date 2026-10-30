@@ -114,19 +114,17 @@ void VertexArray::setVertexBuffer(const VertexBuffer* vertexBuffer)
         
         if (IsInteger(element.type) && !element.normalized)
         {
-            glVertexAttribIPointer(
-                                  location,
-                                  GetComponentCount(element.type),
-                                  ShaderDataTypeToOpenGLBaseType(element.type),
-                                  layout.getStride(),
-                                  (const void*)(uintptr_t)element.offset
-                                  );
+            glVertexAttribIPointer(location,
+                                   GetComponentCount(element.type),
+                                   ShaderDataTypeToOpenGLBaseType(element.type),
+                                   layout.getStride(),
+                                   (const void*)(uintptr_t)element.offset
+                                   );
             
         }
         else
         {
-            glVertexAttribPointer(
-                                  location,
+            glVertexAttribPointer(location,
                                   GetComponentCount(element.type),
                                   ShaderDataTypeToOpenGLBaseType(element.type),
                                   element.normalized ? GL_TRUE : GL_FALSE,

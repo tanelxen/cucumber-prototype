@@ -11,11 +11,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-// Возможно стоит делать обновление m_worldMatrix в конце кадра
-// Но тогда в скриптах это придется это учесть и дать метод Invalidate()
-// На случай когда тут же нужно свежее значение
-// Зато из скрипта можно будет прямо образаться к свойствам
-
 struct TransformComponent : public Component
 {
     const std::string getTypeName() const override { return "TransformComponent"; }

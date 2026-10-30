@@ -26,22 +26,6 @@ struct MeshComponent : public Component
     
     bool loadModel(const std::filesystem::path& filepath);
 
-    void save(nlohmann::json& j) const override
-    {
-        j["source_glb"] = path;
-        j["layer"] = layer;
-    }
-    
-    void load(const nlohmann::json& j) override
-    {
-        if(j.contains("source_glb"))
-        {
-            path = j.at("source_glb");
-        }
-        
-        if(j.contains("layer"))
-        {
-            layer = j.at("layer");
-        }
-    }
+    void save(nlohmann::json& j) const override;
+    void load(const nlohmann::json& j) override;
 };

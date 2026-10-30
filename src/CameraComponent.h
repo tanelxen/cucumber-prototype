@@ -29,70 +29,8 @@ struct CameraComponent : public Component
     
     const std::string getTypeName() const override { return "CameraComponent"; }
     
-    void save(nlohmann::json& j) const override
-    {
-        j["enabled"] = enabled;
-        j["primary"] = m_isPrimary;
-        j["overlay"] = m_isOverlay;
-        j["cameraStackId"] = cameraStackId;
-        
-        j["clearDepthOnly"] = clearDepthOnly;
-        j["cullingMask"] = cullingMask;
-        j["depth"] = depth;
-        
-        j["fov"] = fov;
-    }
-    
-    void load(const nlohmann::json& j) override
-    {
-        if (j.contains("enabled"))
-        {
-            enabled = j.at("enabled");
-        }
-        else if (j.contains("current"))
-        {
-            enabled = j.at("current");
-        }
-        
-        if(j.contains("clearDepthOnly"))
-        {
-            clearDepthOnly = j.at("clearDepthOnly");
-        }
-
-        if (j.contains("overlay"))
-        {
-            m_isOverlay = j.at("overlay");
-        }
-        else if (j.contains("current"))
-        {
-            m_isOverlay = clearDepthOnly;
-        }
-
-        if (j.contains("primary"))
-        {
-            m_isPrimary = j.at("primary");
-        }
-
-        if (j.contains("cameraStackId"))
-        {
-            cameraStackId = j.at("cameraStackId");
-        }
-        
-        if(j.contains("cullingMask"))
-        {
-            cullingMask = j.at("cullingMask");
-        }
-        
-        if(j.contains("depth"))
-        {
-            depth = j.at("depth");
-        }
-        
-        if(j.contains("fov"))
-        {
-            fov = j.value("fov", 55.f);
-        }
-    }
+    void save(nlohmann::json& j) const override;
+    void load(const nlohmann::json& j) override;
     
     void gizmo() override;
 };

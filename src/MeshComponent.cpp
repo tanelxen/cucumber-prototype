@@ -42,3 +42,22 @@ bool MeshComponent::loadModel(const std::filesystem::path& filepath)
 
     return true;
 }
+
+void MeshComponent::save(nlohmann::json& j) const
+{
+    j["source_glb"] = path;
+    j["layer"] = layer;
+}
+
+void MeshComponent::load(const nlohmann::json& j)
+{
+    if(j.contains("source_glb"))
+    {
+        path = j.at("source_glb");
+    }
+    
+    if(j.contains("layer"))
+    {
+        layer = j.at("layer");
+    }
+}

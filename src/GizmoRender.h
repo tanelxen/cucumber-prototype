@@ -36,6 +36,8 @@ public:
     void DrawIcon3D(const glm::vec3& worldPos, const glm::vec2& scale, const glm::vec4& color);
     void DrawText3D(const glm::vec3& worldPos, const std::string& text, float scale, const glm::vec4& color);
     
+    void DrawGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+    
 private:
     GizmoRender() = default;
     

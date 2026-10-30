@@ -17,11 +17,9 @@
 #include "AnimatorComponent.h"
 #include "LightComponent.h"
 #include "MeshComponent.h"
-#include "Q3BspComponent.h"
 #include "MapComponent.h"
 #include "RigidbodyComponent.h"
 
-#include "q3/Q3BspMesh.h"
 #include "trenchbroom/MapMesh.h"
 
 #include "PhysicsCommon.h"
@@ -169,11 +167,6 @@ void WorldScene::registerComponent(Component *component)
     }
     
     m_allComponents.push_back(component);
-    
-//    if (auto* bsp = dynamic_cast<Q3BspComponent*>(component))
-//    {
-//        m_bsp = bsp;
-//    }
     
     if (auto* map = dynamic_cast<MapComponent*>(component))
     {

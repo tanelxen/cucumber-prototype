@@ -3,7 +3,7 @@
 //  Cucumber
 //
 //  Фронтенд рендера: один вызов за кадр превращает "мир + список видов" в картинку.
-//  Владеет RenderScene, списком видов и ShadowSystem. Application про них больше не знает.
+//  Владеет RenderScene, списком видов и ShadowSystem.
 //
 //  Кадр:   collectViews -> Extract -> shadows.plan -> SubmitViews -> shadows.renderQueued -> RenderDevice::flush
 //

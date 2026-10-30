@@ -65,9 +65,6 @@ public:
     void setIndices(const std::vector<uint32_t>& indices);
     void setSurfaces(std::vector<Surface>& surfaces) { m_surfaces = surfaces; }
     
-//    void draw(RenderView& view, glm::mat4& transform) const;
-//    void draw(RenderView& view, glm::mat4& transform, const std::vector<glm::mat4>& bonesPalette) const;
-    
     unsigned int getVAOId() const;
     
     const AABB& getBounds() const { return m_bounds; }
