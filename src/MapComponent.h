@@ -10,6 +10,7 @@
 #include "Component.h"
 #include "PhysicsCommon.h"
 #include "trenchbroom/LightmapController.h"
+#include "level/LevelDocument.h"
 
 #include <Jolt/Physics/Body/BodyID.h>
 #include <filesystem>
@@ -29,8 +30,8 @@ struct MapComponent : public Component
     void save(nlohmann::json& j) const override;
     void load(const nlohmann::json& j) override;
     
-    bool loadTrenchBroomMap(const std::filesystem::path& filepath);
-    bool rebuildLightmapUVs();
+    //bool loadTrenchBroomMap(const std::filesystem::path& filepath);
+    //bool rebuildLightmapUVs();
     void reload();
     
     bool bakeLighting();                            // запускает фоновый бейк и сразу возвращается
@@ -38,6 +39,19 @@ struct MapComponent : public Component
     bool isBaking() const      { return lightmap.isBaking(); }
     float bakeProgress() const { return lightmap.progress(); }
     bool isLightmapOutdated();
+    
+    
+    
+    // Принимает и .map (импорт, если .cmap.json ещё нет), и .cmap.json. Имя оставлено, чтобы Inspector не менялся.
+    bool loadTrenchBroomMap(const std::filesystem::path& filepath);
+    bool loadLevel(const std::filesystem::path& filepath);                 // .cmap.json
+    bool importTrenchBroomMap(const std::filesystem::path& mapFile, bool overwrite = false);
+    bool saveLevel();
+    bool rebuildFromDocument();     // меш + физика из level; вызывать после правок документа
+    bool rebuildLightmapUVs();      // теперь тоже из level, файл не читается
+    
+    LevelDocument level;
+    
     
     std::string path = "<no map>";
     float lightmapTexelsPerUnit = 1.0f / 8.0f;
@@ -56,4 +70,8 @@ private:
 private:
     std::vector<LightmapBakeLight> collectBakeLights();
     std::filesystem::path lightmapCachePath() const;
+    
+private:
+    bool applyLevel();
+    bool rebuildPhysicsBody();
 };

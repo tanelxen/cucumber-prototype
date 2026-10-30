@@ -43,7 +43,6 @@ static void AddMapSurfaces(const MapMesh& map, RenderScene& out)
         object.bounds = bounds[i];
         object.layer = RenderLayers::Static;
         object.lightMap = map.lightmapTexture();
-        object.reverseWinding = true;
         out.addStatic(object);
     }
 }

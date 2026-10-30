@@ -21,6 +21,9 @@
 #include "VertexBuffer.h"
 #include "Q3Shaders.h"
 
+#include "LevelCooker.h"
+#include "level/LevelDocument.h"
+
 #include <glad/glad.h>
 
 #include <iostream>
@@ -49,7 +52,7 @@ unsigned int MapMesh::vaoId() const
     return m_vao ? m_vao->getID() : 0;
 }
 
-bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& unwrapSettings)
+bool MapMesh::buildFrom(const std::filesystem::path& basePath, const CookFunction& cook)
 {
     m_vao.reset();
     m_posBuffer.reset();
@@ -73,13 +76,8 @@ bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSet
     }
 
     m_revision = s_nextRevision++;
-    if (mapData.entities.empty())
-    {
-        std::cerr << "[MapMesh] Map has no worldspawn entity" << std::endl;
-        return false;
-    }
 
-    const auto scriptsPath = mapData.m_basepath / "scripts";
+    const auto scriptsPath = basePath / "scripts";
     s_q3shaders.initFromDir(scriptsPath.string().c_str());
 
     struct TextureInfo
@@ -112,7 +110,7 @@ bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSet
         const auto& texture = getTexture(name);
         return glm::ivec2(texture.width, texture.height);
     };
-    if (!MapMeshBuilder::build(mapData, unwrapSettings, resolveDimensions, build, error))
+    if (!cook(resolveDimensions, build, error))
     {
         std::cerr << "[MapMesh] Failed to build map mesh: " << error << std::endl;
         return false;
@@ -250,3 +248,21 @@ bool MapMesh::updateLightmapTexture(const std::vector<uint16_t>& halfRgb, std::s
     
     return true;
 }
+
+bool MapMesh::buildFromLevel(const LevelDocument& level, const LightmapUnwrapSettings& settings)
+{
+    return buildFrom(level.basePath, [&](const MapMeshBuilder::TextureDimensionsResolver& resolve,
+                                         MapMeshBuildResult& out, std::string& error)
+                     {
+        return LevelCooker::cook(level, settings, resolve, out, error);
+    });
+}
+
+//bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& settings)
+//{
+//    return buildFrom(mapData.m_basepath, [&](const MapMeshBuilder::TextureDimensionsResolver& resolve,
+//                                             MapMeshBuildResult& out, std::string& error)
+//                     {
+//        return MapMeshBuilder::build(mapData, settings, resolve, out, error);
+//    });
+//}

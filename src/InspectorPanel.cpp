@@ -252,7 +252,7 @@ void InspectorPanel::ProcessAssetInInspector(AssetDragPayload* data)
     if (data->type == AssetType_Map)
     {
         auto mapComponent = m_entity->addComponent<MapComponent>();
-        mapComponent->loadTrenchBroomMap(data->path);
+        mapComponent->importTrenchBroomMap(data->path, true);
     }
     else if (data->type == AssetType_Audio)
     {

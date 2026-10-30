@@ -18,9 +18,14 @@
 #include <string>
 #include <vector>
 
+#include <filesystem>
+#include <functional>
+
 class VertexArray;
 class VertexBuffer;
 class IndexBuffer;
+
+struct LevelDocument;
 
 class MapMesh
 {
@@ -28,7 +33,8 @@ public:
     MapMesh();
     ~MapMesh();
     
-    bool buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& unwrapSettings = {});
+    bool buildFromLevel(const LevelDocument& level, const LightmapUnwrapSettings& unwrapSettings = {});
+//    bool buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& unwrapSettings = {});
     bool updateLightmapTexture(const std::vector<uint16_t>& halfRgb, std::string& error);
     
     unsigned int vaoId() const;
@@ -47,6 +53,10 @@ public:
     
 private:
     void uploadLightmapTexture(const uint16_t* halfRgb);
+    
+    using CookFunction = std::function<bool(const MapMeshBuilder::TextureDimensionsResolver&,
+                                            MapMeshBuildResult&, std::string&)>;
+    bool buildFrom(const std::filesystem::path& basePath, const CookFunction& cook);
 
     std::unique_ptr<VertexArray> m_vao;
     

@@ -186,8 +186,7 @@ set(SRC_TRENCHBROOM
         src/trenchbroom/MapAsset.h
         src/trenchbroom/MapMesh.cpp
         src/trenchbroom/MapMesh.h
-        src/trenchbroom/MapMeshBuilder.cpp
-        src/trenchbroom/MapMeshBuilder.h
+
         src/trenchbroom/LightmapBaker.cpp
         src/trenchbroom/LightmapBaker.h
         src/trenchbroom/LightmapBakeService.cpp
@@ -198,6 +197,28 @@ set(SRC_TRENCHBROOM
         src/trenchbroom/LightmapController.h
         src/trenchbroom/Parallel.h
         src/trenchbroom/Half.h
+
+        src/trenchbroom/LevelCooker.cpp
+        src/trenchbroom/LevelCooker.h
+        src/trenchbroom/MapImporter.cpp
+        src/trenchbroom/MapImporter.h
+        src/trenchbroom/MapMeshBuilder.h
+)
+
+set(SRC_GEOMETRY
+    src/geometry/Epsilon.h
+    src/geometry/Plane.h
+    src/geometry/Polygon.cpp
+    src/geometry/Polygon.h
+    src/geometry/Brush.cpp
+    src/geometry/Brush.h
+)
+
+set(SRC_LEVEL
+    src/level/LevelDocument.cpp
+    src/level/LevelDocument.h
+    src/level/LevelDocumentIO.cpp
+    src/level/LevelDocumentIO.h
 )
 
 set(SRC_IMGUI
@@ -214,6 +235,8 @@ add_executable( ${PROJECT_NAME}
         ${SRC_PANELS}
         ${SRC_GameUI}
         ${SRC_TRENCHBROOM}
+        ${SRC_GEOMETRY}
+        ${SRC_LEVEL}
         ${SRC_IMGUI}
 )
 
@@ -223,6 +246,8 @@ source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
 source_group("Trenchbroom" FILES ${SRC_TRENCHBROOM})
+source_group("Geometry" FILES ${SRC_GEOMETRY})
+source_group("Level" FILES ${SRC_LEVEL})
 source_group("Quake 3" FILES ${SRC_Q3})
 source_group("Game UI" FILES ${SRC_GameUI})
 source_group("imgui" FILES ${SRC_IMGUI})

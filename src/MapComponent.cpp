@@ -15,7 +15,9 @@
 #include "trenchbroom/MapAsset.h"
 #include "trenchbroom/LightmapBaker.h"
 #include "trenchbroom/MapMesh.h"
-#include "trenchbroom/MapMeshBuilder.h"
+#include "trenchbroom/MapImporter.h"
+#include "trenchbroom/LevelCooker.h"
+#include "level/LevelDocumentIO.h"
 
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
@@ -24,183 +26,30 @@
 #include <iostream>
 #include <cmath>
 
-static inline glm::vec3 Quake2OpenGL(const glm::vec3& in)
+namespace
 {
-    return { in.x, in.z, -in.y };
-}
-
-// Пересечение трех плоскостей для генерации вершин браша
-static bool GetMapPlaneIntersection(const MapPlane& p1, const MapPlane& p2, const MapPlane& p3, glm::vec3& outPoint)
-{
-    glm::vec3 cross12 = glm::cross(p1.normal, p2.normal);
-    float denom = glm::dot(cross12, p3.normal);
-    
-    if (std::abs(denom) < 1e-4f) return false;
-    
-    outPoint = (glm::cross(p2.normal, p3.normal) * p1.distance +
-                glm::cross(p3.normal, p1.normal) * p2.distance +
-                cross12 * p3.distance) / denom;
-    return true;
-}
-
-// Проверка: находится ли сгенерированная вершина внутри выпуклого объема браша
-static bool IsPointInsideMapBrush(const glm::vec3& point, const MapBrush& brush)
-{
-    for (const auto& side : brush.sides)
+    bool IsLevelFile(const std::string& p)
     {
-        // В стандартных .map файлах нормали смотрят СНАРУЖИ браша.
-        // Точка внутри, если проекция на нормаль меньше или равна дистанции плоскости (+ погрешность)
-        if (glm::dot(side.plane.normal, point) - side.plane.distance > 0.005f) {
-            return false;
-        }
+        constexpr std::string_view ext = ".cmap.json";
+        return p.size() >= ext.size() && p.compare(p.size() - ext.size(), ext.size(), ext) == 0;
     }
-    return true;
+    
+    std::filesystem::path LevelPathFor(std::filesystem::path mapFile)
+    {
+        return mapFile.replace_extension(".cmap.json");   // maps/e1m1.map -> maps/e1m1.cmap.json
+    }
 }
 
 bool MapComponent::loadTrenchBroomMap(const std::filesystem::path& filepath)
 {
-    path = filepath.string();
-    
-    MapAsset mapData;
-    if (!mapData.loadFromFile((ProjectManager::Get().assetsPath() / filepath).string()))
-    {
-        std::cout << "[Map Error] Cannot open or parse .map file: " << filepath << std::endl;
-        return false;
-    }
-    
-    // Инициализируем графический меш
-    auto loadedMesh = std::make_shared<MapMesh>();
-    LightmapUnwrapSettings unwrapSettings;
-    unwrapSettings.texelsPerUnit = lightmapTexelsPerUnit;
-    if (!loadedMesh->buildFromMapAsset(mapData, unwrapSettings))
-    {
-        bakeStatus = "Map mesh build failed";
-        return false;
-    }
-    mesh = std::move(loadedMesh);
-    bakeStatus.clear();
-    
-    lightmap.attach(mesh, lightmapCachePath(), unwrapSettings.padding);
-    
-    // --- ИНТЕГРАЦИЯ С JOLT ЧЕРЕЗ БРАШИ ---
-    destroyPhysicsBody();
-    
-    JPH::StaticCompoundShapeSettings compoundSettings;
-    JPH::Array<JPH::Vec3> brushVertices;
-    brushVertices.reserve(64);
-    
-    // В файлах TrenchBroom первый энтити (индекс 0) — это всегда "worldspawn"
-    // (вся статическая архитектура уровня: стены, пол, потолок)
-    if (mapData.entities.empty()) return false;
-    const auto& worldspawn = mapData.entities[0];
-    
-    for (const auto& brush : worldspawn.brushes)
-    {
-        if (brush.sides.size() < 4) continue;
-        
-        brushVertices.clear();
-        size_t numSides = brush.sides.size();
-        
-        // Пересекаем каждую тройку плоскостей браша для восстановления полигонального представления
-        for (size_t i = 0; i < numSides; ++i) {
-            for (size_t j = i + 1; j < numSides; ++j) {
-                for (size_t k = j + 1; k < numSides; ++k) {
-                    
-                    glm::vec3 intersectionPoint;
-                    if (GetMapPlaneIntersection(brush.sides[i].plane, brush.sides[j].plane, brush.sides[k].plane, intersectionPoint))
-                    {
-                        if (IsPointInsideMapBrush(intersectionPoint, brush))
-                        {
-                            // Конвертируем систему координат Quake -> OpenGL -> Jolt
-                            glm::vec3 openGLPos = Quake2OpenGL(intersectionPoint);
-                            JPH::Vec3 joltPos = QuakeToJolt(openGLPos);
-                            
-                            // Избавляемся от дубликатов на стыках плоскостей
-                            bool duplicate = false;
-                            for (const auto& v : brushVertices) {
-                                if (v.IsClose(joltPos, QUAKE_UNITS_TO_METERS)) {
-                                    duplicate = true;
-                                    break;
-                                }
-                            }
-                            
-                            if (!duplicate) {
-                                brushVertices.push_back(joltPos);
-                            }
-                        }
-                    }
-                    
-                }
-            }
-        }
-        
-        // Если получился валидный 3D-объем, скармливаем его в физику Jolt
-        if (brushVertices.size() >= 4)
-        {
-            JPH::ConvexHullShapeSettings convexSettings(brushVertices);
-            convexSettings.mMaxConvexRadius = 0.01f;
-            
-            JPH::Shape::ShapeResult shapeResult = convexSettings.Create();
-            if (shapeResult.IsValid()) {
-                compoundSettings.AddShape(JPH::Vec3::sZero(), JPH::Quat::sIdentity(), shapeResult.Get());
-            }
-        }
-    }
-    
-    // Финализация физического тела в Jolt
-    JPH::Shape::ShapeResult finalShapeResult = compoundSettings.Create();
-    if (finalShapeResult.HasError()) {
-        std::cout << "[Physics Error] Map compound shape error: " << finalShapeResult.GetError() << std::endl;
-        return false;
-    }
-    
-    auto& bodyInterface = PhysicsSystem::Get().GetBodyInterface();
-    JPH::BodyCreationSettings settings;
-    settings.SetShape(finalShapeResult.Get());
-    settings.mMotionType = JPH::EMotionType::Static;
-    settings.mObjectLayer = Layers::STATIC;
-    settings.mFriction = 0.3f;
-    
-    JPH::Body* body = bodyInterface.CreateBody(settings);
-    m_bodyID = body->GetID();
-    
-    m_userData.entity = owner;
-    m_userData.component = this;
-    bodyInterface.SetUserData(m_bodyID, reinterpret_cast<JPH::uint64>(&m_userData));
-    bodyInterface.AddBody(m_bodyID, JPH::EActivation::DontActivate);
-    
-    std::cout << "[Physics] Successfully loaded TrenchBroom .map scene with " << compoundSettings.mSubShapes.size() << " static brushes." << std::endl;
-    return true;
+    return IsLevelFile(filepath.string()) ? loadLevel(filepath) : importTrenchBroomMap(filepath, false);
 }
 
 bool MapComponent::rebuildLightmapUVs()
 {
-    if (path == "<no map>")
-    {
-        bakeStatus = "Cannot rebuild lightmap UVs: no map is loaded";
-        return false;
-    }
-
-    MapAsset mapData;
-    if (!mapData.loadFromFile((ProjectManager::Get().assetsPath() / path).string()))
-    {
-        bakeStatus = "Cannot rebuild lightmap UVs: failed to load map";
-        return false;
-    }
-
-    auto rebuiltMesh = std::make_shared<MapMesh>();
-    LightmapUnwrapSettings unwrapSettings;
-    unwrapSettings.texelsPerUnit = lightmapTexelsPerUnit;
-    if (!rebuiltMesh->buildFromMapAsset(mapData, unwrapSettings))
-    {
-        bakeStatus = "Cannot rebuild lightmap UVs: map mesh build failed";
-        return false;
-    }
-
-    mesh = std::move(rebuiltMesh);
-    lightmap.attach(mesh, lightmapCachePath(), unwrapSettings.padding);
+    if (level.solids.empty()) { bakeStatus = "Cannot rebuild lightmap UVs: no level is loaded"; return false; }
+    if (!applyLevel()) return false;
     bakeStatus = "Lightmap UVs rebuilt; bake lighting again";
-    
     return true;
 }
 
@@ -288,11 +137,151 @@ void MapComponent::reload()
 {
     if (path != "<no map>")
     {
-        loadTrenchBroomMap(path);
+        importTrenchBroomMap(path, true);
     }
 }
 
 std::filesystem::path MapComponent::lightmapCachePath() const
 {
     return ProjectManager::Get().assetsPath() / (path + ".lightmap");
+}
+
+bool MapComponent::importTrenchBroomMap(const std::filesystem::path& mapFile, bool overwrite)
+{
+    const auto assets = ProjectManager::Get().assetsPath();
+    const auto levelRel = LevelPathFor(mapFile);
+    
+    // Уже есть документ: не затираем правки редактора
+    if (!overwrite && std::filesystem::exists(assets / levelRel)) return loadLevel(levelRel);
+    
+    MapAsset mapData;
+    if (!mapData.loadFromFile((assets / mapFile).string()))
+    {
+        bakeStatus = "Cannot open or parse .map file";
+        return false;
+    }
+    
+    LevelDocument imported;
+    MapImportReport report;
+    std::string error;
+    if (!ImportMapAsset(mapData, imported, report, error))
+    {
+        bakeStatus = "Map import failed: " + error;
+        return false;
+    }
+    
+    std::cout << "[Import] brushes " << report.brushesImported << "/" << report.brushesRead
+    << ", skipped " << report.brushesSkipped << ", faces dropped " << report.facesDropped
+    << ", entities ignored " << report.entitiesIgnored << std::endl;
+    for (const auto& warning : report.warnings) std::cout << "[Import] " << warning << std::endl;
+    
+    if (!LevelDocumentIO::Save(assets / levelRel, imported, error))
+    {
+        bakeStatus = "Cannot save level: " + error;
+        return false;
+    }
+    return loadLevel(levelRel);
+}
+
+bool MapComponent::loadLevel(const std::filesystem::path& filepath)
+{
+    const auto absolute = ProjectManager::Get().assetsPath() / filepath;
+    
+    LevelDocument loaded;
+    std::string error;
+    if (!LevelDocumentIO::Load(absolute, loaded, error))
+    {
+        bakeStatus = "Level load failed: " + error;
+        return false;
+    }
+    // Как у MapAsset: каталог, в котором лежит scripts/ (иначе пропадут blend-режимы материалов)
+    loaded.basePath = absolute.parent_path().parent_path();
+    
+    path = filepath.string();
+    level = std::move(loaded);
+    return applyLevel();
+}
+
+bool MapComponent::saveLevel()
+{
+    if (!IsLevelFile(path)) { bakeStatus = "Nothing to save: no .cmap.json is loaded"; return false; }
+    std::string error;
+    if (!LevelDocumentIO::Save(ProjectManager::Get().assetsPath() / path, level, error))
+    {
+        bakeStatus = "Save failed: " + error;
+        return false;
+    }
+    return true;
+}
+
+bool MapComponent::applyLevel()
+{
+    auto newMesh = std::make_shared<MapMesh>();
+    LightmapUnwrapSettings unwrap;
+    unwrap.texelsPerUnit = lightmapTexelsPerUnit;
+    if (!newMesh->buildFromLevel(level, unwrap))
+    {
+        bakeStatus = "Map mesh build failed";
+        return false;
+    }
+    mesh = std::move(newMesh);
+    bakeStatus.clear();
+    lightmap.attach(mesh, lightmapCachePath(), unwrap.padding);
+    
+    return rebuildPhysicsBody();
+}
+
+bool MapComponent::rebuildFromDocument() { return applyLevel(); }
+
+bool MapComponent::rebuildPhysicsBody()
+{
+    destroyPhysicsBody();
+    
+    std::vector<std::vector<glm::vec3>> hulls;
+    LevelCooker::collisionHulls(level, hulls);
+    
+    JPH::StaticCompoundShapeSettings compoundSettings;
+    JPH::Array<JPH::Vec3> points;
+    int rejected = 0;
+    
+    for (const auto& hull : hulls)
+    {
+        points.clear();
+        for (const glm::vec3& v : hull) points.push_back(QuakeToJolt(v));
+        
+        JPH::ConvexHullShapeSettings convexSettings(points);
+        convexSettings.mMaxConvexRadius = 0.01f;
+        
+        JPH::Shape::ShapeResult shapeResult = convexSettings.Create();
+        if (shapeResult.IsValid())
+            compoundSettings.AddShape(JPH::Vec3::sZero(), JPH::Quat::sIdentity(), shapeResult.Get());
+        else
+            ++rejected;
+    }
+    if (rejected > 0) std::cout << "[Physics] Jolt rejected " << rejected << " hulls" << std::endl;
+    
+    // Финализация физического тела в Jolt
+    JPH::Shape::ShapeResult finalShapeResult = compoundSettings.Create();
+    if (finalShapeResult.HasError()) {
+        std::cout << "[Physics Error] Map compound shape error: " << finalShapeResult.GetError() << std::endl;
+        return false;
+    }
+    
+    auto& bodyInterface = PhysicsSystem::Get().GetBodyInterface();
+    JPH::BodyCreationSettings settings;
+    settings.SetShape(finalShapeResult.Get());
+    settings.mMotionType = JPH::EMotionType::Static;
+    settings.mObjectLayer = Layers::STATIC;
+    settings.mFriction = 0.3f;
+    
+    JPH::Body* body = bodyInterface.CreateBody(settings);
+    m_bodyID = body->GetID();
+    
+    m_userData.entity = owner;
+    m_userData.component = this;
+    bodyInterface.SetUserData(m_bodyID, reinterpret_cast<JPH::uint64>(&m_userData));
+    bodyInterface.AddBody(m_bodyID, JPH::EActivation::DontActivate);
+    
+    std::cout << "[Physics] Successfully loaded TrenchBroom .map scene with " << compoundSettings.mSubShapes.size() << " static brushes." << std::endl;
+    return true;
 }

@@ -363,7 +363,7 @@ static void DrawMapComponent(MapComponent* comp)
             
             if (payload->IsDelivery() && isModel)
             {
-                comp->loadTrenchBroomMap(info->path);
+                comp->importTrenchBroomMap(info->path, true);
             }
         }
         ImGui::EndDragDropTarget();
@@ -403,7 +403,6 @@ static void DrawMapComponent(MapComponent* comp)
     
     if (!comp->bakeStatus.empty())
     {
-//        ImGui::TextWrapped("%s", comp->bakeStatus.c_str());
         ImGui::TextUnformatted(comp->bakeStatus.c_str());
     }
 }
