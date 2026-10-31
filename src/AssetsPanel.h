@@ -65,6 +65,7 @@ private:
     void renderDirectoryHierarchy(std::shared_ptr<DirectoryInfo>& directory);
     void renderTopBar(float height);
     void renderGridItems();
+    void renderCreateScriptDialog();
     void renderDeleteDialog();
     void handleShortcuts();
     
@@ -86,6 +87,8 @@ private:
     std::filesystem::path m_pathToRename;
     char m_renameBuffer[256];
     char m_searchBuffer[128];
+    char m_scriptClassNameBuffer[128] = {};
+    std::string m_createScriptError;
     
     // Хендлы текстур-иконок
     std::map<AssetType, RenderDevice::handle_t> m_icons;
@@ -93,6 +96,7 @@ private:
     
     bool m_isHovered = false;
     bool m_isFocused = false;
+    bool m_openCreateScriptPopup = false;
     
     enum class ThumbnailSize {
         XS = 0,
@@ -109,6 +113,7 @@ private:
     std::filesystem::path m_lastClickedPath;
     float m_lastClickTime = 0.0f;
     bool m_focusRenameInput = false;
+    bool m_showCreateScriptDialog = false;
     
     // Метод для нативного вызова Finder / Проводника
     void openInExplorer(const std::filesystem::path& path);

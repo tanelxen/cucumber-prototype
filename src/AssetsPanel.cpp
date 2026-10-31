@@ -9,6 +9,7 @@
 #include "ProjectManager.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <cstring>
 #include <imgui.h>
@@ -16,6 +17,21 @@
 
 #include "../vendor/stb_image.h"
 #include "../vendor/IconsMaterialDesignIcons.h"
+
+namespace
+{
+bool IsPathWithin(const std::filesystem::path& path, const std::filesystem::path& directory)
+{
+    auto pathPart = path.begin();
+    for (auto directoryPart = directory.begin(); directoryPart != directory.end();
+         ++directoryPart, ++pathPart)
+    {
+        if (pathPart == path.end() || *pathPart != *directoryPart)
+            return false;
+    }
+    return true;
+}
+}
 
 AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(ICON_MDI_FOLDER_STAR " Assets###Assets"), m_rootPath(std::filesystem::absolute(rootPath))
 {
@@ -485,6 +501,22 @@ void AssetsPanel::renderGridItems()
                 std::ofstream(m_rootPath / m_currentDirectory->filePath / "NewFile.txt");
                 refresh();
             }
+
+            const auto scriptsRelativePath =
+                ProjectManager::Get().scriptsPath().lexically_relative(m_rootPath).lexically_normal();
+            const auto currentRelativePath = m_currentDirectory
+                ? m_currentDirectory->filePath.lexically_normal()
+                : std::filesystem::path{};
+            const bool isInScriptsDirectory = ProjectManager::Get().hasOpenProject() &&
+                !scriptsRelativePath.empty() && !scriptsRelativePath.is_absolute() &&
+                IsPathWithin(currentRelativePath, scriptsRelativePath);
+            if (isInScriptsDirectory && ImGui::MenuItem("Script"))
+            {
+                std::memset(m_scriptClassNameBuffer, 0, sizeof(m_scriptClassNameBuffer));
+                m_createScriptError.clear();
+                m_showCreateScriptDialog = true;
+                m_openCreateScriptPopup = true;
+            }
             
             ImGui::EndMenu();
         }
@@ -657,8 +689,131 @@ void AssetsPanel::renderGridItems()
     
     ImGui::Columns(1);
     
+    renderCreateScriptDialog();
     if (openDeleteModal) ImGui::OpenPopup("Delete Items?");
     renderDeleteDialog();
+}
+
+void AssetsPanel::renderCreateScriptDialog()
+{
+    if (!m_showCreateScriptDialog) return;
+
+    if (m_openCreateScriptPopup)
+    {
+        ImGui::OpenPopup("Create Script");
+        m_openCreateScriptPopup = false;
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(420.0f, 230.0f), ImGuiCond_Appearing);
+    if (!ImGui::BeginPopupModal("Create Script", &m_showCreateScriptDialog,
+                                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+        return;
+
+    ImGui::TextWrapped("Create an EntityScript in the current scripts folder:");
+    ImGui::Spacing();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Class name:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputText("##ClassName", m_scriptClassNameBuffer,
+                     sizeof(m_scriptClassNameBuffer));
+
+    if (!m_createScriptError.empty())
+    {
+        ImGui::Spacing();
+        ImGui::TextWrapped("%s", m_createScriptError.c_str());
+    }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Create", ImVec2(120.0f, 0.0f)))
+    {
+        const std::string className = m_scriptClassNameBuffer;
+        const bool validStart = !className.empty() &&
+            (std::isalpha(static_cast<unsigned char>(className.front())) ||
+             className.front() == '_');
+        const bool validRemainder = std::all_of(
+            className.begin(), className.end(), [](unsigned char character)
+            {
+                return std::isalnum(character) || character == '_';
+            });
+
+        if (!validStart || !validRemainder)
+        {
+            m_createScriptError =
+                "Class name must start with a letter or underscore and contain only letters, digits, and underscores.";
+        }
+        else
+        {
+            const auto scriptsRelativePath =
+                ProjectManager::Get().scriptsPath().lexically_relative(m_rootPath).lexically_normal();
+            const auto currentRelativePath = m_currentDirectory
+                ? m_currentDirectory->filePath.lexically_normal()
+                : std::filesystem::path{};
+            if (!ProjectManager::Get().hasOpenProject() || scriptsRelativePath.empty() ||
+                scriptsRelativePath.is_absolute() ||
+                !IsPathWithin(currentRelativePath, scriptsRelativePath))
+            {
+                m_createScriptError = "Scripts can only be created inside assets/scripts.";
+                ImGui::EndPopup();
+                return;
+            }
+
+            const std::filesystem::path targetDirectory = m_rootPath / currentRelativePath;
+            const std::filesystem::path scriptPath = targetDirectory / (className + ".as");
+            std::error_code filesystemError;
+            const bool scriptExists = std::filesystem::exists(scriptPath, filesystemError);
+            if (filesystemError)
+            {
+                m_createScriptError =
+                    "Could not check the script path: " + filesystemError.message();
+            }
+            else if (scriptExists)
+            {
+                m_createScriptError = "A script with this name already exists.";
+            }
+            else
+            {
+                std::ofstream scriptFile(scriptPath, std::ios::out | std::ios::trunc);
+                if (!scriptFile)
+                {
+                    m_createScriptError = "Could not create the script file.";
+                }
+                else
+                {
+                    scriptFile << "class " << className << " : EntityScript\n"
+                               << "{\n"
+                               << "    void start()\n"
+                               << "    {\n"
+                               << "    }\n\n"
+                               << "    void update(float dt)\n"
+                               << "    {\n"
+                               << "    }\n"
+                               << "}\n";
+                    scriptFile.close();
+                    if (!scriptFile)
+                    {
+                        m_createScriptError = "Failed while writing the script file.";
+                    }
+                    else
+                    {
+                        refresh();
+                        m_showCreateScriptDialog = false;
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+            }
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(100.0f, 0.0f)))
+    {
+        m_showCreateScriptDialog = false;
+        m_createScriptError.clear();
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
 }
 
 

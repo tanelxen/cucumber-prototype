@@ -229,13 +229,6 @@ source_group("imgui" FILES ${SRC_IMGUI})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)
 
-# Настройки компиляции для вашего движка, чтобы они совпадали с Jolt
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR NOT CMAKE_BUILD_TYPE)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE JPH_DEBUG JPH_PROFILE_ENABLED)
-else()
-    target_compile_definitions(${PROJECT_NAME} PRIVATE JPH_PROFILE_ENABLED)
-endif()
-
 #set(SHADERS_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
 #file(GLOB_RECURSE SHADER_FILES "${SHADERS_FOLDER}/*")
 #source_group("Shaders" FILES ${SHADER_FILES})
