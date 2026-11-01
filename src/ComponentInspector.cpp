@@ -370,6 +370,16 @@ static void DrawMapComponent(MapComponent* comp)
     }
     ImGui::PopStyleColor();
     
+    if (comp->isEditing())
+    {
+        if (ImGui::Button("Done")) comp->endEdit();
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) comp->saveLevel();
+        if (comp->isLevelDirty()) ImGui::TextColored(ImVec4(1, 0.7f, 0.2f, 1), "Unsaved changes");
+        return;   // Reload / Bake / Rebuild UVs в режиме правки недоступны
+    }
+    if (ImGui::Button("Edit")) comp->beginEdit();
+    ImGui::SameLine();
     
     if (ImGui::Button("Reimport"))
     {

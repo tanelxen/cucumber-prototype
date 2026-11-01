@@ -42,6 +42,7 @@ namespace
 
 bool MapComponent::loadTrenchBroomMap(const std::filesystem::path& filepath)
 {
+    if (m_edit) { bakeStatus = "Exit edit mode first"; return false; }
     return IsLevelFile(filepath.string()) ? loadLevel(filepath) : importTrenchBroomMap(filepath, false);
 }
 
@@ -140,6 +141,8 @@ std::filesystem::path MapComponent::lightmapCachePath() const
 
 bool MapComponent::importTrenchBroomMap(const std::filesystem::path& mapFile, bool overwrite)
 {
+    if (m_edit) { bakeStatus = "Exit edit mode first"; return false; }
+    
     const auto assets = ProjectManager::Get().assetsPath();
     const auto levelRel = LevelPathFor(mapFile);
     
@@ -190,6 +193,8 @@ bool MapComponent::reimportSource()
 
 bool MapComponent::loadLevel(const std::filesystem::path& filepath)
 {
+    if (m_edit) { bakeStatus = "Exit edit mode first"; return false; }
+    
     const auto absolute = ProjectManager::Get().assetsPath() / filepath;
     
     LevelDocument loaded;
@@ -209,32 +214,26 @@ bool MapComponent::loadLevel(const std::filesystem::path& filepath)
 
 bool MapComponent::saveLevel()
 {
-    if (!IsLevelFile(path)) { bakeStatus = "Nothing to save: no .cmap.json is loaded"; return false; }
+    if (!IsLevelFile(path))
+    {
+        bakeStatus = "Nothing to save: no .cmap.json is loaded";
+        return false;
+    }
+    
     std::string error;
     if (!LevelDocumentIO::Save(ProjectManager::Get().assetsPath() / path, level, error))
     {
         bakeStatus = "Save failed: " + error;
         return false;
     }
+    
+    m_levelDirty = false;
+    if (m_edit) m_edit->history().markSaved();
+    
     return true;
 }
 
-bool MapComponent::applyLevel()
-{
-    auto newMesh = std::make_shared<MapMesh>();
-    LightmapUnwrapSettings unwrap;
-    unwrap.texelsPerUnit = lightmapTexelsPerUnit;
-    if (!newMesh->buildFromLevel(level, unwrap))
-    {
-        bakeStatus = "Map mesh build failed";
-        return false;
-    }
-    mesh = std::move(newMesh);
-    bakeStatus.clear();
-    lightmap.attach(mesh, lightmapCachePath(), unwrap.padding);
-    
-    return rebuildPhysicsBody();
-}
+bool MapComponent::applyLevel() { return rebuildMesh(true) && rebuildPhysicsBody(); }
 
 bool MapComponent::rebuildFromDocument() { return applyLevel(); }
 
@@ -244,6 +243,8 @@ bool MapComponent::rebuildPhysicsBody()
     
     std::vector<std::vector<glm::vec3>> hulls;
     LevelCooker::collisionHulls(level, hulls);
+    
+    if (hulls.empty()) return true;
     
     JPH::StaticCompoundShapeSettings compoundSettings;
     JPH::Array<JPH::Vec3> points;
@@ -288,5 +289,48 @@ bool MapComponent::rebuildPhysicsBody()
     bodyInterface.AddBody(m_bodyID, JPH::EActivation::DontActivate);
     
     std::cout << "[Physics] Successfully loaded TrenchBroom .map scene with " << compoundSettings.mSubShapes.size() << " static brushes." << std::endl;
+    return true;
+}
+
+bool MapComponent::beginEdit()
+{
+    if (m_edit) return true;
+    if (path == "<no map>") { bakeStatus = "No level loaded"; return false; }
+    if (isBaking())         { bakeStatus = "Cancel baking first"; return false; }
+    if (owner && owner->scene && owner->scene->isSimulationMode()) return false;
+    
+    m_meshReplaced = false;
+    m_edit = std::make_unique<LevelEditSession>(level, [this](const ChangeSet&) {
+        m_meshReplaced = true;
+        rebuildMesh(false);   // v1: полный cook на каждый commit; без лайтмапа и без физики
+    });
+    bakeStatus = "Editing geometry";
+    return true;
+}
+
+void MapComponent::endEdit()
+{
+    if (!m_edit) return;
+    if (m_edit->history().isDirty()) m_levelDirty = true;
+    m_edit.reset();
+    
+    bakeStatus.clear();
+    if (m_meshReplaced) { m_meshReplaced = false; applyLevel(); }   // меш + кэш лайтмапа + физика
+}
+
+bool MapComponent::rebuildMesh(bool attachLightmap)
+{
+    if (level.solids.empty())
+    {
+        mesh.reset();
+        if (attachLightmap) lightmap.attach(nullptr, lightmapCachePath(), 1);
+        return true;
+    }
+    auto newMesh = std::make_shared<MapMesh>();
+    LightmapUnwrapSettings unwrap;
+    unwrap.texelsPerUnit = lightmapTexelsPerUnit;
+    if (!newMesh->buildFromLevel(level, unwrap)) { bakeStatus = "Map mesh build failed"; return false; }
+    mesh = std::move(newMesh);
+    if (attachLightmap) { bakeStatus.clear(); lightmap.attach(mesh, lightmapCachePath(), unwrap.padding); }
     return true;
 }

@@ -219,6 +219,14 @@ set(SRC_LEVEL
     src/level/LevelDocument.h
     src/level/LevelDocumentIO.cpp
     src/level/LevelDocumentIO.h
+    src/level/LevelEditOverlay.cpp
+    src/level/LevelEditOverlay.h
+    src/level/LevelEditSession.cpp
+    src/level/LevelEditSession.h
+    src/level/LevelHistory.cpp
+    src/level/LevelHistory.h
+    src/level/LevelPicking.cpp
+    src/level/LevelPicking.h
 )
 
 set(SRC_IMGUI

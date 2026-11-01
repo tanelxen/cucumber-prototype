@@ -40,6 +40,7 @@ public:
     bool drawGrid = true;
     bool drawGizmos = false;
     bool drawSkybox = true;
+    bool drawEditOverlay = false;
 
 private:
     uint32_t m_id;

@@ -11,6 +11,7 @@
 #include "PhysicsCommon.h"
 #include "trenchbroom/LightmapController.h"
 #include "level/LevelDocument.h"
+#include "level/LevelEditSession.h"
 
 #include <Jolt/Physics/Body/BodyID.h>
 #include <filesystem>
@@ -49,6 +50,12 @@ struct MapComponent : public Component
     
     LevelDocument level;
     
+    // ... (level должен быть объявлен ДО m_edit: порядок уничтожения)
+    bool beginEdit();
+    void endEdit();
+    bool isEditing() const { return m_edit != nullptr; }
+    LevelEditSession* editSession() { return m_edit.get(); }
+    bool isLevelDirty() const { return m_levelDirty || (m_edit && m_edit->history().isDirty()); }
     
     std::string path = "<no map>";
     float lightmapTexelsPerUnit = 1.0f / 8.0f;
@@ -71,4 +78,10 @@ private:
 private:
     bool applyLevel();
     bool rebuildPhysicsBody();
+    
+private:
+    bool rebuildMesh(bool attachLightmap);
+    std::unique_ptr<LevelEditSession> m_edit;
+    bool m_levelDirty = false;
+    bool m_meshReplaced = false;
 };

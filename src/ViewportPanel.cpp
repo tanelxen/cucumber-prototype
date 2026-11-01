@@ -19,6 +19,9 @@
 #include "ProjectManager.h"
 #include "SceneSerializer.h"
 
+#include "level/LevelEditSession.h"
+#include "MapComponent.h"
+
 #include "../vendor/IconsMaterialDesignIcons.h"
 
 #include <imgui.h>
@@ -189,6 +192,12 @@ namespace
         SceneSerializer::InitializePrefabComponents(root);
         g_UIManager->setEntity(root);
     }
+    
+    static LevelEditSession* ActiveEditSession(WorldScene& scene)
+    {
+        auto* map = scene.getMap();
+        return map ? map->editSession() : nullptr;
+    }
 }
 
 static void DrawGizmo(Entity* selectedNode, const CameraData& camera, const ImVec2& contentPos,
@@ -349,6 +358,32 @@ void ViewportPanel::update(float dt)
         camera.update(dt, {}, 0.0f, 1, false);
     }
     updateOwnership();
+    
+    if (auto* edit = ActiveEditSession(*scene))
+    {
+        ImGuiIO& io = ImGui::GetIO();
+        const bool mod = io.KeyCtrl || io.KeySuper;   // Cmd на macOS
+        
+        ViewportPointer pointer;
+        pointer.camera   = camera.build(m_viewport.aspect());
+        pointer.sizePx   = { int(m_imageRight - m_imageLeft), int(m_imageBottom - m_imageTop) };
+        pointer.mousePx  = { mouse.x - m_imageLeft, mouse.y - m_imageTop };
+        pointer.over     = hoverInput && !camera.isCapturingMouse();
+        pointer.down     = physicalInput.isLeftMouseButtonPressed();
+        pointer.pressed  = physicalInput.isLeftMouseButtonJustPressed();
+        pointer.released = physicalInput.isLeftMouseButtonClicked();
+        pointer.ctrl = mod; pointer.shift = io.KeyShift; pointer.alt = io.KeyAlt;
+        edit->handlePointer(m_viewport.id(), pointer);
+        
+        if (m_focused && !io.WantTextInput)
+        {
+            if (mod && ImGui::IsKeyPressed(ImGuiKey_Z, false)) { if (io.KeyShift) edit->redo(); else edit->undo(); }
+            if (mod && ImGui::IsKeyPressed(ImGuiKey_Y, false)) edit->redo();
+            if (mod && ImGui::IsKeyPressed(ImGuiKey_S, false)) scene->getMap()->saveLevel();
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
+                edit->deleteSelection();
+        }
+    }
 }
 
 void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
@@ -372,6 +407,8 @@ void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
 
     const bool audioListener = simulating ? m_isPlayViewport : m_focused;
     m_viewport.produceEditorView(out, audioListener);
+    
+    m_viewport.drawEditOverlay = ActiveEditSession(scene) != nullptr;
 }
 
 void ViewportPanel::draw()
@@ -426,6 +463,8 @@ void ViewportPanel::draw()
     }
     else if (DrawPlayButton())
     {
+        if (auto* map = scene->getMap()) map->endEdit();
+        
         m_isPlayViewport = true;
         SceneManager::Get().startSimulation();
     }
@@ -526,7 +565,7 @@ void ViewportPanel::draw()
         ImGui::SetWindowFocus();
     }
     
-    if (!scene->isSimulationMode())
+    if (!scene->isSimulationMode() && !ActiveEditSession(*scene))
     {
         const bool gizmoEnabled = (s_mouseOwner == nullptr) && Input::isCursorEnabled();
         DrawGizmo(m_entity, camera.build(m_viewport.aspect()), contentPos, avail,
