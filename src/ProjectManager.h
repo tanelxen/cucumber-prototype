@@ -8,7 +8,6 @@
 #pragma once
 
 #include <filesystem>
-#include <array>
 #include <string>
 #include <vector>
 
@@ -21,7 +20,6 @@ public:
 
     bool openProject(const std::filesystem::path& path, std::string& error);
     bool createProject(const std::filesystem::path& parentPath, const std::string& name, std::string& error);
-    void saveEditorCamera(float x, float y, float z);
 
     bool hasOpenProject() const { return !m_projectPath.empty(); }
     const std::filesystem::path& projectPath() const { return m_projectPath; }
@@ -35,7 +33,6 @@ public:
     std::filesystem::path resolveProjectPath(const std::filesystem::path& path) const;
     std::string makeProjectRelative(const std::filesystem::path& path) const;
     std::vector<std::filesystem::path> recentProjects() const { return m_recentProjects; }
-    std::array<float, 3> editorCameraPosition() const;
 
 private:
     ProjectManager();

@@ -26,11 +26,89 @@
 
 #include "ModelLoader.h"
 #include "ProjectManager.h"
+#include "EditorCamera.h"
+#include "UIManager.h"
 
 //#include <nlohmann/json.hpp>
 #include "../vendor/json_fwd.hpp"
 #include <fstream>
 #include <iostream>
+#include <cmath>
+
+namespace
+{
+bool ReadVector3(const nlohmann::json& value, glm::vec3& result)
+{
+    if (!value.is_array() || value.size() != 3 ||
+        !value[0].is_number() || !value[1].is_number() || !value[2].is_number()) {
+        return false;
+    }
+
+    result = {
+        value[0].get<float>(),
+        value[1].get<float>(),
+        value[2].get<float>()
+    };
+    return std::isfinite(result.x) && std::isfinite(result.y) && std::isfinite(result.z);
+}
+
+void SaveEditorCamera(nlohmann::json& sceneJson)
+{
+    if (!g_UIManager) return;
+
+    const EditorCamera& camera = g_UIManager->editorCamera();
+    sceneJson["editor_camera"] = {
+        {"position", {camera.position.x, camera.position.y, camera.position.z}},
+        {"yaw", camera.yaw},
+        {"pitch", camera.pitch},
+        {"mode", static_cast<int>(camera.mode())},
+        {"ortho_center", {camera.orthoCenter.x, camera.orthoCenter.y, camera.orthoCenter.z}},
+        {"ortho_half_height", camera.orthoHalfHeight}
+    };
+}
+
+void LoadEditorCamera(const nlohmann::json& sceneJson)
+{
+    if (!g_UIManager) return;
+
+    EditorCamera& camera = g_UIManager->editorCamera();
+    camera = EditorCamera{};
+
+    if (!sceneJson.contains("editor_camera")) return;
+    const auto& data = sceneJson["editor_camera"];
+    if (!data.is_object() ||
+        !data.contains("position") || !data.contains("yaw") || !data.contains("pitch") ||
+        !data.contains("mode") || !data.contains("ortho_center") ||
+        !data.contains("ortho_half_height")) {
+        std::cerr << "[SceneSerializer] Invalid editor camera data; using default view.\n";
+        return;
+    }
+
+    glm::vec3 position;
+    glm::vec3 orthoCenter;
+    const auto& mode = data["mode"];
+    const auto& halfHeight = data["ortho_half_height"];
+    const auto& yaw = data["yaw"];
+    const auto& pitch = data["pitch"];
+    if (!ReadVector3(data["position"], position) ||
+        !ReadVector3(data["ortho_center"], orthoCenter) ||
+        !mode.is_number_integer() || mode.get<int>() < 0 || mode.get<int>() > 3 ||
+        !halfHeight.is_number() || !std::isfinite(halfHeight.get<float>()) ||
+        halfHeight.get<float>() < 8.0f || halfHeight.get<float>() > 32768.0f ||
+        !yaw.is_number() || !std::isfinite(yaw.get<float>()) ||
+        !pitch.is_number() || !std::isfinite(pitch.get<float>())) {
+        std::cerr << "[SceneSerializer] Invalid editor camera values; using default view.\n";
+        return;
+    }
+
+    camera.position = position;
+    camera.yaw = yaw.get<float>();
+    camera.pitch = pitch.get<float>();
+    camera.setMode(static_cast<EditorViewMode>(mode.get<int>()));
+    camera.orthoCenter = orthoCenter;
+    camera.orthoHalfHeight = halfHeight.get<float>();
+}
+}
 
 bool SceneSerializer::LoadFile(WorldScene* scene, const std::string& filename)
 {
@@ -69,7 +147,8 @@ bool SceneSerializer::LoadFile(WorldScene* scene, const std::string& filename)
         file.close(); // Переоткроем файл внутри InstantiatePrefab
         
         Entity* prefabRoot = InstantiatePrefab(
-            scene, ProjectManager::Get().resolveProjectPath(filename).string());
+            scene, ProjectManager::Get().resolveProjectPath(filename).string(),
+            nullptr, UID::Invalid(), false);
         
         if (prefabRoot)
         {
@@ -91,7 +170,9 @@ bool SceneSerializer::LoadFile(WorldScene* scene, const std::string& filename)
     return true;
 }
 
-Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string& filename, Entity* customParent, UID forcedRootUid)
+Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string& filename,
+                                            Entity* customParent, UID forcedRootUid,
+                                            bool initializeComponents)
 {
     std::ifstream file(filename);
     if (!file.is_open())
@@ -116,7 +197,6 @@ Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string&
     if (entitiesArray.empty()) return nullptr;
     
     Entity* rootEntityPtr = nullptr;
-    std::vector<Entity*> instantiatedEntities;
     
     // ЛИНЕЙНЫЙ ЦИКЛ ЗАГРУЗКИ
     for (const auto& entityJson : entitiesArray)
@@ -132,9 +212,7 @@ Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string&
         {
             DeserializeEntity(entityJson, entity.get());
         }
-        
         Entity* rawEntityPtr = entity.get();
-        instantiatedEntities.push_back(rawEntityPtr);
         scene->m_entities.push_back(std::move(entity)); // Передаем владение сцене
         
         // Восстанавливаем родительские связи на лету
@@ -163,10 +241,8 @@ Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string&
     }
     
     // Awake чтобы применить значения из префаба в скриптах
-    for (Entity* entity : instantiatedEntities) {
-        for (const auto& component : entity->getComponents()) {
-            component->awake();
-        }
+    if (initializeComponents) {
+        InitializePrefabComponents(rootEntityPtr);
     }
     
     // Заполнение кэша свойств
@@ -198,28 +274,53 @@ Entity* SceneSerializer::InstantiatePrefab(WorldScene* scene, const std::string&
     return rootEntityPtr;
 }
 
+void SceneSerializer::InitializePrefabComponents(Entity* rootEntity)
+{
+    if (!rootEntity) return;
+
+    std::function<void(Entity*)> initialize = [&](Entity* entity) {
+        for (const auto& component : entity->getComponents()) {
+            component->awake();
+        }
+        for (Entity* child : entity->getChildren()) {
+            initialize(child);
+        }
+    };
+    initialize(rootEntity);
+}
+
 bool SceneSerializer::CreatePrefabFromEntity(WorldScene* scene, Entity* rootEntity, const std::string& savePath)
+{
+    return SavePrefab(scene, rootEntity, savePath, true);
+}
+
+bool SceneSerializer::SavePrefabSource(WorldScene* scene, Entity* rootEntity, const std::string& savePath)
+{
+    return SavePrefab(scene, rootEntity, savePath, false);
+}
+
+bool SceneSerializer::SavePrefab(WorldScene* scene, Entity* rootEntity, const std::string& savePath,
+                                 bool markAsInstance)
 {
     if (!rootEntity) return false;
     
     nlohmann::json prefabJson = nlohmann::json::object();
     prefabJson["type"] = "prefab";
     
-    // 1. Создаем дефолтную (базовую) таблицу экспорта.
-    prefabJson["exposed_properties"] = {
-//        {
-//            {"display_name", "Position"},
-//            {"target_path", "."},
-//            {"component_type", "TransformComponent"},
-//            {"property_name", "position"}
-//        },
-//        {
-//            {"display_name", "Rotation"},
-//            {"target_path", "."},
-//            {"component_type", "TransformComponent"},
-//            {"property_name", "rotation"}
-//        }
-    };
+    auto exposedProperties = nlohmann::json::array();
+    for (const auto& exposed : rootEntity->m_exposedInterfaceCache)
+    {
+        if (!exposed.targetComponent || !exposed.targetComponent->owner) continue;
+
+        nlohmann::json propertyJson;
+        propertyJson["display_name"] = exposed.displayName;
+        propertyJson["component_type"] = exposed.targetComponent->getTypeName();
+        propertyJson["property_name"] = exposed.propertyName;
+        propertyJson["target_path"] =
+            exposed.targetComponent->owner->getPathRelativeTo(rootEntity);
+        exposedProperties.push_back(std::move(propertyJson));
+    }
+    prefabJson["exposed_properties"] = std::move(exposedProperties);
     
     // 2. Собираем плоский список сущностей иерархии
     auto entitiesArray = nlohmann::json::array();
@@ -282,33 +383,33 @@ bool SceneSerializer::CreatePrefabFromEntity(WorldScene* scene, Entity* rootEnti
     }
     file << prefabJson.dump(4);
     file.close();
+    if (!file) {
+        std::cerr << "[Engine] Не удалось полностью записать файл префаба: " << savePath << std::endl;
+        return false;
+    }
     
-    // 4. ПРЕВРАЩАЕМ ЖИВОЙ ОБЪЕКТ НА СЦЕНЕ В ИНСТАНС ПРЕФАБА
-    // Чтобы сцена сразу поняла, что этот объект теперь связан с файлом!
-    std::function<void(Entity*)> markAsPrefab = [&](Entity* ent) {
-        ent->prefabAssetPath = savePath;
-        if (ent == rootEntity) {
-            ent->isPrefabRoot = true;
-            ent->originalPrefabUid = ent->uid; // В рантайме редактора приравниваем исходный ID
-        } else {
-            ent->isPrefabRoot = false;
-        }
-        for (auto* child : ent->getChildren()) { markAsPrefab(child); }
-    };
-    
-    markAsPrefab(rootEntity);
-    
-    // 5. Инициализируем созданный кэш интерфейса для этой живой сущности
-    // (Повторяем логику инициализации кэша, так как объект теперь префаб)
-    for (const auto& propJson : prefabJson["exposed_properties"])
+    if (markAsInstance)
     {
-        CachedExposedProperty cachedProp;
-        cachedProp.displayName = propJson["display_name"];
-        cachedProp.propertyName = propJson["property_name"];
-        // Корень на сцене ("."), компонент TransformComponent всегда на месте
-        cachedProp.targetComponent = &rootEntity->getTransform();
-        
-        rootEntity->m_exposedInterfaceCache.push_back(cachedProp);
+        std::function<void(Entity*)> markAsPrefab = [&](Entity* ent) {
+            ent->prefabAssetPath = savePath;
+            if (ent == rootEntity) {
+                ent->isPrefabRoot = true;
+                ent->originalPrefabUid = ent->uid;
+            } else {
+                ent->isPrefabRoot = false;
+            }
+            for (auto* child : ent->getChildren()) { markAsPrefab(child); }
+        };
+        markAsPrefab(rootEntity);
+
+        for (const auto& propJson : prefabJson["exposed_properties"])
+        {
+            CachedExposedProperty cachedProp;
+            cachedProp.displayName = propJson["display_name"];
+            cachedProp.propertyName = propJson["property_name"];
+            cachedProp.targetComponent = &rootEntity->getTransform();
+            rootEntity->m_exposedInterfaceCache.push_back(cachedProp);
+        }
     }
     
     std::cout << "[SceneSerializer] Префаб успешно создан и привязан к сцене: " << savePath << std::endl;
@@ -432,6 +533,9 @@ void SceneSerializer::DeserializeEntity(const nlohmann::json& entityJson, Entity
 
 bool SceneSerializer::SaveSceneToMemory(const WorldScene* scene, nlohmann::json& sceneJson)
 {
+    sceneJson = nlohmann::json::object();
+    SaveEditorCamera(sceneJson);
+
     auto entitiesArray = nlohmann::json::array();
     
     for (const auto& entity : scene->m_entities)
@@ -527,6 +631,7 @@ bool SceneSerializer::LoadSceneFromMemory(WorldScene* scene, const nlohmann::jso
 {
     scene->clear();
     scene->m_type = SceneType::Level;
+    LoadEditorCamera(sceneJson);
     
     std::unordered_map<UID, Entity*> entityMap;
     // Мапа для последующего восстановления связей parent-child обычных сущностей
@@ -544,9 +649,17 @@ bool SceneSerializer::LoadSceneFromMemory(WorldScene* scene, const nlohmann::jso
             UID savedRootUid = entityJson["uid"].get<UID>();
             
             // 1. Просто спавним чистую структуру из префаба.
-            Entity* prefabRoot = InstantiatePrefab(scene, prefabPath, nullptr, savedRootUid);
+            Entity* prefabRoot = InstantiatePrefab(scene, prefabPath, nullptr, savedRootUid, false);
             
             if (!prefabRoot) continue;
+
+            if (entityJson.contains("parent"))
+            {
+                const UID parentId = entityJson.at("parent").get<UID>();
+                if (parentId != 0) {
+                    nonPrefabParentsToResolve.push_back({prefabRoot, parentId});
+                }
+            }
             
             // 2. Если спавн прошел успешно и в сцене сохранены уникальные трансформации
             if (prefabRoot && entityJson.contains("transform_override"))

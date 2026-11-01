@@ -31,6 +31,7 @@ public:
     int pixelWidth() const;
     int pixelHeight() const;
     unsigned int texture() const { return m_texture; }
+    bool readDepth(int x, int y, float& depth) const;
 
 private:
     void create();

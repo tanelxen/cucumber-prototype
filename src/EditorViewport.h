@@ -24,6 +24,7 @@ public:
     EditorCamera& camera() { return m_camera; }
     const EditorCamera& camera() const { return m_camera; }
     RenderTarget& target() { return m_target; }
+    const RenderTarget& target() const { return m_target; }
 
     glm::ivec2 size() const { return { m_target.width(), m_target.height() }; }
     float aspect() const { return float(m_target.width()) / float(m_target.height()); }

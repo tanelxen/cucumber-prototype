@@ -27,6 +27,7 @@ public:
     void setEntity(Entity* entity);
     void setEditorCameraPosition(const glm::vec3& position);
     glm::vec3 getEditorCameraPosition() const;
+    glm::vec3 getCreationPositionAt(const glm::vec2& viewportPosition) const;
 
     void update(float dt) override;
     void draw() override;
@@ -51,11 +52,17 @@ private:
     bool m_focused = false;
     bool m_isHovered = false;
     bool m_cursorCaptured = false;
+    bool m_prevRightMouse = false;
+    bool m_rightMouseTracking = false;
+    bool m_rightMouseNavigating = false;
+    bool m_openCreatePopup = false;
+    float m_rightMouseTravel = 0.0f;
 
     bool m_hasImageBounds = false;
     float m_imageLeft = 0, m_imageTop = 0, m_imageRight = 0, m_imageBottom = 0;
-    
+    glm::vec2 m_contextClickPosition{0.0f};
+    glm::vec2 m_contextPopupPosition{0.0f};
+
 private:
     void updateOwnership();
-    bool m_prevRightMouse = false;
 };

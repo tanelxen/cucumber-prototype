@@ -50,6 +50,20 @@ RenderTarget& RenderTarget::operator=(RenderTarget&& other) noexcept
 int RenderTarget::pixelWidth() const { return ScaledSize(m_width, m_scale); }
 int RenderTarget::pixelHeight() const { return ScaledSize(m_height, m_scale); }
 
+bool RenderTarget::readDepth(int x, int y, float& depth) const
+{
+    if (x < 0 || x >= pixelWidth() || y < 0 || y >= pixelHeight()) {
+        return false;
+    }
+
+    GLint previousReadFramebuffer = 0;
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo);
+    glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(previousReadFramebuffer));
+    return true;
+}
+
 void RenderTarget::create()
 {
     glGenFramebuffers(1, &m_fbo);

@@ -32,6 +32,7 @@
 
 #include <cstring>
 
+#include "../vendor/IconsMaterialDesignIcons.h"
 #include "../vendor/tinyfiledialogs.h"
 
 void ComponentInspector::Render(Component* component, InspectorPanel* panel)
@@ -64,7 +65,8 @@ std::string ComponentInspector::GetName(std::type_index id) {
     return (it != registry.end()) ? it->second.displayName : id.name();
 }
 
-static bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
+static bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue,
+                            float columnWidth, bool* linkedAxes = nullptr)
 {
     ImGuiIO& io = ImGui::GetIO();
     auto boldFont = io.Fonts->Fonts[1];
@@ -74,13 +76,32 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     ImGui::Columns(2);
     ImGui::SetColumnWidth(0, columnWidth);
     ImGui::Text("%s", label.c_str());
+    bool linkedAxesChanged = false;
+    if (linkedAxes)
+    {
+        ImGui::SameLine();
+        const bool wasLinked = *linkedAxes;
+        if (wasLinked) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+        }
+        const char* linkIcon = *linkedAxes ? ICON_MDI_LINK_VARIANT : ICON_MDI_LINK_VARIANT_OFF;
+        if (ImGui::SmallButton(linkIcon)) {
+            *linkedAxes = !*linkedAxes;
+            linkedAxesChanged = true;
+            if (*linkedAxes) values = glm::vec3(values.x);
+        }
+        if (wasLinked) ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(*linkedAxes ? "Scale axes linked" : "Scale axes independent");
+        }
+    }
     ImGui::NextColumn();
-    
-    ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 0, 0 });
     
     float lineHeight = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
     ImVec2 buttonSize = { lineHeight + 3.0f, lineHeight };
+
+    ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
     
     bool isChangedX = false;
     bool isChangedY = false;
@@ -92,7 +113,8 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::PushFont(boldFont);
     if (ImGui::Button("X", buttonSize)) {
-        values.x = resetValue;
+        if (linkedAxes && *linkedAxes) values = glm::vec3(resetValue);
+        else values.x = resetValue;
         isChangedX = true;
     }
     ImGui::PopFont();
@@ -101,6 +123,7 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::SameLine();
     if (ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f")) {
+        if (linkedAxes && *linkedAxes) values = glm::vec3(values.x);
         isChangedX = true;
     }
     ImGui::PopItemWidth();
@@ -112,7 +135,8 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::PushFont(boldFont);
     if (ImGui::Button("Y", buttonSize)) {
-        values.y = resetValue;
+        if (linkedAxes && *linkedAxes) values = glm::vec3(resetValue);
+        else values.y = resetValue;
         isChangedY = true;
     }
     ImGui::PopFont();
@@ -121,6 +145,7 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::SameLine();
     if (ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f")) {
+        if (linkedAxes && *linkedAxes) values = glm::vec3(values.y);
         isChangedY = true;
     }
     ImGui::PopItemWidth();
@@ -132,7 +157,8 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::PushFont(boldFont);
     if (ImGui::Button("Z", buttonSize)) {
-        values.z = resetValue;
+        if (linkedAxes && *linkedAxes) values = glm::vec3(resetValue);
+        else values.z = resetValue;
         isChangedZ = true;
     }
     ImGui::PopFont();
@@ -141,6 +167,7 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::SameLine();
     if (ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f")) {
+        if (linkedAxes && *linkedAxes) values = glm::vec3(values.z);
         isChangedZ = true;
     }
     
@@ -152,11 +179,13 @@ static bool DrawVec3Control(const std::string& label, glm::vec3& values, float r
     
     ImGui::PopID();
     
-    return isChangedX || isChangedY || isChangedZ;
+    return linkedAxesChanged || isChangedX || isChangedY || isChangedZ;
 }
 
 static void DrawTransformComponent(TransformComponent* transform)
 {
+    static bool scaleAxesLinked = true;
+
     // 1. ПОЗИЦИЯ
     glm::vec3 pos = transform->getPosition();
     // Передаем копию. Если пользователь покрутил ползунок, функция вернет true
@@ -174,7 +203,7 @@ static void DrawTransformComponent(TransformComponent* transform)
     
     // 3. МАСШТАБ
     glm::vec3 scale = transform->getScale();
-    if (DrawVec3Control("Scale", scale, 1.0f, 100.0f)) {
+    if (DrawVec3Control("Scale", scale, 1.0f, 100.0f, &scaleAxesLinked)) {
         transform->setScale(scale);
     }
 }

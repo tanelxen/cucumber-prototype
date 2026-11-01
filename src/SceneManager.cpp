@@ -28,6 +28,9 @@ void SceneManager::createNewScene(const std::string& name)
     m_activeScene = std::make_unique<WorldScene>();
     m_activeScene->m_type = SceneType::Level;
     m_activeScene->m_filePath = name;
+    if (g_UIManager) {
+        g_UIManager->resetEditorCamera();
+    }
 }
 
 bool SceneManager::openFile(const std::string& filePath)
@@ -57,7 +60,7 @@ void SceneManager::saveCurrentAs(const std::string& filename)
         
         if (rootEntity)
         {
-            SceneSerializer::CreatePrefabFromEntity(m_activeScene.get(), rootEntity, filename);
+            SceneSerializer::SavePrefabSource(m_activeScene.get(), rootEntity, filename);
         }
     }
     else
@@ -81,7 +84,7 @@ void SceneManager::saveCurrent()
         
         if (rootEntity)
         {
-            SceneSerializer::CreatePrefabFromEntity(m_activeScene.get(), rootEntity, m_activeScene->m_filePath);
+            SceneSerializer::SavePrefabSource(m_activeScene.get(), rootEntity, m_activeScene->m_filePath);
         }
     }
     else
@@ -93,15 +96,18 @@ void SceneManager::saveCurrent()
 // =================================================================
 // РЕЖИМ РЕДАКТИРОВАНИЯ ПРЕФАБА
 // =================================================================
-void SceneManager::enterPrefabEditMode(const std::string& prefabPath)
+bool SceneManager::enterPrefabEditMode(const std::string& prefabPath)
 {
-    if (!m_activeScene || m_activeScene->isPrefabContext()) return;
+    if (!m_activeScene || m_activeScene->isPrefabContext() || m_activeScene->isSimulationMode()) return false;
     
     std::cout << "[SceneManager] Сохранение сцены уровня в снапшот и переход в префаб..." << std::endl;
     
     // 1. Запоминаем ВСЮ сцену уровня в JSON в памяти
     s_levelSnapshot.clear();
-    SceneSerializer::SaveSceneToMemory(m_activeScene.get(), s_levelSnapshot);
+    if (!SceneSerializer::SaveSceneToMemory(m_activeScene.get(), s_levelSnapshot)) {
+        s_levelSnapshot.clear();
+        return false;
+    }
     
     // 2. Загружаем префаб как изолированную сцену
     auto prefabScene = std::make_unique<WorldScene>();
@@ -112,9 +118,12 @@ void SceneManager::enterPrefabEditMode(const std::string& prefabPath)
         m_savedLevelScene->clear();
         
         m_activeScene = std::move(prefabScene);
+        g_UIManager->setEntity(nullptr);
+        return true;
     }
     
-    g_UIManager->setEntity(nullptr);
+    s_levelSnapshot.clear();
+    return false;
 }
 
 void SceneManager::exitPrefabEditMode()
@@ -156,6 +165,7 @@ void SceneManager::stopSimulation()
     if (!m_activeScene || !m_activeScene->isSimulationMode()) return;
     
     std::cout << "[SceneManager] Остановка симуляции и восстановление сцены..." << std::endl;
+    const std::string sceneFilePath = m_activeScene->m_filePath;
     
     // Восстанавливаем сцену редактора в чистую память из сохраненного снапшота
     auto restoredScene = std::make_unique<WorldScene>();
@@ -163,6 +173,7 @@ void SceneManager::stopSimulation()
     // Передаем JSON-снапшот в сериализатор
     if (SceneSerializer::LoadSceneFromMemory(restoredScene.get(), s_levelSnapshot))
     {
+        restoredScene->m_filePath = sceneFilePath;
         m_activeScene = std::move(restoredScene);
         m_activeScene->stopSimulation(); // Возвращаем режим редактора
     }

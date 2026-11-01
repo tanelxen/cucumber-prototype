@@ -213,8 +213,7 @@ bool ProjectManager::createProject(const std::filesystem::path& parentPath, cons
 
     nlohmann::json project = {
         {"name", name},
-        {"start_scene", startScene},
-        {"editor", {{"camera_position", {0.0, 128.0, 128.0}}}}
+        {"start_scene", startScene}
     };
     {
         std::ofstream file(projectPath / "project.json");
@@ -243,37 +242,4 @@ std::string ProjectManager::makeProjectRelative(const std::filesystem::path& pat
     const auto relativePath = std::filesystem::relative(path, m_projectPath, error);
     
     return error ? path.generic_string() : relativePath.generic_string();
-}
-
-std::array<float, 3> ProjectManager::editorCameraPosition() const
-{
-    if (m_projectData.contains("editor") &&
-        m_projectData["editor"].is_object() &&
-        m_projectData["editor"].contains("camera_position") &&
-        m_projectData["editor"]["camera_position"].is_array() &&
-        m_projectData["editor"]["camera_position"].size() == 3)
-    {
-        const auto& position = m_projectData["editor"]["camera_position"];
-        if (position[0].is_number() && position[1].is_number() && position[2].is_number())
-        {
-            return {
-                position[0].get<float>(),
-                position[1].get<float>(),
-                position[2].get<float>()
-            };
-        }
-    }
-    return {0.0f, 128.0f, 128.0f};
-}
-
-void ProjectManager::saveEditorCamera(float x, float y, float z)
-{
-    if (!hasOpenProject()) return;
-    
-    m_projectData["editor"]["camera_position"] = {x, y, z};
-    std::ofstream file(m_projectPath / "project.json");
-    
-    if (!file || !(file << m_projectData.dump(4))) {
-        std::cerr << "[ProjectManager] Failed to save project settings." << std::endl;
-    }
 }

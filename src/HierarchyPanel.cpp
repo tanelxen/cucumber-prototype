@@ -13,6 +13,7 @@
 #include "World.h"
 #include "Entity.h"
 #include "ProjectManager.h"
+#include "ViewportPanel.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -46,14 +47,17 @@ void HierarchyPanel::draw()
     
     if (ImGui::Button("+"))
     {
-        auto count = (int)activeScene->m_entities.size();
-        auto entity = std::make_unique<Entity>("Entity_" + std::to_string(count));
-        entity->scene = activeScene;
-        
-        m_selectedEntity = entity.get();
-        g_UIManager->setEntity(m_selectedEntity);
-        
-        activeScene->m_entities.push_back(std::move(entity));
+        ImGui::OpenPopup("CreateEntityPopup");
+    }
+
+    if (ImGui::BeginPopup("CreateEntityPopup"))
+    {
+        const glm::ivec2 viewportSize = g_UIManager->m_pViewportPanel->viewport().size();
+        const glm::vec2 viewportCenter = glm::vec2(viewportSize) * 0.5f;
+        const glm::vec3 creationPosition =
+            g_UIManager->m_pViewportPanel->getCreationPositionAt(viewportCenter);
+        g_UIManager->drawEntityCreationMenu(*activeScene, creationPosition);
+        ImGui::EndPopup();
     }
     
     ImGui::SameLine();
@@ -76,6 +80,20 @@ void HierarchyPanel::draw()
         }
     }
     
+    ImGui::Separator();
+
+    const std::string documentName = activeScene->m_filePath.empty()
+        ? "Untitled"
+        : std::filesystem::path(activeScene->m_filePath).stem().string();
+    const bool isPrefab = activeScene->isPrefabContext();
+    ImGui::PushStyleColor(ImGuiCol_Text, isPrefab
+        ? ImVec4(0.60f, 1.00f, 0.79f, 1.0f)
+        : ImVec4(0.60f, 0.78f, 1.00f, 1.0f));
+    ImGui::Text("%s %s: %s",
+                isPrefab ? ICON_MDI_CUBE_OUTLINE : ICON_MDI_FILE_DOCUMENT_OUTLINE,
+                isPrefab ? "Prefab" : "Scene",
+                documentName.empty() ? "Untitled" : documentName.c_str());
+    ImGui::PopStyleColor();
     ImGui::Separator();
     
     m_liveEntities.clear();
@@ -107,25 +125,25 @@ void HierarchyPanel::draw()
         }
     }
     
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DrawLinesToNodes;
-    if (!m_selectedEntity) {
-        flags |= ImGuiTreeNodeFlags_Selected;
-    }
-
     m_visitedEntities.clear();
     m_pendingReparents.clear();
     m_pendingDestructions.clear();
-    if (ImGui::TreeNodeEx(&m_rootEntities, flags, "Scene"))
-    {
-        if (ImGui::IsItemClicked()) {
-            m_selectedEntity = nullptr;
-            g_UIManager->setEntity(nullptr);
-        }
+    for (Entity* entity : m_rootEntities) {
+        DrawEntityNode(entity);
+    }
 
-        for (Entity* entity : m_rootEntities) {
-            DrawEntityNode(entity);
-        }
-        ImGui::TreePop();
+    if (m_selectedEntity &&
+        ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+        ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        m_selectedEntity = nullptr;
+        g_UIManager->setEntity(nullptr);
+    }
+
+    const ImVec2 emptySpace = ImGui::GetContentRegionAvail();
+    if (emptySpace.x > 0.0f && emptySpace.y > 0.0f &&
+        ImGui::InvisibleButton("##empty_hierarchy_space", emptySpace)) {
+        m_selectedEntity = nullptr;
+        g_UIManager->setEntity(nullptr);
     }
 
     for (Entity* entity : m_pendingDestructions) {
@@ -166,14 +184,30 @@ void HierarchyPanel::DrawEntityNode(Entity* entity)
         return;
     }
 
+    const auto isVisibleChild = [entity](Entity* child) {
+        return child && !(entity->isPrefabRoot && child->isPrefabChild());
+    };
+    const bool hasVisibleChildren = std::any_of(
+        entity->children.begin(), entity->children.end(), isVisibleChild);
+
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DrawLinesToNodes;
     
     if (m_selectedEntity == entity) flags |= ImGuiTreeNodeFlags_Selected;
-    if (entity->children.empty())  flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
-    
+    if (!hasVisibleChildren) flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet;
+
+    ImGui::PushStyleColor(ImGuiCol_Text,
+                          entity->isPrefabRoot
+                              ? ImVec4(0.60f, 1.00f, 0.79f, 1.0f)
+                              : ImVec4(0.83f, 0.83f, 0.83f, 1.0f));
+
+    const char *name = entity->isPrefabRoot ? ICON_MDI_CUBE_OUTLINE " %s"
+                                            : ICON_MDI_CUBE_OUTLINE " %s";
+
     // Отрисовываем узел дерева
-    bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, entity->isPrefabRoot ? "[P] %s" : ICON_MDI_CUBE " %s", entity->m_name.c_str());
-    
+    bool isOpened = ImGui::TreeNodeEx((void*)(uintptr_t)entity, flags, name, entity->m_name.c_str());
+
+    ImGui::PopStyleColor();
+
     // Умное выделение объекта с учетом, что это может быть просто drag-n-drop
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && ImGui::IsItemHovered(ImGuiHoveredFlags_None))
     {
@@ -248,7 +282,9 @@ void HierarchyPanel::DrawEntityNode(Entity* entity)
     // Рекурсивный вызов для отрисовки детей, если папка раскрыта
     if (isOpened) {
         for (Entity* child : entity->children) {
-            DrawEntityNode(child);
+            if (isVisibleChild(child)) {
+                DrawEntityNode(child);
+            }
         }
         ImGui::TreePop();
     }

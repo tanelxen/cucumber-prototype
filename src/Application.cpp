@@ -33,6 +33,7 @@
 #include <imgui.h>
 
 #include <stdio.h>
+#include <filesystem>
 #include <thread>
 
 #if defined(_M_X64) || defined(__x86_64__)
@@ -86,7 +87,6 @@ Application::~Application()
 {
     if (m_pUIManager)
     {
-        m_pUIManager->saveProjectSettings();
         delete m_pUIManager;
     }
     
@@ -100,6 +100,7 @@ void Application::run()
 {
     double lastTime = glfwGetTime();
     const double desiredFrameTime = 1.0 / 60;
+    std::string currentWindowTitle;
     
     while (!glfwWindowShouldClose(m_pWindow))
     {
@@ -135,6 +136,17 @@ void Application::run()
         m_pUIManager->update(elapsedTime);
         
         auto activeScene = SceneManager::Get().getActiveScene();
+        std::string sceneName = "Untitled";
+        if (activeScene && !activeScene->m_filePath.empty()) {
+            const std::string fileName = std::filesystem::path(activeScene->m_filePath).stem().string();
+            if (!fileName.empty()) sceneName = fileName;
+        }
+        const std::string windowTitle = "Cucumber - " + sceneName;
+        if (windowTitle != currentWindowTitle) {
+            glfwSetWindowTitle(m_pWindow, windowTitle.c_str());
+            currentWindowTitle = windowTitle;
+        }
+
         if (activeScene)
         {
             activeScene->update(elapsedTime);

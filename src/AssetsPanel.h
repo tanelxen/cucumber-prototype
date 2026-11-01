@@ -24,8 +24,9 @@ enum AssetType: uint32_t {
     AssetType_Mesh        = 1 << 3,
     AssetType_Audio       = 1 << 4,
     AssetType_Scene       = 1 << 5,
-    AssetType_Script      = 1 << 6,
-    AssetType_Map         = 1 << 7,
+    AssetType_Prefab      = 1 << 6,
+    AssetType_Script      = 1 << 7,
+    AssetType_Map         = 1 << 8,
 };
 
 struct AssetDragPayload {
@@ -97,6 +98,7 @@ private:
     bool m_isHovered = false;
     bool m_isFocused = false;
     bool m_openCreateScriptPopup = false;
+    bool m_refreshAfterPrefabDrop = false;
     
     enum class ThumbnailSize {
         XS = 0,

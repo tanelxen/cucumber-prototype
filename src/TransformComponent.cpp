@@ -42,6 +42,10 @@ void TransformComponent::load(const nlohmann::json& j)
         auto scl = j.at("scale").get<std::vector<float>>();
         m_scale = glm::vec3(scl[0], scl[1], scl[2]);
     }
+
+    if (owner) {
+        owner->invalidateTransform();
+    }
 }
 
 glm::vec3 TransformComponent::getForward()

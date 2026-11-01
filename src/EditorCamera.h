@@ -29,9 +29,9 @@ public:
 
     // scrollWheel — шаги колеса (0 если мышь не над видом).
     // viewportHeightPx — высота вида в пикселях (для перевода пикселей мыши в единицы мира в ortho).
-    void update(float dt, const Input::State& input, float scrollWheel, int viewportHeightPx, bool canStartCapture = true);
+    void update(float dt, const Input::State& input, float scrollWheel, int viewportHeightPx, bool captureMouse);
 
-    // true, пока зажата ПКМ (полёт / панорамирование). Панель по этому флагу прячет курсор.
+    // true, пока активен режим полёта. Панель по этому флагу захватывает курсор.
     bool isCapturingMouse() const { return m_capturing; }
 
     CameraData build(float aspect) const;

@@ -18,6 +18,9 @@
 bool MeshComponent::loadModel(const std::filesystem::path& filepath)
 {
     auto resource = ModelLoader::LoadModel(filepath.string());
+    if (!resource.mesh) {
+        return false;
+    }
 
     mesh = resource.mesh;
     materials = resource.embeddedMaterials;

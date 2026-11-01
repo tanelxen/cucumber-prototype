@@ -20,6 +20,7 @@ class HierarchyPanel : public EditorPanel
 public:
     HierarchyPanel();
     void draw() override;
+    void setEntity(Entity* entity) { m_selectedEntity = entity; }
     
 private:
     void DrawEntityNode(Entity* entity);

@@ -12,11 +12,21 @@
 #include "World.h"
 #include "Entity.h"
 #include "Input.h"
+#include "UIManager.h"
+#include "AssetsPanel.h"
+#include "MeshComponent.h"
+#include "ModelLoader.h"
+#include "ProjectManager.h"
+#include "SceneSerializer.h"
 
 #include "../vendor/IconsMaterialDesignIcons.h"
 
 #include <imgui.h>
 #include <ImGuizmo.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
 
 static bool DrawPlayButton();
 static bool DrawStopButton();
@@ -24,6 +34,161 @@ static bool DrawStopButton();
 namespace
 {
     ViewportPanel* s_mouseOwner = nullptr;   // единственная панель, которой сейчас принадлежит мышь
+
+    bool ReadWorldPosition(const glm::mat4& inverseViewProj, const RenderTarget& target,
+                           int pixelX, int pixelYFromTop, glm::vec3& position)
+    {
+        pixelX = std::clamp(pixelX, 0, target.pixelWidth() - 1);
+        pixelYFromTop = std::clamp(pixelYFromTop, 0, target.pixelHeight() - 1);
+        const int pixelY = target.pixelHeight() - 1 - pixelYFromTop;
+
+        float depth = 1.0f;
+        if (!target.readDepth(pixelX, pixelY, depth) || depth >= 1.0f ||
+            !std::isfinite(depth)) {
+            return false;
+        }
+
+        const float x = 2.0f * (static_cast<float>(pixelX) + 0.5f) /
+                        static_cast<float>(target.pixelWidth()) - 1.0f;
+        const float y = 2.0f * (static_cast<float>(pixelY) + 0.5f) /
+                        static_cast<float>(target.pixelHeight()) - 1.0f;
+        const float z = depth * 2.0f - 1.0f;
+        const glm::vec4 world = inverseViewProj * glm::vec4(x, y, z, 1.0f);
+        if (std::abs(world.w) <= 0.0001f) return false;
+
+        position = glm::vec3(world) / world.w;
+        return true;
+    }
+
+    bool GetSurfaceAt(const EditorCamera& camera, const RenderTarget& target,
+                      const glm::ivec2& viewportSize, const glm::vec2& mousePosition,
+                      glm::vec3& position, glm::vec3& normal)
+    {
+        normal = glm::vec3(0.0f);
+        const CameraData cameraData = camera.build(
+            static_cast<float>(viewportSize.x) / static_cast<float>(viewportSize.y));
+        const glm::mat4 inverseViewProj = glm::inverse(cameraData.viewProj());
+        const int pixelX = static_cast<int>(mousePosition.x * target.pixelWidth() / viewportSize.x);
+        const int pixelY = static_cast<int>(mousePosition.y * target.pixelHeight() / viewportSize.y);
+        if (!ReadWorldPosition(inverseViewProj, target, pixelX, pixelY, position)) return false;
+
+        glm::vec3 left, right, up, down;
+        if (!ReadWorldPosition(inverseViewProj, target, pixelX - 1, pixelY, left) ||
+            !ReadWorldPosition(inverseViewProj, target, pixelX + 1, pixelY, right) ||
+            !ReadWorldPosition(inverseViewProj, target, pixelX, pixelY - 1, up) ||
+            !ReadWorldPosition(inverseViewProj, target, pixelX, pixelY + 1, down)) return true;
+
+        const glm::vec3 horizontal = right - left;
+        const glm::vec3 vertical = down - up;
+        const glm::vec3 cross = glm::cross(horizontal, vertical);
+        if (glm::dot(cross, cross) < 1e-8f) return true;
+
+        const float centerDepth = -glm::vec3(cameraData.view * glm::vec4(position, 1.0f)).z;
+        const float edgeDepth = std::max({
+            std::abs(-glm::vec3(cameraData.view * glm::vec4(left, 1.0f)).z - centerDepth),
+            std::abs(-glm::vec3(cameraData.view * glm::vec4(right, 1.0f)).z - centerDepth),
+            std::abs(-glm::vec3(cameraData.view * glm::vec4(up, 1.0f)).z - centerDepth),
+            std::abs(-glm::vec3(cameraData.view * glm::vec4(down, 1.0f)).z - centerDepth)
+        });
+        if (edgeDepth > std::max(8.0f, std::abs(centerDepth) * 0.1f)) return true;
+
+        normal = glm::normalize(cross);
+        if (glm::dot(normal, -cameraData.forward) < 0.0f) {
+            normal = -normal;
+        }
+        return true;
+    }
+
+    glm::vec3 GetCreationPosition(const EditorCamera& camera, const RenderTarget& target,
+                                  const glm::ivec2& viewportSize, const glm::vec2& mousePosition)
+    {
+        glm::vec3 position;
+        glm::vec3 normal;
+        if (GetSurfaceAt(camera, target, viewportSize, mousePosition, position, normal)) {
+            return position;
+        }
+
+        const CameraData cameraData = camera.build(
+            static_cast<float>(viewportSize.x) / static_cast<float>(viewportSize.y));
+
+        glm::vec3 rayStart;
+        glm::vec3 rayDirection;
+        ScreenPointToRay(cameraData, viewportSize, mousePosition, rayStart, rayDirection);
+
+        if (!cameraData.ortho) return cameraData.position + rayDirection * 64.0f;
+
+        const float forwardDistance = glm::dot(cameraData.forward,
+            cameraData.position + cameraData.forward * 64.0f - rayStart);
+        const float rayForward = glm::dot(rayDirection, cameraData.forward);
+        return rayStart + rayDirection * (forwardDistance / rayForward);
+    }
+
+    glm::vec3 SnapPivotToGrid(const glm::vec3& position)
+    {
+        constexpr float kGridStep = 16.0f;
+        return glm::round(position / kGridStep) * kGridStep;
+    }
+
+    void CreateMeshEntity(WorldScene& scene, const AssetDragPayload& payload,
+                          const glm::vec3& position)
+    {
+        const char* pathEnd = std::find(payload.path, payload.path + sizeof(payload.path), '\0');
+        if (pathEnd == payload.path + sizeof(payload.path))
+        {
+            std::cerr << "[Viewport] Cannot drop mesh: asset path is not terminated.\n";
+            return;
+        }
+
+        const std::filesystem::path assetPath(payload.path);
+        const ModelResource resource = ModelLoader::LoadModel(assetPath.string());
+        if (!resource.mesh)
+        {
+            std::cerr << "[Viewport] Failed to load mesh asset: " << assetPath << '\n';
+            return;
+        }
+
+        auto entity = std::make_unique<Entity>("Mesh_" + assetPath.stem().string());
+        entity->scene = &scene;
+        entity->getTransform().setPosition(position);
+
+        Entity* createdEntity = entity.get();
+        scene.m_entities.push_back(std::move(entity));
+        auto* mesh = createdEntity->addComponent<MeshComponent>();
+        if (!mesh->loadModel(assetPath))
+        {
+            std::cerr << "[Viewport] Failed to initialize mesh asset: " << assetPath << '\n';
+            createdEntity->destroy();
+            return;
+        }
+
+        createdEntity->getTransform().setPosition(SnapPivotToGrid(position));
+
+        g_UIManager->setEntity(createdEntity);
+    }
+
+    void InstantiatePrefabAt(WorldScene& scene, const AssetDragPayload& payload,
+                             const glm::vec3& position)
+    {
+        const char* pathEnd = std::find(payload.path, payload.path + sizeof(payload.path), '\0');
+        if (pathEnd == payload.path + sizeof(payload.path))
+        {
+            std::cerr << "[Viewport] Cannot drop prefab: asset path is not terminated.\n";
+            return;
+        }
+
+        const std::filesystem::path assetPath(payload.path);
+        Entity* root = SceneSerializer::InstantiatePrefab(
+            &scene, assetPath.string(), nullptr, UID::Invalid(), false);
+        if (!root)
+        {
+            std::cerr << "[Viewport] Failed to instantiate prefab: " << assetPath << '\n';
+            return;
+        }
+
+        root->getTransform().setPosition(SnapPivotToGrid(position));
+        SceneSerializer::InitializePrefabComponents(root);
+        g_UIManager->setEntity(root);
+    }
 }
 
 static void DrawGizmo(Entity* selectedNode, const CameraData& camera, const ImVec2& contentPos,
@@ -55,6 +220,12 @@ void ViewportPanel::setEditorCameraPosition(const glm::vec3& position)
 glm::vec3 ViewportPanel::getEditorCameraPosition() const
 {
     return m_viewport.camera().position;
+}
+
+glm::vec3 ViewportPanel::getCreationPositionAt(const glm::vec2& viewportPosition) const
+{
+    const glm::ivec2 size = m_viewport.size();
+    return GetCreationPosition(m_viewport.camera(), m_viewport.target(), size, viewportPosition);
 }
 
 void ViewportPanel::syncCursor()
@@ -93,21 +264,22 @@ void ViewportPanel::update(float dt)
 
     EditorCamera& camera = m_viewport.camera();
     const Input::State physicalInput = Input::getState();
-    
-    // Фронт нажатия ПКМ — считаем всегда, даже если панель скрыта, чтобы состояние не устаревало.
-    const bool rmbDown = physicalInput.isRightMouseButtonPressed();
-    const bool rmbPressedNow = rmbDown && !m_prevRightMouse;
-    m_prevRightMouse = rmbDown;
+    const bool rightMouseDown = physicalInput.isRightMouseButtonPressed();
+    const bool rightMousePressed = rightMouseDown && !m_prevRightMouse;
+    const bool rightMouseReleased = !rightMouseDown && m_prevRightMouse;
+    m_prevRightMouse = rightMouseDown;
     
     if (!isVisible || !m_windowOpen)
     {
         m_hasImageBounds = false;
+        m_rightMouseTracking = false;
+        m_rightMouseNavigating = false;
         if (m_isPlayViewport) Input::setGameInputState({});
         if (camera.isCapturingMouse())
         {
             camera.update(dt, {}, 0.0f, 1, false);   // отпускаем захват
-            updateOwnership();
         }
+        updateOwnership();
         return;
     }
     
@@ -121,7 +293,9 @@ void ViewportPanel::update(float dt)
     const bool mouseFree = (s_mouseOwner == nullptr);
     
     const bool hoverInput = mouseFree && !cursorLocked && mouseInImage;   // обычное наведение
-    const bool editorInput = iOwn || hoverInput;
+    const bool rightMouseNavigation = m_rightMouseTracking &&
+                                     m_rightMouseNavigating && rightMouseDown;
+    const bool editorInput = iOwn || hoverInput || rightMouseNavigation;
     const bool gameCursorCaptured = m_isPlayViewport && mouseFree && cursorLocked;
     
     const Input::State panelInput = (editorInput || gameCursorCaptured) ? physicalInput : Input::State{};
@@ -131,18 +305,50 @@ void ViewportPanel::update(float dt)
         Input::setGameInputState(panelInput);
     }
     
-    if (!scene) return;
-    
-    if (m_isPlayViewport && scene->hasActiveSceneCamera()) return;
-    
+    if (!scene || (m_isPlayViewport && scene->hasActiveSceneCamera()))
+    {
+        m_rightMouseTracking = false;
+        m_rightMouseNavigating = false;
+        camera.update(dt, {}, 0.0f, 1, false);
+        updateOwnership();
+        return;
+    }
+
+    if (rightMousePressed && hoverInput)
+    {
+        m_rightMouseTracking = true;
+        m_rightMouseNavigating = false;
+        m_rightMouseTravel = 0.0f;
+        m_contextClickPosition = {mouse.x - m_imageLeft, mouse.y - m_imageTop};
+        m_contextPopupPosition = {mouse.x, mouse.y};
+    }
+
+    if (m_rightMouseTracking && rightMouseDown && !m_rightMouseNavigating)
+    {
+        m_rightMouseTravel += std::sqrt(
+            physicalInput.getMouseOffsetX() * physicalInput.getMouseOffsetX() +
+            physicalInput.getMouseOffsetY() * physicalInput.getMouseOffsetY());
+        m_rightMouseNavigating = m_rightMouseTravel >= 5.0f;
+    }
+
+    if (rightMouseReleased && m_rightMouseTracking)
+    {
+        m_openCreatePopup = !m_rightMouseNavigating && !scene->isSimulationMode();
+        m_rightMouseTracking = false;
+        m_rightMouseNavigating = false;
+    }
+
     if (editorInput)
     {
-        const bool canStartCapture = hoverInput && rmbPressedNow;
         const float wheel = hoverInput ? ImGui::GetIO().MouseWheel : 0.0f;
-        
-        camera.update(dt, panelInput, wheel, m_viewport.size().y, canStartCapture);
-        updateOwnership();
+        camera.update(dt, panelInput, wheel, m_viewport.size().y,
+                      rightMouseNavigation);
     }
+    else if (camera.isCapturingMouse())
+    {
+        camera.update(dt, {}, 0.0f, 1, false);
+    }
+    updateOwnership();
 }
 
 void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
@@ -204,6 +410,9 @@ void ViewportPanel::draw()
         camera.setMode(static_cast<EditorViewMode>(mode));
     }
 
+    ImGui::SameLine();
+    ImGui::TextDisabled("RMB: Fly / Pan");
+
     ImGui::SameLine(ImGui::GetWindowWidth() - 48);
 
     if (scene->isSimulationMode())
@@ -244,6 +453,73 @@ void ViewportPanel::draw()
     m_imageRight = viewportMax.x;
     m_imageBottom = viewportMax.y;
     m_hasImageBounds = viewportMax.x > viewportMin.x && viewportMax.y > viewportMin.y;
+
+    if (!scene->isSimulationMode() && ImGui::BeginDragDropTarget())
+    {
+        const ImGuiPayload* currentPayload = ImGui::GetDragDropPayload();
+        const auto* currentAsset = currentPayload &&
+            currentPayload->IsDataType("ASSET_ITEM") &&
+            currentPayload->DataSize == sizeof(AssetDragPayload)
+            ? static_cast<const AssetDragPayload*>(currentPayload->Data)
+            : nullptr;
+        if (currentAsset &&
+            (currentAsset->type == AssetType_Mesh || currentAsset->type == AssetType_Prefab))
+        {
+            const ImGuiPayload* payload =
+                ImGui::AcceptDragDropPayload("ASSET_ITEM", ImGuiDragDropFlags_AcceptBeforeDelivery);
+            if (payload)
+            {
+                const ImVec2 mousePosition = ImGui::GetIO().MousePos;
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                const bool isMesh = currentAsset->type == AssetType_Mesh;
+                drawList->AddCircle(mousePosition, 9.0f, IM_COL32(255, 210, 80, 255), 20, 2.0f);
+                drawList->AddText(ImVec2(mousePosition.x + 14.0f, mousePosition.y + 8.0f),
+                                  IM_COL32(255, 255, 255, 230),
+                                  isMesh ? "Drop mesh" : "Drop prefab");
+
+                if (payload->IsDelivery())
+                {
+                    const glm::ivec2 size{
+                        std::max(1, static_cast<int>(m_imageRight - m_imageLeft)),
+                        std::max(1, static_cast<int>(m_imageBottom - m_imageTop))
+                    };
+                    const glm::vec2 dropPosition{
+                        std::clamp(mousePosition.x - m_imageLeft, 0.0f, static_cast<float>(size.x)),
+                        std::clamp(mousePosition.y - m_imageTop, 0.0f, static_cast<float>(size.y))
+                    };
+                    const glm::vec3 position = getCreationPositionAt(dropPosition);
+                    if (isMesh) {
+                        CreateMeshEntity(*scene, *currentAsset, position);
+                    } else {
+                        InstantiatePrefabAt(*scene, *currentAsset, position);
+                    }
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (m_openCreatePopup)
+    {
+        ImGui::SetNextWindowPos(ImVec2(m_contextPopupPosition.x, m_contextPopupPosition.y));
+        ImGui::OpenPopup("ViewportCreatePopup");
+        m_openCreatePopup = false;
+    }
+
+    if (ImGui::BeginPopup("ViewportCreatePopup"))
+    {
+        const glm::ivec2 size{
+            std::max(1, static_cast<int>(m_imageRight - m_imageLeft)),
+            std::max(1, static_cast<int>(m_imageBottom - m_imageTop))
+        };
+        const glm::vec2 clickPosition{
+            std::clamp(m_contextClickPosition.x, 0.0f, static_cast<float>(size.x)),
+            std::clamp(m_contextClickPosition.y, 0.0f, static_cast<float>(size.y))
+        };
+        const glm::vec3 creationPosition = getCreationPositionAt(clickPosition);
+        g_UIManager->drawEntityCreationMenu(*scene, creationPosition);
+        ImGui::EndPopup();
+    }
 
     if (camera.isCapturingMouse())
     {

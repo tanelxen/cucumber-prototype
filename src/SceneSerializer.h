@@ -29,13 +29,17 @@ public:
     static bool LoadSceneFromMemory(WorldScene* scene, const nlohmann::json& inJson);
     
     static bool CreatePrefabFromEntity(WorldScene* scene, Entity* rootEntity, const std::string& savePath);
+    static bool SavePrefabSource(WorldScene* scene, Entity* rootEntity, const std::string& savePath);
     
     // Главный метод для инстанцирования префаба на сцену
     static Entity* InstantiatePrefab(WorldScene* scene, const std::string& filename,
-                                     Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid());
+                                     Entity* customParent = nullptr, UID forcedRootUid = UID::Invalid(),
+                                     bool initializeComponents = true);
+    static void InitializePrefabComponents(Entity* rootEntity);
     
 private:
+    static bool SavePrefab(WorldScene* scene, Entity* rootEntity, const std::string& savePath,
+                           bool markAsInstance);
     static void DeserializeEntity(const nlohmann::json& entityJson, Entity* entity);
     static void HotReloadPrefabInstance(WorldScene* levelScene, Entity* rootEntity);
 };
-

@@ -28,7 +28,7 @@ public:
     void saveCurrent();
     
     // Переключение режимов (вызывается из UI редактора)
-    void enterPrefabEditMode(const std::string& prefabPath);
+    bool enterPrefabEditMode(const std::string& prefabPath);
     void exitPrefabEditMode();
     
     // Режим Симуляции (Play Mode)

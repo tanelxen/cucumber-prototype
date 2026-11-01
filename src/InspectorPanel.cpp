@@ -11,6 +11,8 @@
 #include "UIManager.h"
 
 #include "Entity.h"
+#include "World.h"
+#include "SceneManager.h"
 #include "CollisionComponent.h"
 #include "MovementComponent.h"
 #include "CameraComponent.h"
@@ -26,11 +28,10 @@
 
 #include "../vendor/IconsMaterialDesignIcons.h"
 
-#include <fstream>
-#include <iostream>
 #include <filesystem>
 
 static bool s_isHovered;
+static void DrawPrefabInterfaceEditor(Entity* prefabRoot, const std::string& prefabPath);
 
 InspectorPanel::InspectorPanel() : EditorPanel(ICON_MDI_INFORMATION " Properties###Inspector")
 {
@@ -47,6 +48,25 @@ void InspectorPanel::draw()
     ImGui::Begin(m_name.c_str());
     
     s_isHovered = ImGui::IsItemHovered();
+
+    WorldScene* activeScene = SceneManager::Get().getActiveScene();
+    if (activeScene && activeScene->isPrefabContext())
+    {
+        Entity* prefabRoot = nullptr;
+        for (const auto& entity : activeScene->m_entities)
+        {
+            if (entity && !entity->getParent()) {
+                prefabRoot = entity.get();
+                break;
+            }
+        }
+
+        if (prefabRoot)
+        {
+            DrawPrefabInterfaceEditor(prefabRoot, activeScene->m_filePath);
+            ImGui::Separator();
+        }
+    }
     
     if (!m_entity)
     {
@@ -304,9 +324,18 @@ void InspectorPanel::DrawPrefabInstanceInspector(Entity* prefabRoot)
     ImGui::TextDisabled("Source: %s", prefabRoot->prefabAssetPath.c_str());
     ImGui::Separator();
     ImGui::Spacing();
-    
-    ImGui::Text("Exposed Interface (Properties):");
+
+    ComponentInspector::Get().Render(&prefabRoot->getTransform(), this);
     ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    ImGui::Text("Prefab Properties");
+    ImGui::Spacing();
+
+    if (prefabRoot->m_exposedInterfaceCache.empty()) {
+        ImGui::TextDisabled("This prefab has no public properties.");
+    }
     
     // Запускаем плоский цикл по нашему оптимизированному кэшу указателей!
     for (auto& prop : prefabRoot->m_exposedInterfaceCache)
@@ -414,290 +443,134 @@ void InspectorPanel::DrawPrefabInstanceInspector(Entity* prefabRoot)
     }
 }
 
-static void saveCurrentPrefabInterface(Entity* prefabRoot)
+static void DrawPrefabInterfaceEditor(Entity* prefabRoot, const std::string& prefabPath)
 {
-    if (!prefabRoot || !prefabRoot->isPrefabRoot || prefabRoot->prefabAssetPath.empty()) {
-        std::cerr << "[Engine Editor] Ошибка: Неверный корень префаба для сохранения интерфейса." << std::endl;
-        return;
-    }
-    
-    // 1. Сначала читаем существующий файл префаба, чтобы сохранить структуру его сущностей (entities)
-    nlohmann::json prefabJson;
+    if (ImGui::CollapsingHeader("Prefab Interface", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        std::ifstream fileIn(prefabRoot->prefabAssetPath);
-        if (!fileIn.is_open()) {
-            std::cerr << "[Engine Editor] Не удалось открыть исходный файл префаба для чтения: "
-            << prefabRoot->prefabAssetPath << std::endl;
-            return;
+        ImGui::TextDisabled("Public properties available on prefab instances.");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Source: %s", prefabPath.c_str());
         }
-        try {
-            fileIn >> prefabJson;
-        } catch (const nlohmann::json::parse_error& e) {
-            std::cerr << "[Engine Editor] Ошибка парсинга JSON префаба при обновлении интерфейса: "
-            << e.what() << std::endl;
-            return;
-        }
-    }
-    
-    // 2. Генерируем НОВЫЙ блок exposed_properties на основе нашего кэша из ImGui-редактора
-    auto newExposedArray = nlohmann::json::array();
-    
-    for (const auto& cachedProp : prefabRoot->m_exposedInterfaceCache)
-    {
-        // Пропускаем нелинкованные свойства (у которых нет целевого компонента)
-        if (!cachedProp.targetComponent) continue;
-        
-        nlohmann::json propJson;
-        propJson["display_name"] = cachedProp.displayName;
-        propJson["component_type"] = cachedProp.targetComponent->getTypeName();
-        propJson["property_name"] = cachedProp.propertyName;
-        
-        // Вычисляем NodePath целевой сущности относительно корня префаба
-        Entity* targetEntity = cachedProp.targetComponent->owner;
-        std::string relativePath = targetEntity->getPathRelativeTo(prefabRoot);
-        propJson["target_path"] = relativePath;
-        
-        newExposedArray.push_back(propJson);
-    }
-    
-    // 3. Обновляем JSON структуру
-    prefabJson["exposed_properties"] = newExposedArray;
-    
-    // Нюанс: Если пользователь также изменил базовые (дефолтные) значения свойств самого префаба
-    // во время редактирования "по месту", мы можем обновить и массив "entities" в файле.
-    // Для этого просто сериализуем текущее дерево в плоский список, как мы делали при создании префаба.
-    auto entitiesArray = nlohmann::json::array();
-    std::function<void(const Entity*)> serializeFlat = [&](const Entity* ent) {
-        nlohmann::json entJson;
-        entJson["name"] = ent->getName();
-        entJson["parent"] = (ent == prefabRoot) ? "" : ent->getParent()->getPathRelativeTo(prefabRoot);
-        
-        auto componentsArray = nlohmann::json::array();
-        for (auto& comp : ent->getComponents()) {
-            nlohmann::json compNode;
-            compNode["type"] = comp->getTypeName();
-            nlohmann::json compData = nlohmann::json::object();
-            
-            // ВАЖНО: Мы сохраняем префаб как класс (шаблон), поэтому пишем ВСЕ свойства,
-            // но перед этим временно синхронизируем m_prefabValue = m_value, так как это новые дефолты!
-            comp->save(compData);
-            
-            compNode["data"] = compData;
-            componentsArray.push_back(compNode);
-        }
-        entJson["components"] = componentsArray;
-        entitiesArray.push_back(entJson);
-        
-        for (auto* child : ent->getChildren()) {
-            serializeFlat(child);
-        }
-    };
-    
-    serializeFlat(prefabRoot);
-    prefabJson["entities"] = entitiesArray;
-    
-    // 4. Записываем обновленный префаб обратно на диск
-    std::ofstream fileOut(prefabRoot->prefabAssetPath);
-    if (!fileOut.is_open()) {
-        std::cerr << "[Engine Editor] Не удалось открыть файл префаба для записи: "
-        << prefabRoot->prefabAssetPath << std::endl;
-        return;
-    }
-    
-    fileOut << prefabJson.dump(4);
-    fileOut.close();
-    
-    /*
-     // 5. Актуализируем рантайм-состояние: так как мы переписали дефолты префаба,
-     // текущие значения на сцене теперь являются эталоном. Сбрасываем флаги оверрайдов сцены!
-     for (auto& cachedProp : prefabRoot->m_exposedInterfaceCache)
-     {
-     if (cachedProp.targetComponent) {
-     // Для всех свойств внутри компонентов нужно обновить m_prefabValue = m_value.
-     // Простейший способ — сымитировать setFromPrefab текущим значением.
-     nlohmann::json currentVal = cachedProp.targetComponent->getExposedValue(cachedProp.propertyName);
-     cachedProp.targetComponent->setExposedValue(cachedProp.propertyName, currentVal);
-     
-     // Также принудительно сообщаем компоненту сбросить оверрайд свойства, если это необходимо,
-     // но в нашей текущей архитектуре достаточно очистить флаг сцены:
-     prefabRoot->markInterfaceOverrideDirty(cachedProp.displayName, false);
-     }
-     }
-     */
-    
-    std::cout << "[Engine Editor] Интерфейс и дефолты префаба успешно сохранены: "
-    << prefabRoot->prefabAssetPath << std::endl;
-}
-
-static Entity* m_editingPrefabRoot = nullptr;
-
-static void togglePrefabEditMode(Entity* entity)
-{
-    if (m_editingPrefabRoot == entity) m_editingPrefabRoot = nullptr; // Выйти
-    else if (entity->isPrefabRoot) m_editingPrefabRoot = entity;      // Войти
-}
-
-static void DrawPrefabInterfaceEditor(Entity* prefabRoot)
-{
-    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f), "--- PREFAB EDIT MODE ---");
-    if (ImGui::Button("Save Changes to .prefab File")) {
-        // Логика функции Apply Changes (перезапись исходного .prefab)
-        saveCurrentPrefabInterface(prefabRoot);
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Exit Edit Mode")) {
-        togglePrefabEditMode(prefabRoot);
-        return;
-    }
-    ImGui::Separator();
-    
-    // Таблица для удобного редактирования строк
-    if (ImGui::BeginTable("InterfaceTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-    {
-        ImGui::TableSetupColumn("Name");
-        ImGui::TableSetupColumn("Source");
-        ImGui::TableSetupColumn("Link");
-        ImGui::TableSetupColumn("Actions");
-        ImGui::TableHeadersRow();
-        
-        int propIdx = 0;
-        // Работаем НАПРЯМУЮ с кэшем/вектором структуры инстанса
-        for (auto it = prefabRoot->m_exposedInterfaceCache.begin(); it != prefabRoot->m_exposedInterfaceCache.end(); )
+        if (ImGui::Button("Save Prefab"))
         {
-            ImGui::TableNextRow();
-            
-            // 1. Колонка: Редактирование Внешнего Имени (Display Name)
-            ImGui::TableSetColumnIndex(0);
-            char nameBuf[64];
-            strncpy(nameBuf, it->displayName.c_str(), sizeof(nameBuf));
-            ImGui::PushID(propIdx);
-            if (ImGui::InputText("##dispName", nameBuf, sizeof(nameBuf))) {
-                it->displayName = std::string(nameBuf);
-            }
-            
-            // 2. Колонка: Визуальное отображение куда ведет связь
-            ImGui::TableSetColumnIndex(1);
-            if (it->targetComponent) {
-                std::string path = it->targetComponent->owner->getPathRelativeTo(prefabRoot);
-                ImGui::Text("%s -> %s::%s", path.c_str(), it->targetComponent->getTypeName().c_str(), it->propertyName.c_str());
-                //if (!it->subProperty.empty()) ImGui::SameLine(); ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), " (%s)", it->subProperty.c_str());
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Unlinked!");
-            }
-            
-            // 3. Колонка: Кнопка связывания (Link Menu)
-            ImGui::TableSetColumnIndex(2);
-            if (ImGui::Button("Link...")) {
-                ImGui::OpenPopup("LinkBindingPopup");
-            }
-            
-            // РЕКУРСИВНОЕ КОНТЕНСТНОЕ МЕНЮ СВЯЗЫВАНИЯ
-            if (ImGui::BeginPopup("LinkBindingPopup"))
+            SceneManager::Get().saveCurrent();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+ Expose Property"))
+        {
+            CachedExposedProperty newProp;
+            newProp.displayName = "New Property";
+            prefabRoot->m_exposedInterfaceCache.push_back(newProp);
+        }
+        ImGui::Separator();
+
+        if (prefabRoot->m_exposedInterfaceCache.empty()) {
+            ImGui::TextDisabled("No public properties. Use + Expose Property to add one.");
+        }
+
+        if (ImGui::BeginTable("InterfaceTable", 3,
+                              ImGuiTableFlags_RowBg |
+                              ImGuiTableFlags_BordersInnerV |
+                              ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("##display_name", ImGuiTableColumnFlags_WidthStretch, 0.38f);
+            ImGui::TableSetupColumn("##target_property", ImGuiTableColumnFlags_WidthStretch, 0.54f);
+            ImGui::TableSetupColumn("##remove", ImGuiTableColumnFlags_WidthFixed, 26.0f);
+
+            int propIdx = 0;
+            for (auto it = prefabRoot->m_exposedInterfaceCache.begin();
+                 it != prefabRoot->m_exposedInterfaceCache.end();)
             {
-                ImGui::Text("Select Target Component Property:");
-                ImGui::Separator();
-                
-                // Лямбда для обхода дерева префаба и генерации вложенных подменю ImGui
-                std::function<void(Entity*)> drawEntityMenu = [&](Entity* ent) {
-                    std::string entLabel = ent->getName();
-                    if (ent == prefabRoot) entLabel += " (Root)";
-                    
-                    if (ImGui::BeginMenu(entLabel.c_str()))
-                    {
-                        // Сначала выводим компоненты этой сущности
-                        
-                        if (ImGui::BeginMenu("Transform"))
+                ImGui::TableNextRow();
+                ImGui::PushID(propIdx);
+
+                ImGui::TableSetColumnIndex(0);
+                char nameBuf[64]{};
+                std::snprintf(nameBuf, sizeof(nameBuf), "%s", it->displayName.c_str());
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::InputText("##display_name", nameBuf, sizeof(nameBuf))) {
+                    it->displayName = nameBuf;
+                }
+
+                ImGui::TableSetColumnIndex(1);
+                std::string propertyButton = "Choose target...";
+                std::string targetTooltip;
+                if (it->targetComponent && it->targetComponent->owner) {
+                    const std::string path =
+                        it->targetComponent->owner->getPathRelativeTo(prefabRoot);
+                    const std::string targetName = path.empty() ? "Root" : path;
+                    propertyButton = targetName + " / " + it->propertyName;
+                    targetTooltip = targetName + " / " +
+                                    it->targetComponent->getTypeName() + "::" +
+                                    it->propertyName;
+                }
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::Button(propertyButton.c_str(), ImVec2(-1.0f, 0.0f))) {
+                    ImGui::OpenPopup("SelectPrefabProperty");
+                }
+                if (!targetTooltip.empty() && ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", targetTooltip.c_str());
+                }
+
+                if (ImGui::BeginPopup("SelectPrefabProperty"))
+                {
+                    ImGui::TextUnformatted("Select target property");
+                    ImGui::Separator();
+
+                    std::function<void(Entity*)> drawEntityMenu = [&](Entity* ent) {
+                        std::string entLabel = ent->getName();
+                        if (ent == prefabRoot) entLabel += " (Root)";
+
+                        if (ImGui::BeginMenu(entLabel.c_str()))
                         {
-                            auto& comp = ent->getTransform();
-                            
-                            if (ImGui::MenuItem("Position")) {
-                                it->targetComponent = &comp;
-                                it->propertyName = "position";
+                            if (ImGui::BeginMenu("Transform"))
+                            {
+                                auto& transform = ent->getTransform();
+                                if (ImGui::MenuItem("Position")) {
+                                    it->targetComponent = &transform;
+                                    it->propertyName = "position";
+                                }
+                                if (ImGui::MenuItem("Rotation")) {
+                                    it->targetComponent = &transform;
+                                    it->propertyName = "rotation";
+                                }
+                                if (ImGui::MenuItem("Scale")) {
+                                    it->targetComponent = &transform;
+                                    it->propertyName = "scale";
+                                }
+                                ImGui::EndMenu();
                             }
-                            if (ImGui::MenuItem("Rotation")) {
-                                it->targetComponent = &comp;
-                                it->propertyName = "rotation";
+
+                            for (Entity* child : ent->getChildren()) {
+                                drawEntityMenu(child);
                             }
-                            if (ImGui::MenuItem("Scale")) {
-                                it->targetComponent = &comp;
-                                it->propertyName = "scale";
-                            }
-                            
                             ImGui::EndMenu();
                         }
-                        
-                        /*
-                         for (auto& comp : ent->getComponents())
-                         {
-                         if (ImGui::BeginMenu(comp->getTypeName().c_str()))
-                         {
-                         if (comp->getTypeName() == "TransformComponent")
-                         {
-                         
-                         }
-                         
-                         ImGui::EndMenu();
-                         }
-                         }
-                         */
-                        
-                        // Затем рекурсивно спускаемся к дочерним сущностям в подменю
-                        for (auto* child : ent->getChildren()) {
-                            drawEntityMenu(child);
-                        }
-                        
-                        ImGui::EndMenu();
-                    }
-                };
-                
-                drawEntityMenu(prefabRoot); // Запуск меню от корня префаба
-                ImGui::EndPopup();
+                    };
+                    drawEntityMenu(prefabRoot);
+                    ImGui::EndPopup();
+                }
+
+                ImGui::TableSetColumnIndex(2);
+                if (ImGui::SmallButton("x")) {
+                    it = prefabRoot->m_exposedInterfaceCache.erase(it);
+                } else {
+                    ++it;
+                }
+
+                ImGui::PopID();
+                ++propIdx;
             }
-            
-            // 4. Колонка: Удаление свойства из интерфейса
-            ImGui::TableSetColumnIndex(3);
-            if (ImGui::Button("Delete")) {
-                it = prefabRoot->m_exposedInterfaceCache.erase(it); // Удаляем свойство из таблицы
-            } else {
-                ++it;
-            }
-            
-            ImGui::PopID();
-            propIdx++;
+            ImGui::EndTable();
         }
-        ImGui::EndTable();
-    }
-    
-    if (ImGui::Button("Add New Exposed Property"))
-    {
-        CachedExposedProperty newProp;
-        newProp.displayName = "New Property";
-        prefabRoot->m_exposedInterfaceCache.push_back(newProp);
     }
 }
-
-static bool isInPrefabEditMode() { return m_editingPrefabRoot != nullptr; }
 
 void InspectorPanel::DrawInspector(Entity* selectedEntity)
 {
     if (!selectedEntity) return;
     
-    // Если это префаб, даем кнопку переключения режима
-    if (selectedEntity->isPrefabRoot && !isInPrefabEditMode())
-    {
-        if (ImGui::Button("Edit Prefab Interface")) {
-            togglePrefabEditMode(selectedEntity);
-        }
-        ImGui::Separator();
-    }
-    
-    // Отрисовка в зависимости от режима
-    if (selectedEntity->isPrefabRoot && m_editingPrefabRoot == selectedEntity)
-    {
-        // РЕЖИМ 1: Настройка внешнего интерфейса (экспорта) префаба
-        DrawPrefabInterfaceEditor(selectedEntity);
-    }
-    else if (selectedEntity->isPrefabRoot)
+    if (selectedEntity->isPrefabRoot)
     {
         // РЕЖИМ 2: Дизайнер крутит готовые ползунки на сцене (наш прошлый шаг)
         DrawPrefabInstanceInspector(selectedEntity);

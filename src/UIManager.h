@@ -12,12 +12,14 @@
 #include <vector>
 #include <filesystem>
 #include <string>
+#include <glm/glm.hpp>
 
 class EditorPanel;
 class ViewportPanel;
 class InspectorPanel;
 class AssetsPanel;
 class HierarchyPanel;
+class EditorCamera;
 
 class WorldScene;
 struct ViewDesc;
@@ -35,10 +37,12 @@ public:
     
     void setEntity(Entity* entity);
     void setMaterial(Material* material);
+    void drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position);
     
     void update(float dt);
     void draw();
-    void saveProjectSettings();
+    EditorCamera& editorCamera();
+    void resetEditorCamera();
     
     ViewportPanel* m_pViewportPanel;
     

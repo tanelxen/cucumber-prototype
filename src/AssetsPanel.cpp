@@ -7,11 +7,16 @@
 
 #include "AssetsPanel.h"
 #include "ProjectManager.h"
+#include "SceneManager.h"
+#include "SceneSerializer.h"
+#include "World.h"
+#include "Entity.h"
 
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <cstring>
+#include <iostream>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -31,6 +36,84 @@ bool IsPathWithin(const std::filesystem::path& path, const std::filesystem::path
     }
     return true;
 }
+
+bool SaveDraggedEntityAsPrefab(WorldScene* scene, Entity* entity,
+                               const std::filesystem::path& targetDirectory)
+{
+    if (!scene || !entity) {
+        std::cerr << "[AssetsPanel] Cannot save prefab: missing scene or entity.\n";
+        return false;
+    }
+    if (scene->isSimulationMode()) {
+        return false;
+    }
+
+    const bool belongsToScene = std::any_of(scene->m_entities.begin(), scene->m_entities.end(),
+        [entity](const std::unique_ptr<Entity>& candidate) {
+            return candidate.get() == entity;
+        });
+    if (!belongsToScene || entity->isPendingKill()) {
+        std::cerr << "[AssetsPanel] Cannot save prefab: dragged entity is no longer in the active scene.\n";
+        return false;
+    }
+    if (entity->isPrefabChild()) {
+        std::cerr << "[AssetsPanel] Cannot save a prefab child independently; drag the prefab root instead.\n";
+        return false;
+    }
+
+    std::string baseName = entity->m_name;
+    for (char& character : baseName)
+    {
+        const unsigned char value = static_cast<unsigned char>(character);
+        if (value < 32 || character == '/' || character == '\\' ||
+            character == '<' || character == '>' || character == ':' ||
+            character == '"' || character == '|' || character == '?' || character == '*') {
+            character = '_';
+        }
+    }
+    if (baseName.empty() || baseName == "." || baseName == "..") {
+        baseName = "Prefab";
+    }
+
+    std::error_code error;
+    if (!std::filesystem::is_directory(targetDirectory, error) || error) {
+        std::cerr << "[AssetsPanel] Cannot save prefab: target is not a directory: "
+                  << targetDirectory << '\n';
+        return false;
+    }
+
+    std::filesystem::path savePath = targetDirectory / (baseName + ".prefab");
+    for (unsigned int suffix = 1; std::filesystem::exists(savePath, error) && !error; ++suffix) {
+        savePath = targetDirectory / (baseName + "_" + std::to_string(suffix) + ".prefab");
+    }
+    if (error) {
+        std::cerr << "[AssetsPanel] Cannot find a free prefab filename in: "
+                  << targetDirectory << '\n';
+        return false;
+    }
+
+    if (!SceneSerializer::CreatePrefabFromEntity(scene, entity, savePath.string())) {
+        std::cerr << "[AssetsPanel] Failed to save prefab: " << savePath << '\n';
+        return false;
+    }
+
+    return true;
+}
+
+bool AcceptHierarchyEntityDrop(const std::filesystem::path& targetDirectory)
+{
+    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY"))
+    {
+        if (!payload->Data || payload->DataSize != sizeof(Entity*)) {
+            std::cerr << "[AssetsPanel] Cannot save prefab: invalid hierarchy drag payload.\n";
+            return false;
+        }
+        Entity* entity = *static_cast<Entity* const*>(payload->Data);
+        return SaveDraggedEntityAsPrefab(
+            SceneManager::Get().getActiveScene(), entity, targetDirectory);
+    }
+    return false;
+}
 }
 
 AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(ICON_MDI_FOLDER_STAR " Assets###Assets"), m_rootPath(std::filesystem::absolute(rootPath))
@@ -47,6 +130,7 @@ AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(IC
     m_extensionMap[".mp3"]  = AssetType_Audio;
     m_extensionMap[".scene"] = AssetType_Scene;
     m_extensionMap[".json"]  = AssetType_Scene;
+    m_extensionMap[".prefab"] = AssetType_Prefab;
     m_extensionMap[".as"]   = AssetType_Script;
     m_extensionMap[".glsl"]  = AssetType_Script;
     m_extensionMap[".map"]  = AssetType_Map;
@@ -57,6 +141,7 @@ AssetsPanel::AssetsPanel(const std::filesystem::path& rootPath) : EditorPanel(IC
     m_icons[AssetType_Mesh]    = loadTextureFromFile("resources/icons/file_mesh.png");
     m_icons[AssetType_Audio]   = loadTextureFromFile("resources/icons/file_audio.png");
     m_icons[AssetType_Scene]   = loadTextureFromFile("resources/icons/file_scene.png");
+    m_icons[AssetType_Prefab]  = loadTextureFromFile("resources/icons/file_prefab.png");
     m_icons[AssetType_Script]  = loadTextureFromFile("resources/icons/file_script.png");
     
     refresh();
@@ -141,12 +226,30 @@ void AssetsPanel::draw()
         
         ImGui::BeginChild("ScrollingFilesRegion", ImVec2(0, contentHeight));
         renderGridItems();
+
+        const ImVec2 childMin = ImGui::GetWindowPos();
+        const ImVec2 childSize = ImGui::GetWindowSize();
+        if (ImGui::BeginDragDropTargetCustom(
+                ImRect(childMin, ImVec2(childMin.x + childSize.x, childMin.y + childSize.y)),
+                ImGui::GetID("CurrentAssetsDirectoryDropTarget")))
+        {
+            if (AcceptHierarchyEntityDrop(m_rootPath / m_currentDirectory->filePath)) {
+                m_refreshAfterPrefabDrop = true;
+            }
+            ImGui::EndDragDropTarget();
+        }
         ImGui::EndChild();
         
         ImGui::EndTable();
     }
     
     ImGui::End();
+
+    if (m_refreshAfterPrefabDrop)
+    {
+        m_refreshAfterPrefabDrop = false;
+        refresh();
+    }
 }
 
 void AssetsPanel::refresh()
@@ -320,7 +423,11 @@ void AssetsPanel::renderDirectoryHierarchy(std::shared_ptr<DirectoryInfo>& direc
             std::filesystem::rename(src, m_rootPath / directory->filePath / src.filename());
             refresh();
         }
-        
+
+        if (AcceptHierarchyEntityDrop(m_rootPath / directory->filePath)) {
+            m_refreshAfterPrefabDrop = true;
+        }
+
         ImGui::EndDragDropTarget();
     }
     
@@ -564,6 +671,16 @@ void AssetsPanel::renderGridItems()
                     auto found = findDirectoryByPath(m_baseDirectory, std::filesystem::relative(item.fullPath, m_rootPath));
                     if (found) changeDirectory(found);
                 }
+                else if (item.assetType == AssetType_Scene) {
+                    if (!SceneManager::Get().openFile(item.fullPath.string())) {
+                        std::cerr << "[AssetsPanel] Failed to open scene: " << item.fullPath << '\n';
+                    }
+                }
+                else if (item.assetType == AssetType_Prefab) {
+                    if (!SceneManager::Get().enterPrefabEditMode(item.fullPath.string())) {
+                        std::cerr << "[AssetsPanel] Cannot open prefab for editing: " << item.fullPath << '\n';
+                    }
+                }
             }
             else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                 if (ImGui::GetIO().KeyCtrl) {
@@ -578,11 +695,14 @@ void AssetsPanel::renderGridItems()
         
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
         {
-            AssetDragPayload info;
+            AssetDragPayload info{};
             info.type = item.assetType;
-            strncpy(info.path, item.fullPath.string().c_str(), sizeof(info.path));
-            
-            ImGui::SetDragDropPayload("ASSET_ITEM", &info, sizeof(AssetDragPayload));
+            const std::string assetPath = item.fullPath.string();
+            if (assetPath.size() < sizeof(info.path))
+            {
+                std::memcpy(info.path, assetPath.c_str(), assetPath.size() + 1);
+                ImGui::SetDragDropPayload("ASSET_ITEM", &info, sizeof(AssetDragPayload));
+            }
             
             ImGui::Text("%s", item.name.c_str());
             ImGui::EndDragDropSource();
@@ -598,6 +718,10 @@ void AssetsPanel::renderGridItems()
                 std::filesystem::path src = info->path;
                 std::filesystem::rename(src, item.fullPath / src.filename());
                 refresh();
+            }
+
+            if (AcceptHierarchyEntityDrop(item.fullPath)) {
+                m_refreshAfterPrefabDrop = true;
             }
             
             ImGui::EndDragDropTarget();

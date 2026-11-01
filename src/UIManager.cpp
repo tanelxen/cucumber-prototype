@@ -10,12 +10,15 @@
 #include "RenderDevice.h"
 
 #include "ViewportPanel.h"
+#include "EditorCamera.h"
 #include "InspectorPanel.h"
 #include "AssetsPanel.h"
 #include "HierarchyPanel.h"
+#include "LightComponent.h"
 
 #include "SceneManager.h"
 #include "World.h"
+#include "Entity.h"
 #include "ScriptEngine.h"
 #include "ProjectManager.h"
 
@@ -534,8 +537,6 @@ void UIManager::drawProjectLauncher()
 
 bool UIManager::openProjectPath(const std::filesystem::path& path)
 {
-    saveProjectSettings();
-    
     std::string error;
     auto& projectManager = ProjectManager::Get();
     
@@ -579,21 +580,20 @@ bool UIManager::openProjectPath(const std::filesystem::path& path)
     
     m_pAssetsPanel->setRootPath(projectManager.assetsPath());
     
-    const auto cameraPosition = projectManager.editorCameraPosition();
-    m_pViewportPanel->setEditorCameraPosition({cameraPosition[0], cameraPosition[1], cameraPosition[2]});
-    
     m_projectError.clear();
     m_showProjectLauncher = false;
     
     return true;
 }
 
-void UIManager::saveProjectSettings()
+EditorCamera& UIManager::editorCamera()
 {
-    if (!ProjectManager::Get().hasOpenProject()) return;
-    
-    const auto position = m_pViewportPanel->getEditorCameraPosition();
-    ProjectManager::Get().saveEditorCamera(position.x, position.y, position.z);
+    return m_pViewportPanel->viewport().camera();
+}
+
+void UIManager::resetEditorCamera()
+{
+    editorCamera() = EditorCamera{};
 }
 
 void UIManager::drawPanels()
@@ -612,10 +612,37 @@ void UIManager::drawPanels()
 void UIManager::setEntity(Entity *entity)
 {
     m_pInspectorPanel->setEntity(entity);
+    m_pHierarchyPanel->setEntity(entity);
     
     for (auto* panel : m_viewportPanels)
     {
         panel->setEntity(entity);
+    }
+}
+
+void UIManager::drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position)
+{
+    const auto createEntity = [&](const std::string& name, bool addLight)
+    {
+        auto entity = std::make_unique<Entity>(name);
+        entity->scene = &scene;
+        entity->getTransform().setPosition(position);
+
+        if (addLight) {
+            entity->addComponent<LightComponent>();
+        }
+
+        Entity* createdEntity = entity.get();
+        scene.m_entities.push_back(std::move(entity));
+        setEntity(createdEntity);
+    };
+
+    const auto count = std::to_string(scene.m_entities.size());
+    if (ImGui::MenuItem("Empty")) {
+        createEntity("Entity_" + count, false);
+    }
+    if (ImGui::MenuItem("Light")) {
+        createEntity("Light_" + count, true);
     }
 }
 

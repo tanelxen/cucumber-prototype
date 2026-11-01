@@ -52,10 +52,9 @@ EditorCamera::Basis EditorCamera::basis() const
     return b;
 }
 
-void EditorCamera::update(float dt, const Input::State& input, float scrollWheel, int viewportHeightPx, bool canStartCapture)
+void EditorCamera::update(float dt, const Input::State& input, float scrollWheel, int viewportHeightPx, bool captureMouse)
 {
-    // Уже летим — продолжаем, пока ПКМ зажата. Начать можно только с разрешения панели.
-    m_capturing = input.isRightMouseButtonPressed() && (m_capturing || canStartCapture);
+    m_capturing = captureMouse;
     
     if (isOrtho()) updateOrtho(input, scrollWheel, viewportHeightPx);
     else           updatePerspective(dt, input);
