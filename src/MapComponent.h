@@ -30,10 +30,6 @@ struct MapComponent : public Component
     void save(nlohmann::json& j) const override;
     void load(const nlohmann::json& j) override;
     
-    //bool loadTrenchBroomMap(const std::filesystem::path& filepath);
-    //bool rebuildLightmapUVs();
-    void reload();
-    
     bool bakeLighting();                            // запускает фоновый бейк и сразу возвращается
     void cancelBake()          { lightmap.cancel(); }
     bool isBaking() const      { return lightmap.isBaking(); }
@@ -46,6 +42,7 @@ struct MapComponent : public Component
     bool loadTrenchBroomMap(const std::filesystem::path& filepath);
     bool loadLevel(const std::filesystem::path& filepath);                 // .cmap.json
     bool importTrenchBroomMap(const std::filesystem::path& mapFile, bool overwrite = false);
+    bool reimportSource();
     bool saveLevel();
     bool rebuildFromDocument();     // меш + физика из level; вызывать после правок документа
     bool rebuildLightmapUVs();      // теперь тоже из level, файл не читается

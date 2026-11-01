@@ -133,14 +133,6 @@ void MapComponent::load(const nlohmann::json& j)
     }
 }
 
-void MapComponent::reload()
-{
-    if (path != "<no map>")
-    {
-        importTrenchBroomMap(path, true);
-    }
-}
-
 std::filesystem::path MapComponent::lightmapCachePath() const
 {
     return ProjectManager::Get().assetsPath() / (path + ".lightmap");
@@ -175,12 +167,25 @@ bool MapComponent::importTrenchBroomMap(const std::filesystem::path& mapFile, bo
     << ", entities ignored " << report.entitiesIgnored << std::endl;
     for (const auto& warning : report.warnings) std::cout << "[Import] " << warning << std::endl;
     
+    // generic_string: слеши одинаковые на всех платформах
+    imported.sourceMap = mapFile.generic_string();
+    
     if (!LevelDocumentIO::Save(assets / levelRel, imported, error))
     {
         bakeStatus = "Cannot save level: " + error;
         return false;
     }
     return loadLevel(levelRel);
+}
+
+bool MapComponent::reimportSource()
+{
+    if (level.sourceMap.empty())
+    {
+        bakeStatus = "This level was not imported from a .map";
+        return false;
+    }
+    return importTrenchBroomMap(level.sourceMap, /*overwrite*/ true);
 }
 
 bool MapComponent::loadLevel(const std::filesystem::path& filepath)

@@ -177,16 +177,25 @@ bool LevelDocumentIO::ToString(const LevelDocument& document, std::string& out, 
     }
 
     std::ostringstream stream;
+    
     stream << "{\n";
     stream << "  \"format\": " << Json(kFormat).dump() << ",\n";
     stream << "  \"version\": " << document.version << ",\n";
+    
+    if (!document.sourceMap.empty())
+    {
+        stream << "  \"source\": " << Json(document.sourceMap).dump() << ",\n";
+    }
+    
     stream << "  \"settings\": " << Json({ { "gridSnap", Exact(document.settings.gridSnap) } }).dump() << ",\n";
     stream << "  \"materials\": " << Json(document.materials).dump() << ",\n";
     stream << "  \"solids\": [\n";
+    
     for (size_t i = 0; i < document.solids.size(); ++i)
     {
         stream << "    " << SolidToJson(document.solids[i]).dump() << (i + 1 < document.solids.size() ? "," : "") << "\n";
     }
+    
     stream << "  ]\n";
     stream << "}\n";
 
@@ -219,6 +228,8 @@ bool LevelDocumentIO::FromString(const std::string& text, LevelDocument& out, st
         return false;
     }
     out.version = version;
+    
+    out.sourceMap = root.value("source", "");
 
     if (root.contains("settings") && root["settings"].is_object())
     {

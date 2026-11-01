@@ -371,9 +371,9 @@ static void DrawMapComponent(MapComponent* comp)
     ImGui::PopStyleColor();
     
     
-    if (ImGui::Button("Reload"))
+    if (ImGui::Button("Reimport"))
     {
-        comp->reload();
+        comp->reimportSource();
     }
     
     ImGui::SameLine();

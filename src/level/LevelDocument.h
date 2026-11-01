@@ -71,6 +71,9 @@ struct LevelDocument
 
     // Не сериализуется: каталог документа (нужен, чтобы найти scripts/ с шейдерами материалов)
     std::filesystem::path basePath;
+    
+    // откуда импортирован (путь относительно assets), пусто для уровней, созданных в редакторе
+    std::string sourceMap;
 
     // Индекс материала по пути; добавляет, если такого ещё нет
     uint32_t materialIndex(const std::string& path);
