@@ -1,0 +1,33 @@
+//
+//  SolidBuilder.h
+//  Cucumber
+//
+//  Построение и пересборка выпуклых солидов по плоскостям. Общая основа для создания бокса, push/pull граней
+//  и (позже) правки вершин: грани переносят uid, материал и UV, меняется только форма.
+//
+
+#pragma once
+
+#include "LevelDocument.h"
+#include "geometry/Brush.h"
+
+#include <string>
+#include <vector>
+
+// Плоскости граней солида (в порядке faces), нормали наружу
+std::vector<Geo::Plane> SolidPlanes(const Solid& solid);
+
+Geo::Vec3 FaceCentroid(const Solid& solid, const Face& face);
+
+// UV по умолчанию для грани с данной нормалью: проекция вдоль доминирующей оси, масштаб 1
+FaceUV DefaultFaceUV(const glm::vec3& outwardNormal);
+
+// Пересобирает тело из плоскостей: planes[i] соответствует source.faces[i]. Грани сохраняют uid, материал, UV, флаги.
+// false, если какая-то грань исчезла (схлопнулась) или результат не проходит ValidateSolid.
+// Координаты округляются до 1/256, чтобы многократные правки не копили шум float (сетка остаётся ровной).
+bool RebuildSolid(const Solid& source, const std::vector<Geo::Plane>& planes, size_t materialCount,
+                  Solid& out, std::string& error);
+
+// Новый осевой бокс. Грани получают новые uid и материал `material`.
+bool MakeBoxSolid(const glm::dvec3& mins, const glm::dvec3& maxs, uint32_t material, size_t materialCount,
+                  Solid& out, std::string& error);

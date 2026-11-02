@@ -215,6 +215,11 @@ set(SRC_GEOMETRY
 )
 
 set(SRC_LEVEL
+    src/level/BlockTool.cpp
+    src/level/BlockTool.h
+    src/level/EditMath.cpp
+    src/level/EditMath.h
+    
     src/level/LevelDocument.cpp
     src/level/LevelDocument.h
     src/level/LevelDocumentIO.cpp
@@ -227,6 +232,14 @@ set(SRC_LEVEL
     src/level/LevelHistory.h
     src/level/LevelPicking.cpp
     src/level/LevelPicking.h
+
+    src/level/LevelTool.cpp
+    src/level/LevelTool.h
+    src/level/SelectTool.cpp
+    src/level/SelectTool.h
+    src/level/SolidBuilder.cpp
+    src/level/SolidBuilder.h
+    src/level/ViewportPointer.h
 )
 
 set(SRC_IMGUI

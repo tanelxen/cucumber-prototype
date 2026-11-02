@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <utility>
 
 namespace
 {
@@ -131,6 +133,55 @@ bool RaycastLevel(const LevelDocument& level, const glm::vec3& origin, const glm
         out.distance = static_cast<float>(distance);
         out.position = glm::vec3(o + d * distance);
         out.normal = FaceNormal(solid, solid.faces[face]);
+    }
+    return found;
+}
+
+bool PickResizeFace(const Solid& solid, const Edit::Ray& ray, const Edit::PickTolerance& tolerance, FacePick& out)
+{
+    float distance = 0.0f;
+    size_t face = 0;
+    if (RaycastSolid(solid, glm::vec3(ray.origin), glm::vec3(ray.dir), static_cast<float>(ray.maxDistance), distance, face))
+    {
+        out = { face, static_cast<double>(distance), false };
+        return true;
+    }
+
+    // Рёбра с двумя смежными гранями: ключ (меньший, больший индекс вершины), a = грань с направлением от меньшего к большему
+    struct EdgeFaces { int a = -1; int b = -1; };
+    std::map<std::pair<uint32_t, uint32_t>, EdgeFaces> edges;
+
+    for (size_t f = 0; f < solid.faces.size(); ++f)
+    {
+        const std::vector<uint32_t>& loop = solid.faces[f].loop;
+        for (size_t i = 0; i < loop.size(); ++i)
+        {
+            const uint32_t u = loop[i];
+            const uint32_t v = loop[(i + 1) % loop.size()];
+            EdgeFaces& edge = edges[{ std::min(u, v), std::max(u, v) }];
+            (u < v ? edge.a : edge.b) = static_cast<int>(f);
+        }
+    }
+
+    bool found = false;
+    double bestDistance = 0.0;
+
+    for (const auto& [key, adjacent] : edges)
+    {
+        if (adjacent.a < 0 || adjacent.b < 0) continue;
+
+        const Edit::SegmentApproach approach = Edit::ClosestRaySegment(ray, glm::dvec3(solid.vertices[key.first]),
+                                                                            glm::dvec3(solid.vertices[key.second]));
+        if (approach.distance > tolerance.at(approach.rayT)) continue;
+        if (found && approach.distance >= bestDistance) continue;
+
+        const glm::dvec3 offset = approach.rayPoint - approach.segmentPoint;
+        const double scoreA = glm::dot(glm::dvec3(FaceNormal(solid, solid.faces[adjacent.a])), offset);
+        const double scoreB = glm::dot(glm::dvec3(FaceNormal(solid, solid.faces[adjacent.b])), offset);
+
+        found = true;
+        bestDistance = approach.distance;
+        out = { static_cast<size_t>(scoreA >= scoreB ? adjacent.a : adjacent.b), approach.rayT, true };
     }
     return found;
 }

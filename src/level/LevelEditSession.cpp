@@ -5,7 +5,11 @@
 
 #include "LevelEditSession.h"
 
+#include "BlockTool.h"
+#include "SelectTool.h"
+
 #include <algorithm>
+#include <map>
 
 Solid TranslatedSolid(const Solid& solid, const glm::vec3& delta, bool textureLock)
 {
@@ -30,6 +34,15 @@ Solid TranslatedSolid(const Solid& solid, const glm::vec3& delta, bool textureLo
 LevelEditSession::LevelEditSession(LevelDocument& document, ChangedCallback onChanged)
     : m_document(document), m_onChanged(std::move(onChanged))
 {
+    m_tools[static_cast<size_t>(ToolType::Select)] = std::make_unique<SelectTool>();
+    m_tools[static_cast<size_t>(ToolType::Block)] = std::make_unique<BlockTool>();
+}
+
+LevelEditSession::~LevelEditSession() = default;
+
+double LevelEditSession::gridSize() const
+{
+    return m_document.settings.gridSnap > 0.0f ? static_cast<double>(m_document.settings.gridSnap) : 1.0;
 }
 
 void LevelEditSession::notify(const ChangeSet& changes)
@@ -51,6 +64,7 @@ bool LevelEditSession::commit(std::string name, std::vector<SolidChange> changes
 
 bool LevelEditSession::undo()
 {
+    if (isToolBusy()) return false;
     ChangeSet result;
     if (!m_history.undo(m_document, result)) return false;
     notify(result);
@@ -59,6 +73,7 @@ bool LevelEditSession::undo()
 
 bool LevelEditSession::redo()
 {
+    if (isToolBusy()) return false;
     ChangeSet result;
     if (!m_history.redo(m_document, result)) return false;
     notify(result);
@@ -67,6 +82,8 @@ bool LevelEditSession::redo()
 
 bool LevelEditSession::deleteSelection()
 {
+    if (isToolBusy()) return false;
+
     std::vector<SolidChange> changes;
     for (uint64_t uid : m_selectedSolids)
     {
@@ -79,7 +96,7 @@ bool LevelEditSession::deleteSelection()
 
 bool LevelEditSession::translateSelection(const glm::vec3& delta, bool textureLock)
 {
-    if (delta == glm::vec3(0.0f)) return false;
+    if (delta == glm::vec3(0.0f) || isToolBusy()) return false;
 
     std::vector<SolidChange> changes;
     for (uint64_t uid : m_selectedSolids)
@@ -150,7 +167,87 @@ void LevelEditSession::pruneSelection()
     }
 }
 
-void LevelEditSession::handlePointer(uint32_t viewId, const ViewportPointer& pointer)
+uint32_t LevelEditSession::currentMaterial()
+{
+    const auto faceMaterial = [&](const Solid& solid, uint64_t faceUid) -> int64_t
+    {
+        for (const Face& face : solid.faces)
+        {
+            if (face.uid == faceUid) return face.material;
+        }
+        return -1;
+    };
+
+    if (m_selectedFace != 0)
+    {
+        if (const Solid* solid = findSolid(m_selectedFaceSolid))
+        {
+            const int64_t material = faceMaterial(*solid, m_selectedFace);
+            if (material >= 0) return static_cast<uint32_t>(material);
+        }
+    }
+
+    // Самый частый материал среди видимых граней (выделенных солидов, если они есть, иначе всего документа)
+    std::map<uint32_t, int> counts;
+    const auto count = [&](const Solid& solid)
+    {
+        for (const Face& face : solid.faces)
+        {
+            if (!(face.flags & FaceFlag::NoDraw)) ++counts[face.material];
+        }
+    };
+
+    for (uint64_t uid : m_selectedSolids)
+    {
+        if (const Solid* solid = findSolid(uid)) count(*solid);
+    }
+    if (counts.empty())
+    {
+        for (const Solid& solid : m_document.solids) count(solid);
+    }
+
+    uint32_t best = 0;
+    int bestCount = 0;
+    for (const auto& [material, n] : counts)
+    {
+        if (n > bestCount) { best = material; bestCount = n; }
+    }
+    if (bestCount > 0) return best;
+
+    // Подсказок нет: первый материал таблицы, а в пустой таблице заводим "default"
+    return m_document.materials.empty() ? m_document.materialIndex("default") : 0;
+}
+
+void LevelEditSession::setTool(ToolType type)
+{
+    if (type == m_active) return;
+
+    activeTool().cancel();
+    m_active = type;
+    m_hasHover = false;
+}
+
+bool LevelEditSession::escape()
+{
+    if (activeTool().isBusy())
+    {
+        activeTool().cancel();
+        return true;
+    }
+    if (m_active != ToolType::Select)
+    {
+        setTool(ToolType::Select);
+        return true;
+    }
+    if (!m_selectedSolids.empty() || m_selectedFace != 0)
+    {
+        clearSelection();
+        return true;
+    }
+    return false;
+}
+
+void LevelEditSession::updateHover(uint32_t viewId, const ViewportPointer& pointer)
 {
     if (!pointer.over)
     {
@@ -159,23 +256,14 @@ void LevelEditSession::handlePointer(uint32_t viewId, const ViewportPointer& poi
     }
 
     m_hoverView = viewId;
-    m_hasHover = false;
+    const Edit::Ray ray = MakeRay(pointer);
+    m_hasHover = RaycastLevel(m_document, glm::vec3(ray.origin), glm::vec3(ray.dir), static_cast<float>(ray.maxDistance), m_hover);
+}
 
-    glm::vec3 origin, direction;
-    ScreenPointToRay(pointer.camera, pointer.sizePx, pointer.mousePx, origin, direction);
+void LevelEditSession::handlePointer(uint32_t viewId, const ViewportPointer& pointer)
+{
+    if (m_active == ToolType::Select && !isToolBusy()) updateHover(viewId, pointer);
+    else                                               m_hasHover = false;
 
-    // В ортографии луч стартует на ближней плоскости (нижняя граница диапазона), в перспективе в глазу
-    const float maxDistance = (pointer.camera.farZ - pointer.camera.nearZ) * 1.01f;
-    m_hasHover = RaycastLevel(m_document, origin, direction, maxDistance, m_hover);
-
-    if (!pointer.pressed) return;
-
-    if (!m_hasHover)
-    {
-        if (!pointer.ctrl) clearSelection();
-        return;
-    }
-
-    if (pointer.alt) selectFace(m_hover.solidUid, m_hover.faceUid);
-    else             selectSolid(m_hover.solidUid, pointer.ctrl);
+    activeTool().onPointer(*this, viewId, pointer);
 }

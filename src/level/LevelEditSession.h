@@ -2,34 +2,28 @@
 //  LevelEditSession.h
 //  Cucumber
 //
-//  Состояние одного сеанса правки геометрии: история, выделение, наведение. Живёт, пока уровень в режиме Edit
-//  (владеет им MapComponent). Про OpenGL, ImGui и рендер не знает: ввод приходит в виде ViewportPointer,
-//  результат правок уходит потребителям через ChangedCallback (ChangeSet).
+//  Состояние одного сеанса правки геометрии: история, выделение, наведение, активный инструмент. Живёт, пока
+//  уровень в режиме Edit (владеет им MapComponent). Про OpenGL, ImGui и рендер не знает: ввод приходит в виде
+//  ViewportPointer, результат правок уходит потребителям через ChangedCallback (ChangeSet).
 //
 
 #pragma once
 
 #include "LevelHistory.h"
 #include "LevelPicking.h"
-#include "ViewDesc.h"
+#include "LevelTool.h"
+#include "ViewportPointer.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
-// Состояние указателя над одним видом за кадр. Заполняет панель вьюпорта.
-struct ViewportPointer
+enum class ToolType
 {
-    CameraData camera;
-    glm::ivec2 sizePx{1, 1};
-    glm::vec2 mousePx{0.0f};     // относительно левого верхнего угла вида
-    bool over = false;           // вид вправе принять ввод: курсор над ним, не летим ПКМ, не тянем гизмо
-    bool pressed = false;        // ЛКМ нажата именно в этом кадре
-    bool down = false;
-    bool released = false;
-    bool ctrl = false;
-    bool shift = false;
-    bool alt = false;
+    Select = 0,
+    Block,
+    Count
 };
 
 class LevelEditSession
@@ -39,14 +33,18 @@ public:
 
     // document должен пережить сессию
     LevelEditSession(LevelDocument& document, ChangedCallback onChanged);
+    ~LevelEditSession();
 
     LevelDocument& document() { return m_document; }
     const LevelDocument& document() const { return m_document; }
     LevelHistory& history() { return m_history; }
     const LevelHistory& history() const { return m_history; }
 
+    double gridSize() const;   // шаг сетки документа (всегда > 0)
+
     // --- Правки (все проходят через историю) ---
     bool commit(std::string name, std::vector<SolidChange> changes);
+    // undo / redo / deleteSelection / translateSelection не выполняются, пока инструмент в середине операции
     bool undo();
     bool redo();
 
@@ -64,6 +62,20 @@ public:
     void selectFace(uint64_t solidUid, uint64_t faceUid);
     const Solid* findSolid(uint64_t uid) const;
 
+    // Материал для новых тел: у выделенной грани, иначе у выделенного солида, иначе самый частый в документе.
+    // Если подсказок нет: первый материал таблицы, а при пустой таблице добавляется "default".
+    uint32_t currentMaterial();
+
+    // --- Инструменты ---
+    void setTool(ToolType type);              // прерывает операцию прежнего инструмента
+    ToolType activeToolType() const { return m_active; }
+    LevelTool& activeTool() { return *m_tools[static_cast<size_t>(m_active)]; }
+    const LevelTool& activeTool() const { return *m_tools[static_cast<size_t>(m_active)]; }
+    bool isToolBusy() const { return activeTool().isBusy(); }
+
+    // Esc: прервать операцию; иначе вернуться к Select; иначе снять выделение. true, если что-то сделано.
+    bool escape();
+
     // --- Ввод ---
     // Вызывать для каждого вида каждый кадр (с over = false тоже). Наведение привязано к виду, который его
     // выставил: вид, над которым курсора нет, чужое наведение не сбрасывает (панелей несколько).
@@ -72,14 +84,19 @@ public:
     const LevelHit& hover() const { return m_hover; }
 
     const std::string& lastError() const { return m_lastError; }
+    void reportError(std::string message) { m_lastError = std::move(message); }
 
 private:
     void notify(const ChangeSet& changes);
     void pruneSelection();
+    void updateHover(uint32_t viewId, const ViewportPointer& pointer);
 
     LevelDocument& m_document;
     LevelHistory m_history;
     ChangedCallback m_onChanged;
+
+    std::unique_ptr<LevelTool> m_tools[static_cast<size_t>(ToolType::Count)];
+    ToolType m_active = ToolType::Select;
 
     std::vector<uint64_t> m_selectedSolids;
     uint64_t m_selectedFace = 0;

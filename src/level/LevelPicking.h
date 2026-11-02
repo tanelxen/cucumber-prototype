@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "EditMath.h"
 #include "LevelDocument.h"
 
 #include <cstdint>
@@ -30,3 +31,15 @@ bool RaycastSolid(const Solid& solid, const glm::vec3& origin, const glm::vec3& 
 // Ближайшее попадание по всему документу. Грани NoDraw тоже участвуют: clip-браши должны выбираться.
 bool RaycastLevel(const LevelDocument& level, const glm::vec3& origin, const glm::vec3& direction, float maxDistance,
                   LevelHit& out);
+
+struct FacePick
+{
+    size_t face = 0;
+    double distance = 0.0;     // расстояние вдоль луча (для выбора ближайшего из нескольких солидов)
+    bool viaEdge = false;      // true: курсор вне силуэта, грань выбрана по ближайшему ребру
+};
+
+// Грань для push/pull. Луч попал в тело: грань, через которую он входит (спереди). Иначе ближайшее к лучу ребро
+// (в пределах tolerance), и из двух смежных граней берётся та, в сторону нормали которой курсор ушёл от ребра.
+// Поэтому задняя грань выбирается, когда курсор пересекает силуэт с её стороны.
+bool PickResizeFace(const Solid& solid, const Edit::Ray& ray, const Edit::PickTolerance& tolerance, FacePick& out);

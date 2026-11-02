@@ -20,6 +20,7 @@
 #include "SceneSerializer.h"
 
 #include "level/LevelEditSession.h"
+#include "level/LevelEditOverlay.h"
 #include "MapComponent.h"
 
 #include "../vendor/IconsMaterialDesignIcons.h"
@@ -372,11 +373,18 @@ void ViewportPanel::update(float dt)
         pointer.down     = physicalInput.isLeftMouseButtonPressed();
         pointer.pressed  = physicalInput.isLeftMouseButtonJustPressed();
         pointer.released = physicalInput.isLeftMouseButtonClicked();
-        pointer.ctrl = mod; pointer.shift = io.KeyShift; pointer.alt = io.KeyAlt;
+        pointer.ctrl = mod;
+        pointer.shift = io.KeyShift;
+        pointer.alt = io.KeyAlt;
+        pointer.capturing = camera.isCapturingMouse();
         edit->handlePointer(m_viewport.id(), pointer);
         
         if (m_focused && !io.WantTextInput)
         {
+            if (ImGui::IsKeyPressed(ImGuiKey_B, false)) edit->setTool(ToolType::Block);
+            if (ImGui::IsKeyPressed(ImGuiKey_V, false)) edit->setTool(ToolType::Select);
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) edit->escape();
+            
             if (mod && ImGui::IsKeyPressed(ImGuiKey_Z, false)) { if (io.KeyShift) edit->redo(); else edit->undo(); }
             if (mod && ImGui::IsKeyPressed(ImGuiKey_Y, false)) edit->redo();
             if (mod && ImGui::IsKeyPressed(ImGuiKey_S, false)) scene->getMap()->saveLevel();
@@ -492,6 +500,15 @@ void ViewportPanel::draw()
     m_imageRight = viewportMax.x;
     m_imageBottom = viewportMax.y;
     m_hasImageBounds = viewportMax.x > viewportMin.x && viewportMax.y > viewportMin.y;
+    
+    if (auto* edit = ActiveEditSession(*scene))
+    {
+        DrawLevelEditLabels(*edit, camera.build(m_viewport.aspect()),
+                            m_imageLeft, m_imageTop, m_imageRight - m_imageLeft, m_imageBottom - m_imageTop);
+        
+        ImGui::SetCursorScreenPos(ImVec2(m_imageLeft + 8, m_imageTop + 8));
+        ImGui::TextColored(ImVec4(1, 1, 1, 0.85f), "%s: %s", edit->activeTool().name(), edit->activeTool().hint().c_str());
+    }
 
     if (!scene->isSimulationMode() && ImGui::BeginDragDropTarget())
     {
