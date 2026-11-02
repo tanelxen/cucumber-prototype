@@ -7,6 +7,7 @@
 
 #include "geometry/Epsilon.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -121,4 +122,129 @@ bool MakeBoxSolid(const glm::dvec3& mins, const glm::dvec3& maxs, uint32_t mater
     }
 
     return RebuildSolid(shell, planes, materialCount, out, error);
+}
+
+bool RebuildSolidFromVertices(const Solid& source, const std::vector<glm::dvec3>& positions, size_t materialCount,
+                              Solid& out, std::string& error)
+{
+    const size_t count = source.vertices.size();
+    if (positions.size() != count) { error = "Vertex count differs"; return false; }
+
+    std::vector<Geo::Vec3> points;
+    points.reserve(count);
+    for (const glm::dvec3& p : positions) points.push_back({ CleanCoordinate(p.x), CleanCoordinate(p.y), CleanCoordinate(p.z) });
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        for (size_t j = i + 1; j < count; ++j)
+        {
+            if (glm::distance(points[i], points[j]) <= Geo::kWeld) { error = "Two vertices merged"; return false; }
+        }
+    }
+
+    std::vector<Geo::Polygon> hull;
+    if (!Geo::ConvexHullPolygons(points, hull)) { error = "Vertices do not form a volume"; return false; }
+
+    std::vector<Geo::Vec3> hullVertices;
+    std::vector<std::vector<uint32_t>> hullLoops;
+    Geo::IndexPolygons(hull, Geo::kWeld, hullVertices, hullLoops);
+
+    // Вершины оболочки (пересечения плоскостей, с шумом double) возвращаем к исходным точкам: так координаты остаются круглыми
+    constexpr double kMatch = Geo::kWeld * 5.0;
+    std::vector<int> toSource(hullVertices.size(), -1);
+    std::vector<bool> used(count, false);
+
+    for (size_t h = 0; h < hullVertices.size(); ++h)
+    {
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (glm::distance(hullVertices[h], points[i]) > kMatch) continue;
+            if (used[i]) { error = "Vertices too close together"; return false; }
+            toSource[h] = static_cast<int>(i);
+            used[i] = true;
+            break;
+        }
+        if (toSource[h] < 0) { error = "Unexpected hull vertex"; return false; }
+    }
+    for (size_t i = 0; i < count; ++i)
+    {
+        if (!used[i]) { error = "A vertex ended up inside the solid"; return false; }
+    }
+
+    // Нормали и вершины старых граней для наследования
+    const std::vector<Geo::Plane> oldPlanes = SolidPlanes(source);
+
+    struct NewFace
+    {
+        std::vector<uint32_t> loop;
+        size_t parent = 0;
+        int overlap = 0;
+        double alignment = 0.0;
+    };
+    std::vector<NewFace> faces;
+
+    for (const std::vector<uint32_t>& hullLoop : hullLoops)
+    {
+        if (hullLoop.size() < 3) continue;
+
+        NewFace face;
+        for (uint32_t h : hullLoop) face.loop.push_back(static_cast<uint32_t>(toSource[h]));
+
+        Geo::Polygon polygon;
+        for (uint32_t index : face.loop) polygon.push_back(points[index]);
+        const Geo::Vec3 normal = glm::normalize(Geo::NewellNormal(polygon));
+
+        int bestOverlap = -1;
+        double bestAlignment = -2.0;
+        for (size_t f = 0; f < source.faces.size(); ++f)
+        {
+            int overlap = 0;
+            for (uint32_t index : face.loop)
+            {
+                overlap += std::count(source.faces[f].loop.begin(), source.faces[f].loop.end(), index) > 0 ? 1 : 0;
+            }
+            if (overlap < 2) overlap = 0;   // одна общая вершина ничего не значит: решает нормаль
+
+            const double alignment = glm::dot(normal, oldPlanes[f].normal);
+            if (overlap > bestOverlap || (overlap == bestOverlap && alignment > bestAlignment))
+            {
+                bestOverlap = overlap;
+                bestAlignment = alignment;
+                face.parent = f;
+            }
+        }
+        face.overlap = bestOverlap;
+        face.alignment = bestAlignment;
+        faces.push_back(std::move(face));
+    }
+
+    // uid старой грани достаётся лучшему из её наследников
+    std::vector<int> owner(source.faces.size(), -1);
+    for (size_t n = 0; n < faces.size(); ++n)
+    {
+        int& best = owner[faces[n].parent];
+        if (best < 0 || faces[n].overlap > faces[best].overlap ||
+            (faces[n].overlap == faces[best].overlap && faces[n].alignment > faces[best].alignment))
+        {
+            best = static_cast<int>(n);
+        }
+    }
+
+    Solid result;
+    result.uid = source.uid;
+    for (const Geo::Vec3& p : points) result.vertices.push_back(glm::vec3(p));
+
+    for (size_t n = 0; n < faces.size(); ++n)
+    {
+        Face face = source.faces[faces[n].parent];
+        face.loop = faces[n].loop;
+        if (owner[faces[n].parent] != static_cast<int>(n)) face.uid = NewUid();
+        result.faces.push_back(std::move(face));
+    }
+
+    if (!ValidateSolid(result, materialCount, error)) return false;
+
+    out = std::move(result);
+    error.clear();
+    return true;
 }

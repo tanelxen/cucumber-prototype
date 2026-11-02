@@ -51,3 +51,23 @@ inline Edit::PickTolerance PixelTolerance(const ViewportPointer& pointer, float 
     else                      tolerance.perDistance = perPixel * pixels;
     return tolerance;
 }
+
+// Мировая точка в пиксели вида (начало в левом верхнем углу). false, если точка позади камеры.
+inline bool ProjectToPixels(const ViewportPointer& pointer, const glm::vec3& world, glm::vec2& outPixels)
+{
+    const glm::vec4 clip = pointer.camera.viewProj() * glm::vec4(world, 1.0f);
+    if (clip.w <= 1e-4f) return false;
+
+    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+    outPixels = { (ndc.x * 0.5f + 0.5f) * pointer.sizePx.x, (1.0f - (ndc.y * 0.5f + 0.5f)) * pointer.sizePx.y };
+    return true;
+}
+
+// Расстояние от точки до отрезка на экране
+inline float PixelDistanceToSegment(const glm::vec2& p, const glm::vec2& a, const glm::vec2& b)
+{
+    const glm::vec2 ab = b - a;
+    const float length2 = glm::dot(ab, ab);
+    const float t = length2 > 1e-6f ? std::clamp(glm::dot(p - a, ab) / length2, 0.0f, 1.0f) : 0.0f;
+    return glm::length(p - (a + ab * t));
+}

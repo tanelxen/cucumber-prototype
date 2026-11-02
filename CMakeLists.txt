@@ -217,6 +217,8 @@ set(SRC_GEOMETRY
 set(SRC_LEVEL
     src/level/BlockTool.cpp
     src/level/BlockTool.h
+    src/level/VertexTool.cpp
+    src/level/VertexTool.h
     src/level/EditMath.cpp
     src/level/EditMath.h
     

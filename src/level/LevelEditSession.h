@@ -23,6 +23,7 @@ enum class ToolType
 {
     Select = 0,
     Block,
+    Vertex,
     Count
 };
 
@@ -72,6 +73,9 @@ public:
     LevelTool& activeTool() { return *m_tools[static_cast<size_t>(m_active)]; }
     const LevelTool& activeTool() const { return *m_tools[static_cast<size_t>(m_active)]; }
     bool isToolBusy() const { return activeTool().isBusy(); }
+
+    // Клавиша активному инструменту (панель уже отфильтровала фокус, текстовый ввод и полёт камеры)
+    bool handleKey(LevelKey key, bool shift) { return activeTool().onKey(*this, key, shift); }
 
     // Esc: прервать операцию; иначе вернуться к Select; иначе снять выделение. true, если что-то сделано.
     bool escape();

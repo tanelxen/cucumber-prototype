@@ -379,7 +379,7 @@ void ViewportPanel::update(float dt)
         pointer.capturing = camera.isCapturingMouse();
         edit->handlePointer(m_viewport.id(), pointer);
         
-        if (m_focused && !io.WantTextInput)
+        if (m_focused && !io.WantTextInput && !pointer.capturing)
         {
             if (ImGui::IsKeyPressed(ImGuiKey_B, false)) edit->setTool(ToolType::Block);
             if (ImGui::IsKeyPressed(ImGuiKey_V, false)) edit->setTool(ToolType::Select);
@@ -390,6 +390,21 @@ void ViewportPanel::update(float dt)
             if (mod && ImGui::IsKeyPressed(ImGuiKey_S, false)) scene->getMap()->saveLevel();
             if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
                 edit->deleteSelection();
+            
+            const bool plain = !mod;   // Ctrl+Z / Ctrl+Y остаются за undo / redo
+            if (ImGui::IsKeyPressed(ImGuiKey_E, false)) edit->setTool(ToolType::Vertex);
+            if (plain)
+            {
+                if (ImGui::IsKeyPressed(ImGuiKey_X, false)) edit->handleKey(LevelKey::X, io.KeyShift);
+                if (ImGui::IsKeyPressed(ImGuiKey_Y, false)) edit->handleKey(LevelKey::Y, io.KeyShift);
+                if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) edit->handleKey(LevelKey::Z, io.KeyShift);
+                if (ImGui::IsKeyPressed(ImGuiKey_G, false)) edit->handleKey(LevelKey::G, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_A, false)) edit->handleKey(LevelKey::SelectAll, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_1, false)) edit->handleKey(LevelKey::Num1, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_2, false)) edit->handleKey(LevelKey::Num2, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+                    edit->handleKey(LevelKey::Enter, false);
+            }
         }
     }
 }

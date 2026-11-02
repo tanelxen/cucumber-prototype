@@ -80,22 +80,42 @@ void DrawLevelEditLabels(const LevelEditSession& session, const CameraData& came
 {
     ToolPreview preview;
     session.activeTool().collectPreview(session, preview);
-    if (preview.texts.empty()) return;
+    if (preview.texts.empty() && preview.points.empty()) return;
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const glm::mat4 viewProj = camera.viewProj();
 
-    for (const ToolPreview::Text& label : preview.texts)
+    // Мировая точка в экранные координаты ImGui; false, если позади камеры или за краем вида
+    const auto project = [&](const glm::vec3& world, ImVec2& out)
     {
-        const glm::vec4 clip = viewProj * glm::vec4(label.position, 1.0f);
-        if (clip.w <= 1e-4f) continue;   // позади камеры (в ортографии w = 1)
+        const glm::vec4 clip = viewProj * glm::vec4(world, 1.0f);
+        if (clip.w <= 1e-4f) return false;   // позади камеры (в ортографии w = 1)
 
         const glm::vec3 ndc = glm::vec3(clip) / clip.w;
-        if (ndc.x < -1.0f || ndc.x > 1.0f || ndc.y < -1.0f || ndc.y > 1.0f) continue;
+        if (ndc.x < -1.0f || ndc.x > 1.0f || ndc.y < -1.0f || ndc.y > 1.0f) return false;
+
+        out = ImVec2(x + (ndc.x * 0.5f + 0.5f) * width, y + (1.0f - (ndc.y * 0.5f + 0.5f)) * height);
+        return true;
+    };
+
+    // Маркеры вершин: квадраты постоянного экранного размера с тёмной обводкой
+    for (const ToolPreview::Point& point : preview.points)
+    {
+        ImVec2 center;
+        if (!project(point.position, center)) continue;
+
+        const float h = point.sizePx * 0.5f;
+        drawList->AddRectFilled(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), ToColor(point.color));
+        drawList->AddRect(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), IM_COL32(0, 0, 0, 200));
+    }
+
+    for (const ToolPreview::Text& label : preview.texts)
+    {
+        ImVec2 center;
+        if (!project(label.position, center)) continue;
 
         const ImVec2 size = ImGui::CalcTextSize(label.text.c_str());
-        const ImVec2 position(x + (ndc.x * 0.5f + 0.5f) * width - size.x * 0.5f,
-                              y + (1.0f - (ndc.y * 0.5f + 0.5f)) * height - size.y * 0.5f);
+        const ImVec2 position(center.x - size.x * 0.5f, center.y - size.y * 0.5f);
 
         drawList->AddRectFilled(ImVec2(position.x - 4, position.y - 2), ImVec2(position.x + size.x + 4, position.y + size.y + 2),
                                 IM_COL32(0, 0, 0, 160), 3.0f);

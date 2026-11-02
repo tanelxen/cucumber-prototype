@@ -31,3 +31,12 @@ bool RebuildSolid(const Solid& source, const std::vector<Geo::Plane>& planes, si
 // Новый осевой бокс. Грани получают новые uid и материал `material`.
 bool MakeBoxSolid(const glm::dvec3& mins, const glm::dvec3& maxs, uint32_t material, size_t materialCount,
                   Solid& out, std::string& error);
+
+// Пересобирает тело из новых положений его вершин (positions[i] соответствует source.vertices[i]).
+// Грани строятся заново как выпуклая оболочка, поэтому грань, у которой вершина ушла из плоскости, распадается на
+// треугольники, а грани, оказавшиеся в одной плоскости, сливаются. Каждая новая грань наследует материал, UV и флаги
+// старой грани с наибольшим числом общих вершин (при равенстве с наиболее близкой нормалью); uid сохраняет лучшая
+// из них, остальным выдаются новые. Порядок и число вершин сохраняются: индексы выбранных вершин остаются верными.
+// false, если вершина ушла внутрь тела или две вершины слились, или точки не образуют объём.
+bool RebuildSolidFromVertices(const Solid& source, const std::vector<glm::dvec3>& positions, size_t materialCount,
+                              Solid& out, std::string& error);

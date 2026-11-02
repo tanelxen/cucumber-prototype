@@ -7,6 +7,7 @@
 
 #include "BlockTool.h"
 #include "SelectTool.h"
+#include "VertexTool.h"
 
 #include <algorithm>
 #include <map>
@@ -36,6 +37,7 @@ LevelEditSession::LevelEditSession(LevelDocument& document, ChangedCallback onCh
 {
     m_tools[static_cast<size_t>(ToolType::Select)] = std::make_unique<SelectTool>();
     m_tools[static_cast<size_t>(ToolType::Block)] = std::make_unique<BlockTool>();
+    m_tools[static_cast<size_t>(ToolType::Vertex)] = std::make_unique<VertexTool>();
 }
 
 LevelEditSession::~LevelEditSession() = default;
