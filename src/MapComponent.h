@@ -37,7 +37,7 @@ struct MapComponent : public Component
     float bakeProgress() const { return lightmap.progress(); }
     bool isLightmapOutdated();
     
-    
+    bool createEmptyLevel(const std::filesystem::path& relativePath);
     
     // Принимает и .map (импорт, если .cmap.json ещё нет), и .cmap.json. Имя оставлено, чтобы Inspector не менялся.
     bool loadTrenchBroomMap(const std::filesystem::path& filepath);

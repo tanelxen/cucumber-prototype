@@ -40,6 +40,22 @@ namespace
     }
 }
 
+bool MapComponent::createEmptyLevel(const std::filesystem::path& relativePath)
+{
+    if (m_edit) { bakeStatus = "Exit edit mode first"; return false; }
+    
+    const auto absolute = ProjectManager::Get().assetsPath() / relativePath;
+    if (std::filesystem::exists(absolute)) { bakeStatus = "File already exists: " + relativePath.string(); return false; }
+    
+    std::error_code ec;
+    std::filesystem::create_directories(absolute.parent_path(), ec);
+    
+    std::string error;
+    if (!LevelDocumentIO::Save(absolute, LevelDocument{}, error)) { bakeStatus = "Cannot create level: " + error; return false; }
+    
+    return loadLevel(relativePath);   // выставит path, basePath и пустой меш
+}
+
 bool MapComponent::loadTrenchBroomMap(const std::filesystem::path& filepath)
 {
     if (m_edit) { bakeStatus = "Exit edit mode first"; return false; }
@@ -295,15 +311,23 @@ bool MapComponent::rebuildPhysicsBody()
 bool MapComponent::beginEdit()
 {
     if (m_edit) return true;
-    if (path == "<no map>") { bakeStatus = "No level loaded"; return false; }
-    if (isBaking())         { bakeStatus = "Cancel baking first"; return false; }
+    if (isBaking()) { bakeStatus = "Cancel baking first"; return false; }
     if (owner && owner->scene && owner->scene->isSimulationMode()) return false;
     
+    if (path == "<no map>")   // пустой компонент: заводим новый уровень рядом с остальными
+    {
+        const auto assets = ProjectManager::Get().assetsPath();
+        std::filesystem::path candidate;
+        for (int i = 0;; ++i)
+        {
+            candidate = std::string("maps/untitled") + (i ? "_" + std::to_string(i) : "") + ".cmap.json";
+            if (!std::filesystem::exists(assets / candidate)) break;
+        }
+        if (!createEmptyLevel(candidate)) return false;
+    }
+    
     m_meshReplaced = false;
-    m_edit = std::make_unique<LevelEditSession>(level, [this](const ChangeSet&) {
-        m_meshReplaced = true;
-        rebuildMesh(false);   // v1: полный cook на каждый commit; без лайтмапа и без физики
-    });
+    m_edit = std::make_unique<LevelEditSession>(level, [this](const ChangeSet&) { m_meshReplaced = true; rebuildMesh(false); });
     bakeStatus = "Editing geometry";
     return true;
 }
