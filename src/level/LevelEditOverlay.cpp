@@ -53,11 +53,11 @@ void DrawLevelEditOverlay(const LevelEditSession& session)
         if (const Solid* solid = session.findSolid(uid)) DrawSolidEdges(*solid, kSelectedSolid);
     }
 
-    if (session.selectedFaceUid() != 0)
+    for (const FaceRef& ref : session.selectedFaces())
     {
-        if (const Solid* solid = session.findSolid(session.selectedFaceSolidUid()))
+        if (const Solid* solid = session.findSolid(ref.solidUid))
         {
-            if (const Face* face = FindFace(*solid, session.selectedFaceUid())) DrawFaceOutline(*solid, *face, kSelectedFace);
+            if (const Face* face = FindFace(*solid, ref.faceUid)) DrawFaceOutline(*solid, *face, kSelectedFace);
         }
     }
 

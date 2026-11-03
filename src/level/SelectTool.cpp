@@ -52,7 +52,7 @@ void SelectTool::onPointer(LevelEditSession& session, uint32_t viewId, const Vie
     }
 
     const LevelHit& hit = session.hover();
-    if (pointer.alt) session.selectFace(hit.solidUid, hit.faceUid);
+    if (pointer.alt) session.selectFace(hit.solidUid, hit.faceUid, pointer.ctrl);   // Alt: грань, Ctrl+Alt: добавить / убрать
     else             session.selectSolid(hit.solidUid, pointer.ctrl);
 }
 

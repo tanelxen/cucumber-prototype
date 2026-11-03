@@ -54,10 +54,10 @@ void LevelEditSession::notify(const ChangeSet& changes)
     if (!changes.empty() && m_onChanged) m_onChanged(changes);
 }
 
-bool LevelEditSession::commit(std::string name, std::vector<SolidChange> changes)
+bool LevelEditSession::commit(std::string name, std::vector<SolidChange> changes, const std::string& coalesceTag)
 {
     ChangeSet result;
-    if (!m_history.commit(m_document, std::move(name), std::move(changes), result, m_lastError)) return false;
+    if (!m_history.commit(m_document, std::move(name), std::move(changes), result, m_lastError, coalesceTag)) return false;
 
     m_lastError.clear();
     notify(result);
@@ -119,14 +119,12 @@ bool LevelEditSession::isSolidSelected(uint64_t uid) const
 void LevelEditSession::clearSelection()
 {
     m_selectedSolids.clear();
-    m_selectedFace = 0;
-    m_selectedFaceSolid = 0;
+    m_selectedFaces.clear();
 }
 
 void LevelEditSession::selectSolid(uint64_t uid, bool toggle)
 {
-    m_selectedFace = 0;
-    m_selectedFaceSolid = 0;
+    m_selectedFaces.clear();
 
     const auto it = std::find(m_selectedSolids.begin(), m_selectedSolids.end(), uid);
     if (toggle)
@@ -139,11 +137,93 @@ void LevelEditSession::selectSolid(uint64_t uid, bool toggle)
     m_selectedSolids.assign(1, uid);
 }
 
-void LevelEditSession::selectFace(uint64_t solidUid, uint64_t faceUid)
+bool LevelEditSession::isFaceSelected(uint64_t faceUid) const
+{
+    return std::any_of(m_selectedFaces.begin(), m_selectedFaces.end(), [&](const FaceRef& f) { return f.faceUid == faceUid; });
+}
+
+void LevelEditSession::selectFace(uint64_t solidUid, uint64_t faceUid, bool toggle)
 {
     m_selectedSolids.clear();
-    m_selectedFaceSolid = solidUid;
-    m_selectedFace = faceUid;
+
+    const FaceRef ref{ solidUid, faceUid };
+    const auto it = std::find(m_selectedFaces.begin(), m_selectedFaces.end(), ref);
+    if (toggle)
+    {
+        if (it != m_selectedFaces.end()) m_selectedFaces.erase(it);
+        else                             m_selectedFaces.push_back(ref);
+        return;
+    }
+
+    m_selectedFaces.assign(1, ref);
+}
+
+const Face* LevelEditSession::findFace(const FaceRef& ref) const
+{
+    const Solid* solid = findSolid(ref.solidUid);
+    if (!solid) return nullptr;
+
+    for (const Face& face : solid->faces)
+    {
+        if (face.uid == ref.faceUid) return &face;
+    }
+    return nullptr;
+}
+
+std::vector<FaceRef> LevelEditSession::textureTargets() const
+{
+    if (!m_selectedFaces.empty()) return m_selectedFaces;
+
+    std::vector<FaceRef> targets;
+    for (uint64_t uid : m_selectedSolids)
+    {
+        const Solid* solid = findSolid(uid);
+        if (!solid) continue;
+        for (const Face& face : solid->faces) targets.push_back({ uid, face.uid });
+    }
+    return targets;
+}
+
+bool LevelEditSession::editFaces(const std::vector<FaceRef>& faces, std::string name, std::string coalesceTag, const FaceEditFn& fn)
+{
+    if (isToolBusy()) return false;
+
+    std::vector<uint64_t> solidOrder;   // тела в порядке первого упоминания, без повторов
+    for (const FaceRef& ref : faces)
+    {
+        if (std::find(solidOrder.begin(), solidOrder.end(), ref.solidUid) == solidOrder.end()) solidOrder.push_back(ref.solidUid);
+    }
+
+    std::vector<SolidChange> changes;
+    for (uint64_t solidUid : solidOrder)
+    {
+        const Solid* original = findSolid(solidUid);
+        if (!original) continue;
+
+        Solid edited = *original;
+        bool changed = false;
+
+        for (const FaceRef& ref : faces)
+        {
+            if (ref.solidUid != solidUid) continue;
+
+            for (Face& face : edited.faces)
+            {
+                if (face.uid != ref.faceUid) continue;
+
+                const Face before = face;
+                const bool reported = fn(*original, face);
+                const bool differs = before.material != face.material || before.flags != face.flags ||
+                                     before.uv.uAxis != face.uv.uAxis || before.uv.vAxis != face.uv.vAxis ||
+                                     before.uv.shift != face.uv.shift || before.uv.scale != face.uv.scale;
+                changed = changed || (reported && differs);
+            }
+        }
+        if (changed) changes.push_back(SolidChange::Modified(*original, std::move(edited)));
+    }
+
+    if (changes.empty()) return false;
+    return commit(std::move(name), std::move(changes), coalesceTag);
 }
 
 const Solid* LevelEditSession::findSolid(uint64_t uid) const
@@ -160,13 +240,8 @@ void LevelEditSession::pruneSelection()
     m_selectedSolids.erase(std::remove_if(m_selectedSolids.begin(), m_selectedSolids.end(),
                            [&](uint64_t uid) { return findSolid(uid) == nullptr; }), m_selectedSolids.end());
 
-    if (m_selectedFace != 0)
-    {
-        const Solid* solid = findSolid(m_selectedFaceSolid);
-        const bool faceAlive = solid && std::any_of(solid->faces.begin(), solid->faces.end(),
-                                                    [&](const Face& f) { return f.uid == m_selectedFace; });
-        if (!faceAlive) { m_selectedFace = 0; m_selectedFaceSolid = 0; }
-    }
+    m_selectedFaces.erase(std::remove_if(m_selectedFaces.begin(), m_selectedFaces.end(),
+                          [&](const FaceRef& ref) { return findFace(ref) == nullptr; }), m_selectedFaces.end());
 }
 
 uint32_t LevelEditSession::currentMaterial()
@@ -180,11 +255,11 @@ uint32_t LevelEditSession::currentMaterial()
         return -1;
     };
 
-    if (m_selectedFace != 0)
+    for (const FaceRef& ref : m_selectedFaces)
     {
-        if (const Solid* solid = findSolid(m_selectedFaceSolid))
+        if (const Solid* solid = findSolid(ref.solidUid))
         {
-            const int64_t material = faceMaterial(*solid, m_selectedFace);
+            const int64_t material = faceMaterial(*solid, ref.faceUid);
             if (material >= 0) return static_cast<uint32_t>(material);
         }
     }
@@ -241,7 +316,7 @@ bool LevelEditSession::escape()
         setTool(ToolType::Select);
         return true;
     }
-    if (!m_selectedSolids.empty() || m_selectedFace != 0)
+    if (!m_selectedSolids.empty() || !m_selectedFaces.empty())
     {
         clearSelection();
         return true;

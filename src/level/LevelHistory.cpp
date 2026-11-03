@@ -158,19 +158,57 @@ void ChangeSet::merge(const ChangeSet& other)
     }
 }
 
+bool LevelHistory::tryCoalesce(const std::vector<SolidChange>& changes, const std::string& tag)
+{
+    // Сохранённое состояние не трогаем: слияние оставило бы курсор на месте и спрятало бы признак "изменён"
+    if (tag.empty() || m_cursor == 0 || m_cursor != m_edits.size() || m_saved == m_cursor) return false;
+
+    Edit& last = m_edits.back();
+    if (last.tag != tag) return false;
+
+    for (const SolidChange& change : changes)
+    {
+        if (!change.before || !change.after) return false;
+        for (const SolidChange& previous : last.changes)
+        {
+            if (previous.uid == change.uid && (!previous.before || !previous.after)) return false;
+        }
+    }
+
+    for (const SolidChange& change : changes)
+    {
+        const auto it = std::find_if(last.changes.begin(), last.changes.end(),
+                                     [&](const SolidChange& previous) { return previous.uid == change.uid; });
+        if (it != last.changes.end()) it->after = change.after;   // before остаётся самым первым: undo вернёт к исходному
+        else                          last.changes.push_back(change);
+    }
+    return true;
+}
+
+void LevelHistory::sealLast()
+{
+    if (!m_edits.empty()) m_edits.back().tag.clear();
+}
+
 bool LevelHistory::commit(LevelDocument& document, std::string name, std::vector<SolidChange> changes,
-                          ChangeSet& out, std::string& error)
+                          ChangeSet& out, std::string& error, const std::string& coalesceTag)
 {
     out = {};
     if (!Validate(document, changes, error)) return false;
 
     for (SolidChange& change : changes) ApplyForward(document, change, out);
 
+    if (tryCoalesce(changes, coalesceTag))
+    {
+        error.clear();
+        return true;
+    }
+
     // Новая правка отбрасывает ветку redo; если в ней было сохранённое состояние, оно теперь недостижимо
     m_edits.resize(m_cursor);
     if (m_saved != kNoMark && m_saved > m_cursor) m_saved = kNoMark;
 
-    m_edits.push_back({ std::move(name), std::move(changes) });
+    m_edits.push_back({ std::move(name), std::move(changes), coalesceTag });
     ++m_cursor;
 
     if (m_edits.size() > kMaxEdits)
@@ -190,6 +228,7 @@ bool LevelHistory::undo(LevelDocument& document, ChangeSet& out)
     if (!canUndo()) return false;
 
     Edit& edit = m_edits[m_cursor - 1];
+    edit.tag.clear();
     for (auto it = edit.changes.rbegin(); it != edit.changes.rend(); ++it) ApplyBackward(document, *it, out);
 
     --m_cursor;
@@ -202,6 +241,7 @@ bool LevelHistory::redo(LevelDocument& document, ChangeSet& out)
     if (!canRedo()) return false;
 
     Edit& edit = m_edits[m_cursor];
+    edit.tag.clear();
     for (SolidChange& change : edit.changes) ApplyForward(document, change, out);
 
     ++m_cursor;

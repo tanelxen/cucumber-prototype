@@ -14,6 +14,8 @@
 #include "InspectorPanel.h"
 #include "AssetsPanel.h"
 #include "HierarchyPanel.h"
+#include "TexturingPanel.h"
+
 #include "LightComponent.h"
 
 #include "SceneManager.h"
@@ -69,11 +71,15 @@ UIManager::UIManager()
     m_pAssetsPanel = new AssetsPanel();
     m_pAssetsPanel->m_manager = this;
     
+    m_pTexturingPanel = new TexturingPanel("Texturing");
+    m_pTexturingPanel->m_manager = this;
+    
     m_panels.push_back(m_pViewportPanel);
 //    m_panels.push_back(m_pViewportPanel2);
     m_panels.push_back(m_pHierarchyPanel);
     m_panels.push_back(m_pInspectorPanel);
     m_panels.push_back(m_pAssetsPanel);
+    m_panels.push_back(m_pTexturingPanel);
     
     g_UIManager = this;
     

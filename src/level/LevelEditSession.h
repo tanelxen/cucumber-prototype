@@ -19,6 +19,15 @@
 #include <string>
 #include <vector>
 
+// Грань уровня: солид + грань внутри него (uid стабильны при правках формы и undo)
+struct FaceRef
+{
+    uint64_t solidUid = 0;
+    uint64_t faceUid = 0;
+
+    bool operator==(const FaceRef& other) const { return solidUid == other.solidUid && faceUid == other.faceUid; }
+};
+
 enum class ToolType
 {
     Select = 0,
@@ -44,7 +53,9 @@ public:
     double gridSize() const;   // шаг сетки документа (всегда > 0)
 
     // --- Правки (все проходят через историю) ---
-    bool commit(std::string name, std::vector<SolidChange> changes);
+    // coalesceTag: см. LevelHistory::commit (перетаскивание ползунка = одна запись undo)
+    bool commit(std::string name, std::vector<SolidChange> changes, const std::string& coalesceTag = {});
+    void sealEdit() { m_history.sealLast(); }   // конец перетаскивания: следующая правка начнёт новую запись undo
     // undo / redo / deleteSelection / translateSelection не выполняются, пока инструмент в середине операции
     bool undo();
     bool redo();
@@ -56,14 +67,25 @@ public:
     // --- Выделение ---
     const std::vector<uint64_t>& selectedSolids() const { return m_selectedSolids; }
     bool isSolidSelected(uint64_t uid) const;
-    uint64_t selectedFaceUid() const { return m_selectedFace; }
-    uint64_t selectedFaceSolidUid() const { return m_selectedFaceSolid; }
     void clearSelection();
     void selectSolid(uint64_t uid, bool toggle);
-    void selectFace(uint64_t solidUid, uint64_t faceUid);
     const Solid* findSolid(uint64_t uid) const;
 
-    // Материал для новых тел: у выделенной грани, иначе у выделенного солида, иначе самый частый в документе.
+    // Выбор граней (взаимоисключающ с выбором солидов). toggle добавляет / убирает грань, иначе выбор заменяется.
+    const std::vector<FaceRef>& selectedFaces() const { return m_selectedFaces; }
+    bool isFaceSelected(uint64_t faceUid) const;
+    void selectFace(uint64_t solidUid, uint64_t faceUid, bool toggle = false);
+    const Face* findFace(const FaceRef& ref) const;
+
+    // Грани, к которым применяется текстурирование: выбранные грани, а если их нет, все грани выбранных солидов
+    std::vector<FaceRef> textureTargets() const;
+
+    // Правка граней: fn вызывается для каждой грани (solid это тело до правки) и возвращает true, если грань изменена.
+    // Все изменённые тела уходят одной правкой в историю. false, если ничего не изменилось.
+    using FaceEditFn = std::function<bool(const Solid& solid, Face& face)>;
+    bool editFaces(const std::vector<FaceRef>& faces, std::string name, std::string coalesceTag, const FaceEditFn& fn);
+
+    // Материал для новых тел: у первой выбранной грани, иначе у выделенного солида, иначе самый частый в документе.
     // Если подсказок нет: первый материал таблицы, а при пустой таблице добавляется "default".
     uint32_t currentMaterial();
 
@@ -103,8 +125,7 @@ private:
     ToolType m_active = ToolType::Select;
 
     std::vector<uint64_t> m_selectedSolids;
-    uint64_t m_selectedFace = 0;
-    uint64_t m_selectedFaceSolid = 0;
+    std::vector<FaceRef> m_selectedFaces;
 
     LevelHit m_hover;
     bool m_hasHover = false;

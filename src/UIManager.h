@@ -20,6 +20,7 @@ class InspectorPanel;
 class AssetsPanel;
 class HierarchyPanel;
 class EditorCamera;
+class TexturingPanel;
 
 class WorldScene;
 struct ViewDesc;
@@ -52,6 +53,7 @@ private:
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
     HierarchyPanel* m_pHierarchyPanel;
+    TexturingPanel* m_pTexturingPanel;
     
 private:
     void drawMenuBar();

@@ -177,6 +177,9 @@ set(SRC_PANELS
         src/EditorCamera.h
         src/EditorViewport.cpp
         src/EditorViewport.h
+        
+        src/TexturingPanel.cpp
+        src/TexturingPanel.h
 )
 
 set(SRC_TRENCHBROOM
@@ -242,6 +245,9 @@ set(SRC_LEVEL
     src/level/SolidBuilder.cpp
     src/level/SolidBuilder.h
     src/level/ViewportPointer.h
+    
+    src/level/FaceTexturing.cpp
+    src/level/FaceTexturing.h
 )
 
 set(SRC_IMGUI

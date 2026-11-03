@@ -46,8 +46,15 @@ class LevelHistory
 public:
     // Применяет правку к документу и кладёт её в стек. Ветка redo отбрасывается.
     // false (документ не тронут), если какое-то изменение некорректно: error объясняет почему.
+    //
+    // coalesceTag: правки подряд с одинаковым непустым тегом (перетаскивание ползунка: десятки правок за секунду)
+    // сливаются в одну запись undo, если все они только заменяют солиды. Слияние рвёт sealLast(), undo/redo,
+    // правка с другим тегом и сохранение документа.
     bool commit(LevelDocument& document, std::string name, std::vector<SolidChange> changes,
-                ChangeSet& out, std::string& error);
+                ChangeSet& out, std::string& error, const std::string& coalesceTag = {});
+
+    // Следующая правка не сольётся с последней, даже если тег совпадёт (конец перетаскивания)
+    void sealLast();
 
     bool undo(LevelDocument& document, ChangeSet& out);
     bool redo(LevelDocument& document, ChangeSet& out);
@@ -68,7 +75,10 @@ private:
     {
         std::string name;
         std::vector<SolidChange> changes;
+        std::string tag;                 // тег слияния (пусто: не сливается)
     };
+
+    bool tryCoalesce(const std::vector<SolidChange>& changes, const std::string& tag);
 
     static constexpr size_t kNoMark = static_cast<size_t>(-1);
     static constexpr size_t kMaxEdits = 512;
