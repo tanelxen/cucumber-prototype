@@ -248,3 +248,31 @@ bool RebuildSolidFromVertices(const Solid& source, const std::vector<glm::dvec3>
     error.clear();
     return true;
 }
+
+Solid TranslatedSolid(const Solid& solid, const glm::vec3& delta, bool textureLock)
+{
+    Solid result = solid;
+    for (glm::vec3& v : result.vertices) v += delta;
+
+    if (textureLock)
+    {
+        // u = dot(pos, uAxis) / scale.x + shift.x: после сдвига pos на delta u уходит на dot(delta, uAxis) / scale.x.
+        // Вычитаем это из shift, и текстура остаётся на теле.
+        for (Face& face : result.faces)
+        {
+            const float sx = face.uv.scale.x != 0.0f ? face.uv.scale.x : 1.0f;
+            const float sy = face.uv.scale.y != 0.0f ? face.uv.scale.y : 1.0f;
+            face.uv.shift.x -= glm::dot(delta, face.uv.uAxis) / sx;
+            face.uv.shift.y -= glm::dot(delta, face.uv.vAxis) / sy;
+        }
+    }
+    return result;
+}
+
+Solid CloneWithNewUids(const Solid& solid)
+{
+    Solid copy = solid;
+    copy.uid = NewUid();
+    for (Face& face : copy.faces) face.uid = NewUid();
+    return copy;
+}

@@ -405,6 +405,18 @@ void ViewportPanel::update(float dt)
                 if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
                     edit->handleKey(LevelKey::Enter, false);
             }
+            
+            if (mod)
+            {
+                if (ImGui::IsKeyPressed(ImGuiKey_C, false)) edit->handleKey(LevelKey::Copy, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_X, false)) edit->handleKey(LevelKey::Cut, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_V, false)) edit->handleKey(LevelKey::Paste, false);
+                if (ImGui::IsKeyPressed(ImGuiKey_D, false)) edit->handleKey(LevelKey::Duplicate, false);
+            }
+            else if (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_D, false))
+            {
+                edit->handleKey(LevelKey::DuplicateMove, true);
+            }
         }
     }
 }

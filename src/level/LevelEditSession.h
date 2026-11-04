@@ -11,6 +11,7 @@
 
 #include "LevelHistory.h"
 #include "LevelPicking.h"
+#include "SolidBuilder.h"
 #include "LevelTool.h"
 #include "ViewportPointer.h"
 
@@ -62,7 +63,23 @@ public:
 
     bool deleteSelection();
     // Сдвиг выделенных солидов. textureLock: текстура остаётся на месте относительно тела (компенсируется shift).
-    bool translateSelection(const glm::vec3& delta, bool textureLock = true);
+    // coalesceTag: см. LevelHistory::commit ("дублировать и сдвинуть" сливается в один шаг undo)
+    bool translateSelection(const glm::vec3& delta, bool textureLock = true, const std::string& coalesceTag = {});
+
+    // Копии выбранных солидов со сдвигом offset (новые uid, текстуры остаются на телах). Копии становятся выбранными.
+    bool duplicateSelection(const glm::vec3& offset, const std::string& coalesceTag = {});
+
+    // Буфер обмена (общий на процесс, см. LevelClipboard). Вставка ставит копии под курсор: центр основания габарита
+    // на точку под курсором (поверхность уровня или земля y = 0), с привязкой к сетке. Без курсора: со смещением на шаг сетки.
+    bool copySelection();
+    bool cutSelection();
+    bool paste();
+
+    // Компенсировать ли текстуры при перемещении тел (текстура остаётся на теле, а не на мире)
+    bool textureLock() const { return m_textureLock; }
+    void setTextureLock(bool enabled) { m_textureLock = enabled; }
+
+    AABB selectionBounds() const;   // габариты выбранных солидов; valid() == false, если солидов нет
 
     // --- Выделение ---
     const std::vector<uint64_t>& selectedSolids() const { return m_selectedSolids; }
@@ -97,7 +114,8 @@ public:
     bool isToolBusy() const { return activeTool().isBusy(); }
 
     // Клавиша активному инструменту (панель уже отфильтровала фокус, текстовый ввод и полёт камеры)
-    bool handleKey(LevelKey key, bool shift) { return activeTool().onKey(*this, key, shift); }
+    // Клавиши, которые инструмент не взял (копирование, вставка, дублирование), выполняет сама сессия.
+    bool handleKey(LevelKey key, bool shift);
 
     // Esc: прервать операцию; иначе вернуться к Select; иначе снять выделение. true, если что-то сделано.
     bool escape();
@@ -131,8 +149,12 @@ private:
     bool m_hasHover = false;
     uint32_t m_hoverView = 0;
 
+    // Последний указатель над видом: по нему вставка находит точку под курсором
+    ViewportPointer m_lastPointer;
+    uint32_t m_lastPointerView = 0;
+    bool m_hasLastPointer = false;
+
+    bool m_textureLock = true;
+
     std::string m_lastError;
 };
-
-// Копия солида, сдвинутая на delta (с компенсацией UV при textureLock)
-Solid TranslatedSolid(const Solid& solid, const glm::vec3& delta, bool textureLock);

@@ -248,6 +248,9 @@ set(SRC_LEVEL
     
     src/level/FaceTexturing.cpp
     src/level/FaceTexturing.h
+    
+    src/level/LevelClipboard.cpp
+    src/level/LevelClipboard.h
 )
 
 set(SRC_IMGUI

@@ -77,6 +77,66 @@ namespace Edit
         return result;
     }
 
+    void TranslateConstraint::begin(const Ray& startRay, const glm::dvec3& planePoint, const glm::dvec3& snapReference,
+                                    const glm::dvec3& freeNormal)
+    {
+        m_startRay = startRay;
+        m_planePoint = planePoint;
+        m_snapReference = snapReference;
+        m_freeNormal = glm::normalize(freeNormal);
+        clear();
+    }
+
+    void TranslateConstraint::toggleAxis(int axis, bool plane)
+    {
+        if (m_axis == axis && m_plane == plane)
+        {
+            clear();
+            return;
+        }
+        m_axis = axis;
+        m_plane = plane;
+    }
+
+    bool TranslateConstraint::compute(const Ray& ray, double grid, glm::dvec3& out) const
+    {
+        if (m_axis >= 0 && !m_plane)
+        {
+            glm::dvec3 axis(0.0);
+            axis[m_axis] = 1.0;
+
+            double t0 = 0.0, t = 0.0;
+            if (!ClosestLineParam(m_startRay, m_planePoint, axis, t0) || !ClosestLineParam(ray, m_planePoint, axis, t)) return false;
+
+            const double snapped = Snap(m_snapReference[m_axis] + (t - t0), grid);
+            out = axis * (snapped - m_snapReference[m_axis]);
+            return true;
+        }
+
+        glm::dvec3 normal = m_freeNormal;
+        if (m_axis >= 0)
+        {
+            normal = glm::dvec3(0.0);
+            normal[m_axis] = 1.0;
+        }
+
+        double ts = 0.0, tn = 0.0;
+        if (!RayPlane(m_startRay, m_planePoint, normal, ts) || !RayPlane(ray, m_planePoint, normal, tn)) return false;
+
+        out = SnapVec(m_snapReference + (ray.at(tn) - m_startRay.at(ts)), grid) - m_snapReference;
+
+        if (m_axis >= 0)
+        {
+            out[m_axis] = 0.0;   // плоскость: исключённая ось не двигается
+        }
+        else
+        {
+            const int locked = DominantAxis(m_freeNormal);
+            if (std::abs(m_freeNormal[locked]) > 0.999) out[locked] = 0.0;   // осевая плоскость (ортографика, горизонталь): ось нормали стоит
+        }
+        return true;
+    }
+
     double Snap(double value, double grid)
     {
         if (grid <= 0.0) return value;

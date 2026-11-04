@@ -171,7 +171,8 @@ bool LevelHistory::tryCoalesce(const std::vector<SolidChange>& changes, const st
         if (!change.before || !change.after) return false;
         for (const SolidChange& previous : last.changes)
         {
-            if (previous.uid == change.uid && (!previous.before || !previous.after)) return false;
+            // Слить можно с созданием или заменой (итоговое after обновится); с удалением нельзя
+            if (previous.uid == change.uid && !previous.after) return false;
         }
     }
 
@@ -179,7 +180,7 @@ bool LevelHistory::tryCoalesce(const std::vector<SolidChange>& changes, const st
     {
         const auto it = std::find_if(last.changes.begin(), last.changes.end(),
                                      [&](const SolidChange& previous) { return previous.uid == change.uid; });
-        if (it != last.changes.end()) it->after = change.after;   // before остаётся самым первым: undo вернёт к исходному
+        if (it != last.changes.end()) it->after = change.after;   // before остаётся самым первым (у созданного его нет): undo вернёт к исходному
         else                          last.changes.push_back(change);
     }
     return true;

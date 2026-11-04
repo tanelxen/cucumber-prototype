@@ -39,8 +39,8 @@ public:
     Mode mode() const { return m_mode; }
     size_t selectedCount() const { return m_selected.size(); }
     bool hasHover() const { return m_hover.valid; }
-    int constraintAxis() const { return m_grab.axis; }
-    bool constraintIsPlane() const { return m_grab.planeMode; }
+    int constraintAxis() const { return m_grab.constraint.axis(); }
+    bool constraintIsPlane() const { return m_grab.constraint.isPlane(); }
     glm::dvec3 grabDelta() const { return m_grab.delta; }
 
 private:
@@ -75,12 +75,8 @@ private:
         bool fromDrag = false;             // начато протяжкой ЛКМ (подтверждается отпусканием), иначе клавишей G
         uint32_t view = 0;
         glm::vec2 pressPx{0.0f};
-        Edit::Ray startRay;
-        glm::dvec3 anchor{0.0};            // вершина, по положению которой считается привязка к сетке
-        glm::dvec3 freeNormal{0.0, 0.0, -1.0};   // нормаль плоскости движения без ограничений (взгляд камеры)
-        bool orthographic = false;
-        int axis = -1;
-        bool planeMode = false;
+        Edit::TranslateConstraint constraint;
+        glm::dvec3 anchor{0.0};            // вершина: через неё идёт плоскость движения и по ней считается привязка к сетке
         glm::dvec3 delta{0.0};
         std::vector<SolidEdit> edits;
     };
@@ -96,7 +92,6 @@ private:
 
     bool beginGrab(LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer, bool fromDrag, const glm::vec3* anchorHint);
     void updateGrab(LevelEditSession& session, const ViewportPointer& pointer);
-    bool computeDelta(const Edit::Ray& ray, double grid, glm::dvec3& out) const;
     bool applyDelta(const LevelEditSession& session, const glm::dvec3& delta);
     void finishGrab(LevelEditSession& session);
 

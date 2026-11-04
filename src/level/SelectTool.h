@@ -6,6 +6,14 @@
 //  (push/pull, как в TrenchBroom): подсвечивается грань выделенного солида, подходящая курсору (в том числе
 //  задняя), ЛКМ с протяжкой выдвигает её вдоль своей нормали с привязкой к сетке. Один commit на отпускании.
 //
+//  Перемещение выбранных солидов целиком (без режима вершин):
+//    - протяжка ЛКМ по солиду (невыбранный выбирается и сразу тянется; Ctrl+клик только переключает выбор);
+//    - клавиша G берёт выбранные солиды в движение за курсором, клик или Enter подтверждает;
+//    - Shift+D копирует выбранные солиды и сразу двигает копии (Esc отменяет только движение, копии остаются).
+//  Без ограничений солиды ходят в плоскости, через точку захвата: в ортографике это плоскость вида, в перспективе
+//  горизонталь (или вертикальная плоскость лицом к камере, если смотрим почти горизонтально). X / Y / Z фиксируют
+//  ось, Shift+X / Y / Z фиксируют плоскость, исключая ось (Blender). Привязка к сетке идёт по углу габарита.
+//
 
 #pragma once
 
@@ -18,9 +26,10 @@ public:
     const char* name() const override { return "Select"; }
 
     void onPointer(LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer) override;
-    void cancel() override { m_drag = {}; m_hasCandidate = false; }
-    bool isBusy() const override { return m_drag.active; }
-    bool showsHover() const override { return !m_pushPullMode && !m_drag.active; }
+    void cancel() override { m_drag = {}; m_move = {}; m_hasCandidate = false; }
+    bool onKey(LevelEditSession& session, LevelKey key, bool shift) override;
+    bool isBusy() const override { return m_drag.active || m_move.active; }
+    bool showsHover() const override { return !m_pushPullMode && !m_drag.active && !m_move.active; }
 
     std::string hint() const override;
     void collectPreview(const LevelEditSession& session, ToolPreview& out) const override;
@@ -30,6 +39,10 @@ public:
     size_t candidateFace() const { return m_candidateFace; }
     uint64_t candidateSolid() const { return m_candidateSolid; }
     double dragDelta() const { return m_drag.delta; }
+    bool isMoving() const { return m_move.active; }
+    glm::dvec3 moveDelta() const { return m_move.delta; }
+    int moveConstraintAxis() const { return m_move.constraint.axis(); }
+    bool moveConstraintIsPlane() const { return m_move.constraint.isPlane(); }
 
 private:
     struct Drag
@@ -48,10 +61,37 @@ private:
         double delta = 0.0;                 // смещение плоскости вдоль нормали (последнее валидное)
     };
 
+    // Перемещение выбранных солидов целиком
+    struct Move
+    {
+        bool active = false;
+        bool fromDrag = false;           // начато протяжкой ЛКМ (подтверждается отпусканием), иначе клавишей G
+        bool moved = false;              // курсор ушёл дальше порога протяжки
+        uint32_t view = 0;
+        glm::vec2 pressPx{0.0f};
+        Edit::TranslateConstraint constraint;
+        glm::dvec3 grabPoint{0.0};
+        glm::dvec3 delta{0.0};
+        uint64_t narrowUid = 0;          // клик по выбранному солиду из группы без протяжки сужает выбор до него
+        std::string tag;                 // тег слияния undo для "дублировать и сдвинуть"
+    };
+
+    bool beginMove(LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer, const glm::dvec3& grabPoint, bool fromDrag);
+    void updateMove(LevelEditSession& session, const ViewportPointer& pointer);
+    void finishMove(LevelEditSession& session);
+
     void updateCandidate(const LevelEditSession& session, const ViewportPointer& pointer);
     bool beginDrag(const LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer);
     void updateDrag(LevelEditSession& session, const ViewportPointer& pointer);
     void finishDrag(LevelEditSession& session);
+
+    Move m_move;
+    uint64_t m_moveSerial = 0;
+
+    // Последний указатель над видом: нужен клавишам G и Shift+D, у которых своего указателя нет
+    bool m_hasLast = false;
+    uint32_t m_lastView = 0;
+    ViewportPointer m_last;
 
     bool m_pushPullMode = false;
     bool m_hasCandidate = false;

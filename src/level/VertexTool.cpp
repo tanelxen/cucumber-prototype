@@ -254,17 +254,7 @@ bool VertexTool::onKey(LevelEditSession& session, LevelKey key, bool shift)
         {
             if (!m_grab.active) return false;
 
-            const int axis = static_cast<int>(key) - static_cast<int>(LevelKey::X);
-            if (m_grab.axis == axis && m_grab.planeMode == shift)
-            {
-                m_grab.axis = -1;           // повторное нажатие снимает ограничение
-                m_grab.planeMode = false;
-            }
-            else
-            {
-                m_grab.axis = axis;
-                m_grab.planeMode = shift;
-            }
+            m_grab.constraint.toggleAxis(static_cast<int>(key) - static_cast<int>(LevelKey::X), shift);   // повтор снимает
 
             // Ограничение считается от исходного положения мыши: возвращаем форму к исходной, дальше посчитает кадр
             m_grab.delta = glm::dvec3(0.0);
@@ -308,6 +298,13 @@ bool VertexTool::onKey(LevelEditSession& session, LevelKey key, bool shift)
             if (m_grab.active) return false;
             selectAllVertices(session);
             return true;
+
+        case LevelKey::Copy:
+        case LevelKey::Cut:
+        case LevelKey::Paste:
+        case LevelKey::Duplicate:
+        case LevelKey::DuplicateMove:
+            return false;   // общие операции с солидами: их выполняет сессия
     }
     return false;
 }
@@ -352,48 +349,11 @@ bool VertexTool::beginGrab(LevelEditSession& session, uint32_t viewId, const Vie
     grab.fromDrag = fromDrag;
     grab.view = viewId;
     grab.pressPx = pointer.mousePx;
-    grab.startRay = MakeRay(pointer);
     grab.anchor = glm::dvec3(*anchorHint);
-    grab.freeNormal = glm::normalize(glm::dvec3(pointer.camera.forward));
-    grab.orthographic = pointer.camera.ortho;
+    // Без ограничений вершина ходит в плоскости, параллельной экрану: глубина не меняется
+    grab.constraint.begin(MakeRay(pointer), grab.anchor, grab.anchor, glm::dvec3(pointer.camera.forward));
 
     m_grab = std::move(grab);
-    return true;
-}
-
-bool VertexTool::computeDelta(const Edit::Ray& ray, double grid, glm::dvec3& out) const
-{
-    const glm::dvec3& a0 = m_grab.anchor;
-
-    if (m_grab.axis >= 0 && !m_grab.planeMode)
-    {
-        // Вдоль оси: ближайшая к лучу точка прямой через якорь. База берётся от исходного луча, поэтому смена оси
-        // не "прыгает": результат это проекция всего пути мыши на новую ось.
-        glm::dvec3 axis(0.0);
-        axis[m_grab.axis] = 1.0;
-
-        double t0 = 0.0, t = 0.0;
-        if (!Edit::ClosestLineParam(m_grab.startRay, a0, axis, t0) || !Edit::ClosestLineParam(ray, a0, axis, t)) return false;
-
-        const double snapped = Edit::Snap(a0[m_grab.axis] + (t - t0), grid);
-        out = axis * (snapped - a0[m_grab.axis]);
-        return true;
-    }
-
-    glm::dvec3 normal = m_grab.freeNormal;
-    if (m_grab.axis >= 0)
-    {
-        normal = glm::dvec3(0.0);
-        normal[m_grab.axis] = 1.0;
-    }
-
-    double ts = 0.0, tn = 0.0;
-    if (!Edit::RayPlane(m_grab.startRay, a0, normal, ts) || !Edit::RayPlane(ray, a0, normal, tn)) return false;
-
-    out = Edit::SnapVec(a0 + (ray.at(tn) - m_grab.startRay.at(ts)), grid) - a0;
-
-    if (m_grab.axis >= 0)               out[m_grab.axis] = 0.0;                              // плоскость: исключённая ось не двигается
-    else if (m_grab.orthographic)       out[Edit::DominantAxis(m_grab.freeNormal)] = 0.0;    // ортографика: глубина не двигается
     return true;
 }
 
@@ -425,7 +385,7 @@ void VertexTool::updateGrab(LevelEditSession& session, const ViewportPointer& po
     if (!pointer.capturing)   // во время полёта камеры курсор скрыт: замираем на последней форме
     {
         glm::dvec3 delta;
-        if (computeDelta(MakeRay(pointer), session.gridSize(), delta) && delta != m_grab.delta)
+        if (m_grab.constraint.compute(MakeRay(pointer), session.gridSize(), delta) && delta != m_grab.delta)
         {
             // Недопустимые положения (вершина ушла внутрь тела, объём схлопнулся) пропускаем: остаёмся на последнем допустимом
             if (applyDelta(session, delta)) m_grab.delta = delta;
@@ -487,11 +447,12 @@ void VertexTool::collectPreview(const LevelEditSession& session, ToolPreview& ou
 
         // Направляющие осей через исходный якорь
         const glm::vec3 anchor(m_grab.anchor);
-        if (m_grab.axis >= 0)
+        const int constraintAxis = m_grab.constraint.axis();
+        if (constraintAxis >= 0)
         {
             for (int axis = 0; axis < 3; ++axis)
             {
-                const bool drawn = m_grab.planeMode ? axis != m_grab.axis : axis == m_grab.axis;
+                const bool drawn = m_grab.constraint.isPlane() ? axis != constraintAxis : axis == constraintAxis;
                 if (!drawn) continue;
 
                 glm::vec3 direction(0.0f);
@@ -500,7 +461,7 @@ void VertexTool::collectPreview(const LevelEditSession& session, ToolPreview& ou
             }
         }
 
-        out.addText(anchor + glm::vec3(m_grab.delta), DescribeDelta(m_grab.delta, m_grab.axis, m_grab.planeMode), kHoverColor);
+        out.addText(anchor + glm::vec3(m_grab.delta), DescribeDelta(m_grab.delta, m_grab.constraint.axis(), m_grab.constraint.isPlane()), kHoverColor);
         return;
     }
 

@@ -6,31 +6,12 @@
 #include "LevelEditSession.h"
 
 #include "BlockTool.h"
+#include "LevelClipboard.h"
 #include "SelectTool.h"
 #include "VertexTool.h"
 
 #include <algorithm>
 #include <map>
-
-Solid TranslatedSolid(const Solid& solid, const glm::vec3& delta, bool textureLock)
-{
-    Solid result = solid;
-    for (glm::vec3& v : result.vertices) v += delta;
-
-    if (textureLock)
-    {
-        // u = dot(pos, uAxis) / scale.x + shift.x: после сдвига pos на delta u уходит на dot(delta, uAxis) / scale.x.
-        // Вычитаем это из shift, и текстура остаётся на теле.
-        for (Face& face : result.faces)
-        {
-            const float sx = face.uv.scale.x != 0.0f ? face.uv.scale.x : 1.0f;
-            const float sy = face.uv.scale.y != 0.0f ? face.uv.scale.y : 1.0f;
-            face.uv.shift.x -= glm::dot(delta, face.uv.uAxis) / sx;
-            face.uv.shift.y -= glm::dot(delta, face.uv.vAxis) / sy;
-        }
-    }
-    return result;
-}
 
 LevelEditSession::LevelEditSession(LevelDocument& document, ChangedCallback onChanged)
     : m_document(document), m_onChanged(std::move(onChanged))
@@ -93,10 +74,12 @@ bool LevelEditSession::deleteSelection()
     }
     if (changes.empty()) return false;
 
-    return commit(changes.size() == 1 ? "Delete solid" : "Delete solids", std::move(changes));
+    const char* name = changes.size() == 1 ? "Delete solid" : "Delete solids";   // до перемещения changes: порядок вычисления аргументов не определён
+
+    return commit(name, std::move(changes));
 }
 
-bool LevelEditSession::translateSelection(const glm::vec3& delta, bool textureLock)
+bool LevelEditSession::translateSelection(const glm::vec3& delta, bool textureLock, const std::string& coalesceTag)
 {
     if (delta == glm::vec3(0.0f) || isToolBusy()) return false;
 
@@ -108,7 +91,164 @@ bool LevelEditSession::translateSelection(const glm::vec3& delta, bool textureLo
     }
     if (changes.empty()) return false;
 
-    return commit(changes.size() == 1 ? "Move solid" : "Move solids", std::move(changes));
+    const char* name = changes.size() == 1 ? "Move solid" : "Move solids";   // до перемещения changes: порядок вычисления аргументов не определён
+
+    return commit(name, std::move(changes), coalesceTag);
+}
+
+AABB LevelEditSession::selectionBounds() const
+{
+    AABB box;
+    for (uint64_t uid : m_selectedSolids)
+    {
+        if (const Solid* solid = findSolid(uid)) box.expand(SolidBounds(*solid));
+    }
+    return box;
+}
+
+bool LevelEditSession::duplicateSelection(const glm::vec3& offset, const std::string& coalesceTag)
+{
+    if (isToolBusy() || m_selectedSolids.empty()) return false;
+
+    std::vector<SolidChange> changes;
+    std::vector<uint64_t> copies;
+    for (uint64_t uid : m_selectedSolids)
+    {
+        const Solid* solid = findSolid(uid);
+        if (!solid) continue;
+
+        Solid copy = TranslatedSolid(CloneWithNewUids(*solid), offset, true);
+        copies.push_back(copy.uid);
+        changes.push_back(SolidChange::Created(std::move(copy)));
+    }
+    if (changes.empty()) return false;
+
+    const char* name = changes.size() == 1 ? "Duplicate solid" : "Duplicate solids";   // до перемещения changes: порядок вычисления аргументов не определён
+
+    if (!commit(name, std::move(changes), coalesceTag)) return false;
+
+    m_selectedFaces.clear();
+    m_selectedSolids = std::move(copies);   // выбраны копии: дальше пользователь двигает именно их
+    return true;
+}
+
+bool LevelEditSession::copySelection()
+{
+    std::vector<const Solid*> solids;
+    for (uint64_t uid : m_selectedSolids)
+    {
+        if (const Solid* solid = findSolid(uid)) solids.push_back(solid);
+    }
+    if (solids.empty()) return false;
+
+    LevelClipboard::Get().assign(m_document, solids);
+    return true;
+}
+
+bool LevelEditSession::cutSelection()
+{
+    if (isToolBusy() || !copySelection()) return false;
+    return deleteSelection();
+}
+
+bool LevelEditSession::paste()
+{
+    LevelClipboard& clipboard = LevelClipboard::Get();
+    if (isToolBusy() || clipboard.empty()) return false;
+
+    const AABB box = clipboard.bounds();
+    const double grid = gridSize();
+    const glm::dvec3 anchor((box.min.x + box.max.x) * 0.5, box.min.y, (box.min.z + box.max.z) * 0.5);   // центр основания
+
+    glm::dvec3 delta(grid, 0.0, grid);   // без курсора: рядом с оригиналом
+
+    if (m_hasLastPointer)
+    {
+        const Edit::Ray ray = MakeRay(m_lastPointer);
+        bool found = false;
+        glm::dvec3 aim(0.0);
+
+        if (m_lastPointer.camera.ortho)
+        {
+            // Глубина (ось взгляда) остаётся прежней, курсор задаёт положение в плоскости вида
+            const int axis = Edit::DominantAxis(glm::dvec3(m_lastPointer.camera.forward));
+            glm::dvec3 normal(0.0);
+            normal[axis] = 1.0;
+
+            double t = 0.0;
+            if (Edit::RayPlane(ray, anchor, normal, t))
+            {
+                aim = ray.at(t);
+                glm::dvec3 target = Edit::SnapVec(aim, grid);
+                target[axis] = anchor[axis];
+                delta = target - anchor;
+                found = true;
+            }
+        }
+        else
+        {
+            LevelHit hit;
+            double t = 0.0;
+            if (RaycastLevel(m_document, glm::vec3(ray.origin), glm::vec3(ray.dir), static_cast<float>(ray.maxDistance), hit))
+            {
+                aim = glm::dvec3(hit.position);
+                found = true;
+            }
+            else if (Edit::RayPlane(ray, glm::dvec3(0.0), glm::dvec3(0.0, 1.0, 0.0), t))
+            {
+                aim = ray.at(t);   // "земля" y = 0, как у инструмента Block
+                found = true;
+            }
+            if (found) delta = Edit::SnapVec(aim, grid) - anchor;
+        }
+    }
+
+    std::vector<Solid> copies = clipboard.instantiate(m_document, glm::vec3(delta), true);
+
+    std::vector<SolidChange> changes;
+    std::vector<uint64_t> uids;
+    for (Solid& copy : copies)
+    {
+        uids.push_back(copy.uid);
+        changes.push_back(SolidChange::Created(std::move(copy)));
+    }
+
+    const char* name = changes.size() == 1 ? "Paste solid" : "Paste solids";   // до перемещения changes: порядок вычисления аргументов не определён
+
+    if (!commit(name, std::move(changes))) return false;
+
+    m_selectedFaces.clear();
+    m_selectedSolids = std::move(uids);
+    return true;
+}
+
+bool LevelEditSession::handleKey(LevelKey key, bool shift)
+{
+    if (activeTool().onKey(*this, key, shift)) return true;
+    if (isToolBusy()) return false;
+
+    switch (key)
+    {
+        case LevelKey::Copy:      return copySelection();
+        case LevelKey::Cut:       return cutSelection();
+        case LevelKey::Paste:     return paste();
+        case LevelKey::Duplicate: return duplicateSelection(glm::vec3(static_cast<float>(gridSize()), 0.0f, static_cast<float>(gridSize())));
+
+        case LevelKey::DuplicateMove:
+            // Работает из любого инструмента: копию двигает инструмент Select
+            if (m_selectedSolids.empty() || m_active == ToolType::Select || !m_hasLastPointer) return false;
+            setTool(ToolType::Select);
+            {
+                // Select не видел курсор, пока был активен другой инструмент: сообщаем ему положение (без нажатий кнопок)
+                ViewportPointer pointer = m_lastPointer;
+                pointer.pressed = pointer.down = pointer.released = false;
+                activeTool().onPointer(*this, m_lastPointerView, pointer);
+            }
+            return activeTool().onKey(*this, key, shift);
+
+        default:
+            return false;
+    }
 }
 
 bool LevelEditSession::isSolidSelected(uint64_t uid) const
@@ -339,6 +479,17 @@ void LevelEditSession::updateHover(uint32_t viewId, const ViewportPointer& point
 
 void LevelEditSession::handlePointer(uint32_t viewId, const ViewportPointer& pointer)
 {
+    if (pointer.over && !pointer.capturing)
+    {
+        m_lastPointer = pointer;
+        m_lastPointerView = viewId;
+        m_hasLastPointer = true;
+    }
+    else if (m_hasLastPointer && m_lastPointerView == viewId)
+    {
+        m_hasLastPointer = false;   // курсор ушёл с вида, на котором его видели: вставка по курсору недоступна
+    }
+
     if (m_active == ToolType::Select && !isToolBusy()) updateHover(viewId, pointer);
     else                                               m_hasHover = false;
 

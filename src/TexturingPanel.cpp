@@ -230,6 +230,11 @@ void TexturingPanel::draw()
         return;
     }
 
+    // Касается перемещения и дублирования солидов целиком, поэтому стоит выше выбора граней
+    bool textureLock = session->textureLock();
+    if (ImGui::Checkbox("Lock textures when moving solids", &textureLock)) session->setTextureLock(textureLock);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("On: texture moves together with the solid.\nOff: texture stays in place in the world.");
+
     const std::vector<FaceRef> targets = session->textureTargets();
     if (targets.empty())
     {

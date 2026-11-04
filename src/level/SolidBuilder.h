@@ -40,3 +40,9 @@ bool MakeBoxSolid(const glm::dvec3& mins, const glm::dvec3& maxs, uint32_t mater
 // false, если вершина ушла внутрь тела или две вершины слились, или точки не образуют объём.
 bool RebuildSolidFromVertices(const Solid& source, const std::vector<glm::dvec3>& positions, size_t materialCount,
                               Solid& out, std::string& error);
+
+// Копия солида, сдвинутая на delta. textureLock: текстура остаётся на месте относительно тела (компенсируется shift).
+Solid TranslatedSolid(const Solid& solid, const glm::vec3& delta, bool textureLock);
+
+// Копия с новыми uid солида и всех его граней (материалы, UV, флаги сохраняются)
+Solid CloneWithNewUids(const Solid& solid);
