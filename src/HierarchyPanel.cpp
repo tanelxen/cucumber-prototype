@@ -52,11 +52,10 @@ void HierarchyPanel::draw()
 
     if (ImGui::BeginPopup("CreateEntityPopup"))
     {
-        const glm::ivec2 viewportSize = g_UIManager->m_pViewportPanel->viewport().size();
-        const glm::vec2 viewportCenter = glm::vec2(viewportSize) * 0.5f;
-        const glm::vec3 creationPosition =
-            g_UIManager->m_pViewportPanel->getCreationPositionAt(viewportCenter);
-        g_UIManager->drawEntityCreationMenu(*activeScene, creationPosition);
+//        const glm::ivec2 viewportSize = g_UIManager->m_pViewportPanel->viewport().size();
+//        const glm::vec2 viewportCenter = glm::vec2(viewportSize) * 0.5f;
+//        const glm::vec3 creationPosition = g_UIManager->m_pViewportPanel->getCreationPositionAt(viewportCenter);
+        g_UIManager->drawEntityCreationMenu(*activeScene, {0, 0, 0});
         ImGui::EndPopup();
     }
     

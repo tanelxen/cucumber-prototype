@@ -297,7 +297,18 @@ target_include_directories(angelscript_addons PUBLIC ${angelscript_SOURCE_DIR}/s
 
 
 ############################# JOLT ####################################
-# Опции сборки Jolt ставим ДО объявления, чтобы они закешировались
+# 1. ОТКЛЮЧАЕМ GPU-ВЫЧИСЛЕНИЯ JOLT (Именно эти флаги прописаны в Jolt.cmake)
+set(JPH_USE_DX12 OFF CACHE BOOL "Disable DX12 Compute Backend" FORCE)
+set(JPH_USE_VK OFF CACHE BOOL "Disable Vulkan Compute Backend" FORCE)
+set(JPH_USE_MTL OFF CACHE BOOL "Disable Metal Compute Backend" FORCE)
+
+# Включаем обычную CPU-реализацию в качестве заглушки
+set(JPH_USE_CPU_COMPUTE ON CACHE BOOL "Use CPU Fallback for Compute" FORCE)
+
+# 2. Стандартные настройки утилит и тестов Jolt
+set(ENABLE_SAMPLES OFF CACHE BOOL "Disable Jolt Samples" FORCE)
+set(ENABLE_VIEWER OFF CACHE BOOL "Disable Jolt Viewer" FORCE)
+set(ENABLE_TESTS OFF CACHE BOOL "Disable Jolt Tests" FORCE)
 set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
 set(TARGET_SAMPLES OFF CACHE INTERNAL "")
 set(PROFILER_IMPLEMENTATION "None" CACHE INTERNAL "")

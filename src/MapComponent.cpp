@@ -62,7 +62,8 @@ bool MapComponent::loadTrenchBroomMap(const std::filesystem::path& filepath)
     path = filepath.string();
     
     MapAsset mapData;
-    if (!mapData.loadFromFile(ProjectManager::Get().assetsPath() / filepath.string())) {
+    if (!mapData.loadFromFile((ProjectManager::Get().assetsPath() / filepath).string()))
+    {
         std::cout << "[Map Error] Cannot open or parse .map file: " << filepath << std::endl;
         return false;
     }
@@ -181,7 +182,7 @@ bool MapComponent::rebuildLightmapUVs()
     }
 
     MapAsset mapData;
-    if (!mapData.loadFromFile(ProjectManager::Get().assetsPath() / path))
+    if (!mapData.loadFromFile((ProjectManager::Get().assetsPath() / path).string()))
     {
         bakeStatus = "Cannot rebuild lightmap UVs: failed to load map";
         return false;
