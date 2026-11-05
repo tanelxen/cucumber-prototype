@@ -15,6 +15,7 @@
 
 #include "Mesh.h"
 #include "trenchbroom/MapMesh.h"
+#include "trenchbroom/LevelEditMesh.h"
 #include "level/LevelEditOverlay.h"
 
 #include <cstdint>
@@ -29,7 +30,8 @@ static auto RawPtr(const P& p)
 }
 
 // Каждая поверхность карты — отдельный статический объект со своим AABB
-static void AddMapSurfaces(const MapMesh& map, RenderScene& out)
+template <typename MeshT>
+static void AddMapSurfaces(const MeshT& map, RenderScene& out)
 {
     const unsigned int vao = map.vaoId();
     if (vao == 0) return;
@@ -54,21 +56,20 @@ void ExtractRenderScene(WorldScene& world, RenderScene& out)
 
     // --- Статика: карта. Перестраиваем только при смене ревизии (загрузка / reload) ---
     const MapMesh* map = nullptr;
+    const LevelEditMesh* editMesh = nullptr;
     if (auto* mapComponent = world.getMap())
     {
         map = RawPtr(mapComponent->mesh);
-        
-        if (auto* edit = mapComponent->editSession())
-        {
-            DrawLevelEditOverlay(*edit);
-        }
+        editMesh = mapComponent->editMesh();
+        if (auto* edit = mapComponent->editSession()) DrawLevelEditOverlay(*edit);
     }
-
-    const uint64_t staticKey = map ? map->getRevision() : 0;
+    
+    const uint64_t staticKey = editMesh ? editMesh->getRevision() : (map ? map->getRevision() : 0);
     if (staticKey != out.staticKey())
     {
         out.resetStatic(staticKey);
-        if (map) AddMapSurfaces(*map, out);
+        if (editMesh)  AddMapSurfaces(*editMesh, out);
+        else if (map)  AddMapSurfaces(*map, out);
         out.finalizeStatic();
     }
 

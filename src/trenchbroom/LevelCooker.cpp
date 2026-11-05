@@ -5,34 +5,20 @@
 
 #include "LevelCooker.h"
 
+#include "trenchbroom/CookCommon.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <map>
 #include <tuple>
+#include <string>
 #include <utility>
 
 namespace
 {
-    constexpr float kChunkSize = 1024.0f;          // размер ячейки нарезки (как в прежнем билдере)
-    constexpr int kMaxLightmapAtlasSize = 8192;
-
-    // Порядок обхода граней в готовом меше. Прежний билдер писал треугольники ПО часовой стрелке (если смотреть
-    // снаружи), и весь рендер карты (reverseWinding = true в SceneExtractor, cull GL_FRONT) на это рассчитан.
-    // Пока живёт этот путь, кукер сохраняет совместимость. Когда прежний билдер будет удалён: поставить false
-    // здесь и убрать reverseWinding у объектов карты в SceneExtractor.
-    constexpr bool kEmitLegacyWinding = false;
-
-    glm::vec2 CalculateValve220UV(const glm::vec3& pos, const FaceUV& uv, int texWidth, int texHeight)
-    {
-        // защита от нулевого масштаба (TrenchBroom трактует 0 как 1)
-        const float sx = uv.scale.x != 0.0f ? uv.scale.x : 1.0f;
-        const float sy = uv.scale.y != 0.0f ? uv.scale.y : 1.0f;
-
-        const float u = glm::dot(pos, uv.uAxis) / sx + uv.shift.x;
-        const float v = glm::dot(pos, uv.vAxis) / sy + uv.shift.y;
-        return { u / static_cast<float>(texWidth), v / static_cast<float>(texHeight) };
-    }
+    // Тот же размер ячейки, порядок граней и UV, что у EditGeometry (см. CookCommon.h)
+    constexpr int kMaxLightmapAtlasSize = 8192;   // как в прежнем билдере: атлас 32768^2 это гигабайты у бейкера
 }
 
 bool LevelCooker::cook(const LevelDocument& level,
@@ -90,12 +76,10 @@ bool LevelCooker::cook(const LevelDocument& level,
     {
         if (solid.faces.empty()) continue;
 
-        // Ячейка определяется по центру ВСЕГО солида (включая NoDraw-грани): грани солида идут в одну ячейку
-        const AABB solidBounds = SolidBounds(solid);
-        const glm::vec3 cell = solidBounds.center() / kChunkSize;
-        const int cx = static_cast<int>(std::floor(cell.x));
-        const int cy = static_cast<int>(std::floor(cell.y));
-        const int cz = static_cast<int>(std::floor(cell.z));
+        const CookCommon::Cell cell = CookCommon::CellOfSolid(solid);
+        const int cx = cell.x;
+        const int cy = cell.y;
+        const int cz = cell.z;
 
         for (const Face& face : solid.faces)
         {
@@ -106,9 +90,7 @@ bool LevelCooker::cook(const LevelDocument& level,
             data.face = &face;
             data.normal = FaceNormal(solid, face);
 
-            data.points.reserve(face.loop.size());
-            for (uint32_t index : face.loop) data.points.push_back(solid.vertices[index]);
-            if (kEmitLegacyWinding) std::reverse(data.points.begin(), data.points.end());
+            data.points = CookCommon::FacePoints(solid, face);
 
             // Планарная проекция грани на её плоскость: чарт лайтмапы
             const glm::vec3 reference = std::abs(data.normal.z) < 0.9f ? glm::vec3(0.0f, 0.0f, 1.0f)
@@ -132,8 +114,7 @@ bool LevelCooker::cook(const LevelDocument& level,
             if (!std::isfinite(texelExtent.x) || !std::isfinite(texelExtent.y)
                 || texelExtent.x > maxChartExtent || texelExtent.y > maxChartExtent)
             {
-                error = "Could not pack lightmap charts into a " + std::to_string(kMaxLightmapAtlasSize) + "x"
-                + std::to_string(kMaxLightmapAtlasSize) + " atlas";
+                error = "Lightmap chart exceeds the maximum atlas size";
                 return false;
             }
 
@@ -183,7 +164,7 @@ bool LevelCooker::cook(const LevelDocument& level,
         {
             if (atlasSize >= kMaxLightmapAtlasSize)
             {
-                error = "Could not pack lightmap charts into a 32768x32768 atlas";
+                error = "Could not pack lightmap charts into a " + std::to_string(kMaxLightmapAtlasSize) + "x" + std::to_string(kMaxLightmapAtlasSize) + " atlas";
                 return false;
             }
             atlasSize = std::min(atlasSize * 2, kMaxLightmapAtlasSize);
@@ -223,7 +204,7 @@ bool LevelCooker::cook(const LevelDocument& level,
 
             VertexShading shading;
             shading.normal = data.normal;
-            shading.texCoord = CalculateValve220UV(data.points[i], data.face->uv, it->second.x, it->second.y);
+            shading.texCoord = CookCommon::ValveUV(data.points[i], data.face->uv, it->second.x, it->second.y);
 
             chunk.positions.push_back(position);
             chunk.shading.push_back(shading);

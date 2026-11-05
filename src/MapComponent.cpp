@@ -326,8 +326,15 @@ bool MapComponent::beginEdit()
         if (!createEmptyLevel(candidate)) return false;
     }
     
-    m_meshReplaced = false;
-    m_edit = std::make_unique<LevelEditSession>(level, [this](const ChangeSet&) { m_meshReplaced = true; rebuildMesh(false); });
+    m_editChanged = false;
+    m_editMesh = std::make_unique<LevelEditMesh>();
+    m_editMesh->build(level);
+    m_edit = std::make_unique<LevelEditSession>(level, [this](const ChangeSet& changes)
+                                                {
+        m_editChanged = true;
+        if (m_editMesh) m_editMesh->apply(level, changes);
+    });
+    
     bakeStatus = "Editing geometry";
     return true;
 }
@@ -337,9 +344,9 @@ void MapComponent::endEdit()
     if (!m_edit) return;
     if (m_edit->history().isDirty()) m_levelDirty = true;
     m_edit.reset();
-    
+    m_editMesh.reset();                // до applyLevel: статика вернётся к запечённому MapMesh
     bakeStatus.clear();
-    if (m_meshReplaced) { m_meshReplaced = false; applyLevel(); }   // меш + кэш лайтмапа + физика
+    if (m_editChanged) { m_editChanged = false; applyLevel(); }
 }
 
 bool MapComponent::rebuildMesh(bool attachLightmap)

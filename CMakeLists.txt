@@ -206,6 +206,12 @@ set(SRC_TRENCHBROOM
         src/trenchbroom/MapImporter.cpp
         src/trenchbroom/MapImporter.h
         src/trenchbroom/MapMeshBuilder.h
+        
+        src/trenchbroom/CookCommon.h
+        src/trenchbroom/EditGeometry.cpp
+        src/trenchbroom/EditGeometry.h
+        src/trenchbroom/LevelEditMesh.cpp
+        src/trenchbroom/LevelEditMesh.h
 )
 
 set(SRC_GEOMETRY

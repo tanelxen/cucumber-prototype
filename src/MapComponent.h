@@ -10,6 +10,7 @@
 #include "Component.h"
 #include "PhysicsCommon.h"
 #include "trenchbroom/LightmapController.h"
+#include "trenchbroom/LevelEditMesh.h"
 #include "level/LevelDocument.h"
 #include "level/LevelEditSession.h"
 
@@ -55,6 +56,7 @@ struct MapComponent : public Component
     void endEdit();
     bool isEditing() const { return m_edit != nullptr; }
     LevelEditSession* editSession() { return m_edit.get(); }
+    const LevelEditMesh* editMesh() const { return m_editMesh.get(); }
     bool isLevelDirty() const { return m_levelDirty || (m_edit && m_edit->history().isDirty()); }
     
     std::string path = "<no map>";
@@ -81,7 +83,10 @@ private:
     
 private:
     bool rebuildMesh(bool attachLightmap);
+    
     std::unique_ptr<LevelEditSession> m_edit;
+    std::unique_ptr<LevelEditMesh> m_editMesh;
+    
     bool m_levelDirty = false;
-    bool m_meshReplaced = false;
+    bool m_editChanged = false;
 };
