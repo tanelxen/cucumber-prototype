@@ -61,7 +61,7 @@ void DrawLevelEditOverlay(const LevelEditSession& session)
         }
     }
 
-    if (session.hasHover() && session.activeTool().showsHover())
+    if (session.hoverHighlight() && session.hasHover() && session.activeTool().showsHover())
     {
         const LevelHit& hit = session.hover();
         if (const Solid* solid = session.findSolid(hit.solidUid))

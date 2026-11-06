@@ -131,6 +131,12 @@ public:
     bool hasHover() const { return m_hasHover; }
     const LevelHit& hover() const { return m_hover; }
 
+    // Подсвечивать ли солид под курсором. По умолчанию нет: лишний визуальный шум (в ортографике под курсором
+    // оказывается всё, что лежит вдоль луча). Подсвечиваются только выбранное и кандидаты инструментов.
+    // Hover при этом считается всегда: клик берёт солид именно из него.
+    bool hoverHighlight() const { return m_hoverHighlight; }
+    void setHoverHighlight(bool enabled) { m_hoverHighlight = enabled; }
+
     const std::string& lastError() const { return m_lastError; }
     void reportError(std::string message) { m_lastError = std::move(message); }
 
@@ -159,6 +165,7 @@ private:
     bool m_hasLastPointer = false;
 
     bool m_textureLock = true;
+    bool m_hoverHighlight = false;
 
     std::string m_lastError;
 };

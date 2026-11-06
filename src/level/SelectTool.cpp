@@ -78,9 +78,9 @@ void SelectTool::onPointer(LevelEditSession& session, uint32_t viewId, const Vie
 
     m_pushPullMode = pointer.shift && !session.selectedSolids().empty();
 
-    // Alt при выбранном солиде (или гранях): работаем только с гранями этого солида
+    // Alt: выбор грани. При выбранном солиде (или гранях) работаем только с гранями этого солида, иначе с уровнем
     const std::vector<uint64_t> context = session.contextSolids();
-    m_altMode = !m_pushPullMode && pointer.alt && !context.empty();
+    m_altMode = !m_pushPullMode && pointer.alt;
 
     // Кандидата сбрасывает только вид, который его выставил: соседняя панель без курсора его не гасит
     if (!pointer.over || pointer.capturing)
@@ -119,12 +119,19 @@ void SelectTool::onPointer(LevelEditSession& session, uint32_t viewId, const Vie
     if (pointer.alt)  { session.selectFace(hit.solidUid, hit.faceUid, pointer.ctrl); return; }   // Alt: грань, Ctrl+Alt: добавить / убрать
     if (pointer.ctrl) { session.selectSolid(hit.solidUid, true); return; }                      // Ctrl: только переключить выбор
 
-    // Обычное нажатие: выбираем (если солид ещё не выбран) и взводим протяжку. Клик без протяжки остаётся выбором.
-    const bool wasSelected = session.isSolidSelected(hit.solidUid);
-    if (!wasSelected) session.selectSolid(hit.solidUid, false);
+    // Обычное нажатие по невыбранному солиду только выбирает его: случайно сдвинуть солид, просто наведя и потянув ЛКМ,
+    // нельзя (особенно в ортографике, где в луч попадает всё подряд). Тащить можно только солид, выбранный заранее.
+    // Солид под курсором это первый, в который попал луч: если выбранный закрыт другим, нажатие выберет закрывающий
+    // (как в TrenchBroom), а выбранный двигается клавишей G.
+    if (!session.isSolidSelected(hit.solidUid))
+    {
+        session.selectSolid(hit.solidUid, false);
+        return;
+    }
 
+    // Нажатие по выбранному взводит протяжку. Клик без протяжки остаётся кликом (в группе сужает выбор).
     beginMove(session, viewId, pointer, glm::dvec3(hit.position), true);
-    if (m_move.active && wasSelected && session.selectedSolids().size() > 1) m_move.narrowUid = hit.solidUid;
+    if (m_move.active && session.selectedSolids().size() > 1) m_move.narrowUid = hit.solidUid;
 }
 
 bool SelectTool::beginMove(LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer, const glm::dvec3& grabPoint, bool fromDrag)
