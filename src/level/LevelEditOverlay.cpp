@@ -98,15 +98,26 @@ void DrawLevelEditLabels(const LevelEditSession& session, const CameraData& came
         return true;
     };
 
-    // Маркеры вершин: квадраты постоянного экранного размера с тёмной обводкой
+    // Маркеры постоянного экранного размера с тёмной обводкой. Квадрат это вершина, ромб это ребро: ручки разных
+    // режимов правки различаются формой, а не только цветом
     for (const ToolPreview::Point& point : preview.points)
     {
         ImVec2 center;
         if (!project(point.position, center)) continue;
 
         const float h = point.sizePx * 0.5f;
-        drawList->AddRectFilled(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), ToColor(point.color));
-        drawList->AddRect(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), IM_COL32(0, 0, 0, 200));
+        if (point.shape == ToolPreview::Shape::Diamond)
+        {
+            const float r = h * 1.35f;   // ромб при той же "стороне" заметно меньше квадрата: чуть увеличиваем
+            const ImVec2 top(center.x, center.y - r), right(center.x + r, center.y), bottom(center.x, center.y + r), left(center.x - r, center.y);
+            drawList->AddQuadFilled(top, right, bottom, left, ToColor(point.color));
+            drawList->AddQuad(top, right, bottom, left, IM_COL32(0, 0, 0, 200));
+        }
+        else
+        {
+            drawList->AddRectFilled(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), ToColor(point.color));
+            drawList->AddRect(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), IM_COL32(0, 0, 0, 200));
+        }
     }
 
     for (const ToolPreview::Text& label : preview.texts)

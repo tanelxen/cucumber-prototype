@@ -2,9 +2,15 @@
 //  SelectTool.h
 //  Cucumber
 //
-//  Выбор солидов и граней по клику. При зажатом Shift и непустом выделении включается режим смещения граней
-//  (push/pull, как в TrenchBroom): подсвечивается грань выделенного солида, подходящая курсору (в том числе
-//  задняя), ЛКМ с протяжкой выдвигает её вдоль своей нормали с привязкой к сетке. Один commit на отпускании.
+//  Выбор солидов и граней по клику.
+//
+//  Пока выбран солид, с его гранями работаем ТОЛЬКО по нему: луч не видит остальной уровень, поэтому грани, спрятанные
+//  за другими солидами, достижимы (Alt выбирает грань, Shift тянет её). Alt промахнулся мимо выбранных солидов: берётся
+//  грань под курсором из всего уровня.
+//
+//  Shift при выбранном солиде включает push/pull граней по схеме ExtrudeTool из TrenchBroom (см. PickExtrudeFace):
+//  подсвечивается грань под курсором, а если луч в солид не попал, то тыльная грань ближайшего горизонтального ребра.
+//  ЛКМ с протяжкой выдвигает её вдоль нормали с привязкой к сетке. Один commit на отпускании.
 //
 //  Перемещение выбранных солидов целиком (без режима вершин):
 //    - протяжка ЛКМ по солиду (невыбранный выбирается и сразу тянется; Ctrl+клик только переключает выбор);
@@ -17,6 +23,7 @@
 
 #pragma once
 
+#include "LevelPicking.h"
 #include "LevelTool.h"
 #include "geometry/Plane.h"
 
@@ -26,10 +33,10 @@ public:
     const char* name() const override { return "Select"; }
 
     void onPointer(LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer) override;
-    void cancel() override { m_drag = {}; m_move = {}; m_hasCandidate = false; }
+    void cancel() override { m_drag = {}; m_move = {}; m_hasCandidate = false; m_altValid = false; }
     bool onKey(LevelEditSession& session, LevelKey key, bool shift) override;
     bool isBusy() const override { return m_drag.active || m_move.active; }
-    bool showsHover() const override { return !m_pushPullMode && !m_drag.active && !m_move.active; }
+    bool showsHover() const override { return !m_pushPullMode && !m_altMode && !m_drag.active && !m_move.active; }
 
     std::string hint() const override;
     void collectPreview(const LevelEditSession& session, ToolPreview& out) const override;
@@ -38,6 +45,10 @@ public:
     bool hasCandidate() const { return m_hasCandidate; }
     size_t candidateFace() const { return m_candidateFace; }
     uint64_t candidateSolid() const { return m_candidateSolid; }
+    ExtrudePick::Kind candidateKind() const { return m_candidatePick.kind; }
+    bool hasAltFace() const { return m_altValid; }
+    uint64_t altSolid() const { return m_altSolid; }
+    uint64_t altFace() const { return m_altFaceUid; }
     double dragDelta() const { return m_drag.delta; }
     bool isMoving() const { return m_move.active; }
     glm::dvec3 moveDelta() const { return m_move.delta; }
@@ -54,8 +65,13 @@ private:
         Solid source;
         Solid preview;                      // последняя валидная форма
         std::vector<Geo::Plane> planes;
-        glm::dvec3 linePoint{0.0};
-        glm::dvec3 normal{0.0};
+        glm::dvec3 normal{0.0};             // нормаль тащимой грани (наружу)
+
+        // Откуда берётся смещение: по прямой через referencePoint вдоль normal (луч попал в грань) или по опорной
+        // плоскости (грань выбрана по горизонтальному ребру): курсор в плоскости, смещение это проекция на normal
+        bool usePlane = false;
+        glm::dvec3 referencePoint{0.0};
+        glm::dvec3 referenceNormal{0.0};
         double startParam = 0.0;
         double baseDistance = 0.0;
         double delta = 0.0;                 // смещение плоскости вдоль нормали (последнее валидное)
@@ -81,6 +97,8 @@ private:
     void finishMove(LevelEditSession& session);
 
     void updateCandidate(const LevelEditSession& session, const ViewportPointer& pointer);
+    void updateAltFace(const LevelEditSession& session, const ViewportPointer& pointer, const std::vector<uint64_t>& context);
+    static bool DragParam(const Drag& drag, const Edit::Ray& ray, double& out);
     bool beginDrag(const LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer);
     void updateDrag(LevelEditSession& session, const ViewportPointer& pointer);
     void finishDrag(LevelEditSession& session);
@@ -98,6 +116,13 @@ private:
     uint32_t m_candidateView = 0;
     uint64_t m_candidateSolid = 0;
     size_t m_candidateFace = 0;
+    ExtrudePick m_candidatePick;
+
+    // Alt: грань выбранного солида под курсором (в том числе за другими солидами)
+    bool m_altMode = false;
+    bool m_altValid = false;
+    uint64_t m_altSolid = 0;
+    uint64_t m_altFaceUid = 0;
 
     Drag m_drag;
 };

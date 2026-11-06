@@ -137,51 +137,119 @@ bool RaycastLevel(const LevelDocument& level, const glm::vec3& origin, const glm
     return found;
 }
 
-bool PickResizeFace(const Solid& solid, const Edit::Ray& ray, const Edit::PickTolerance& tolerance, FacePick& out)
+namespace
 {
-    float distance = 0.0f;
-    size_t face = 0;
-    if (RaycastSolid(solid, glm::vec3(ray.origin), glm::vec3(ray.dir), static_cast<float>(ray.maxDistance), distance, face))
+    // Грань считается видимой (обращённой к камере), если смотрит против луча. Перпендикулярная лучу не видна:
+    // в ортографике боковые грани стоят ребром, и именно они нужны.
+    constexpr double kFrontEpsilon = 1e-6;
+
+    struct HorizonEdge
     {
-        out = { face, static_cast<double>(distance), false };
+        size_t solidIndex = 0;
+        size_t dragFace = 0;               // невидимая грань пары: её и тащим
+        size_t visibleFace = 0;
+        double distance = 0.0;             // между лучом и ребром
+        double rayDistance = 0.0;          // вдоль луча до ближайшей точки
+        glm::dvec3 handlePoint{0.0};
+        glm::dvec3 visibleNormal{0.0};
+    };
+
+    // Горизонтальные ребра солида: две смежные грани по разные стороны от силуэта
+    void CollectHorizonEdges(const Solid& solid, size_t solidIndex, const Edit::Ray& ray, std::vector<HorizonEdge>& out)
+    {
+        struct EdgeFaces { int a = -1; int b = -1; };
+        std::map<std::pair<uint32_t, uint32_t>, EdgeFaces> edges;
+
+        for (size_t f = 0; f < solid.faces.size(); ++f)
+        {
+            const std::vector<uint32_t>& loop = solid.faces[f].loop;
+            for (size_t i = 0; i < loop.size(); ++i)
+            {
+                const uint32_t u = loop[i];
+                const uint32_t v = loop[(i + 1) % loop.size()];
+                EdgeFaces& edge = edges[{ std::min(u, v), std::max(u, v) }];
+                (u < v ? edge.a : edge.b) = static_cast<int>(f);
+            }
+        }
+
+        std::vector<glm::dvec3> normals;
+        std::vector<double> dots;
+        normals.reserve(solid.faces.size());
+        dots.reserve(solid.faces.size());
+        for (const Face& face : solid.faces)
+        {
+            normals.push_back(glm::dvec3(FaceNormal(solid, face)));
+            dots.push_back(glm::dot(normals.back(), ray.dir));
+        }
+
+        for (const auto& [key, adjacent] : edges)
+        {
+            if (adjacent.a < 0 || adjacent.b < 0) continue;
+
+            const bool frontA = dots[adjacent.a] < -kFrontEpsilon;
+            const bool frontB = dots[adjacent.b] < -kFrontEpsilon;
+            if (frontA == frontB) continue;   // обе видны или обе нет: ребро не на силуэте
+
+            const Edit::SegmentApproach approach = Edit::ClosestRaySegment(ray, glm::dvec3(solid.vertices[key.first]),
+                                                                                glm::dvec3(solid.vertices[key.second]));
+            HorizonEdge edge;
+            edge.solidIndex = solidIndex;
+            edge.dragFace = static_cast<size_t>(frontA ? adjacent.b : adjacent.a);
+            edge.visibleFace = static_cast<size_t>(frontA ? adjacent.a : adjacent.b);
+            edge.distance = approach.distance;
+            edge.rayDistance = approach.rayT;
+            edge.handlePoint = approach.segmentPoint;
+            edge.visibleNormal = normals[edge.visibleFace];
+            out.push_back(edge);
+        }
+    }
+}
+
+bool PickExtrudeFace(const std::vector<const Solid*>& solids, const Edit::Ray& ray, bool orthographic,
+                     double edgeHandleRadius, ExtrudePick& out)
+{
+    // Прямое попадание: ближайшая входная грань среди выбранных солидов (остальной уровень луч не заслоняет)
+    bool direct = false;
+    ExtrudePick directPick;
+    for (size_t s = 0; s < solids.size(); ++s)
+    {
+        float distance = 0.0f;
+        size_t face = 0;
+        if (!RaycastSolid(*solids[s], glm::vec3(ray.origin), glm::vec3(ray.dir), static_cast<float>(ray.maxDistance), distance, face)) continue;
+        if (direct && distance >= directPick.distance) continue;
+
+        direct = true;
+        directPick.kind = ExtrudePick::Kind::Face;
+        directPick.solidIndex = s;
+        directPick.face = face;
+        directPick.distance = distance;
+        directPick.handlePoint = ray.at(distance);
+    }
+
+    if (direct && !orthographic)
+    {
+        out = directPick;
         return true;
     }
 
-    // Рёбра с двумя смежными гранями: ключ (меньший, больший индекс вершины), a = грань с направлением от меньшего к большему
-    struct EdgeFaces { int a = -1; int b = -1; };
-    std::map<std::pair<uint32_t, uint32_t>, EdgeFaces> edges;
+    std::vector<HorizonEdge> horizon;
+    for (size_t s = 0; s < solids.size(); ++s) CollectHorizonEdges(*solids[s], s, ray, horizon);
 
-    for (size_t f = 0; f < solid.faces.size(); ++f)
+    const HorizonEdge* best = nullptr;
+    for (const HorizonEdge& edge : horizon)
     {
-        const std::vector<uint32_t>& loop = solid.faces[f].loop;
-        for (size_t i = 0; i < loop.size(); ++i)
-        {
-            const uint32_t u = loop[i];
-            const uint32_t v = loop[(i + 1) % loop.size()];
-            EdgeFaces& edge = edges[{ std::min(u, v), std::max(u, v) }];
-            (u < v ? edge.a : edge.b) = static_cast<int>(f);
-        }
+        // Ортографика, курсор внутри силуэта: работает только ребро, у которого курсор в пределах ручки
+        if (direct && orthographic && edge.distance > edgeHandleRadius) continue;
+        if (!best || edge.distance < best->distance) best = &edge;
     }
+    if (!best) return false;   // нет горизонтальных рёбер, либо 2D и курсор внутри силуэта вдали от рёбер
 
-    bool found = false;
-    double bestDistance = 0.0;
-
-    for (const auto& [key, adjacent] : edges)
-    {
-        if (adjacent.a < 0 || adjacent.b < 0) continue;
-
-        const Edit::SegmentApproach approach = Edit::ClosestRaySegment(ray, glm::dvec3(solid.vertices[key.first]),
-                                                                            glm::dvec3(solid.vertices[key.second]));
-        if (approach.distance > tolerance.at(approach.rayT)) continue;
-        if (found && approach.distance >= bestDistance) continue;
-
-        const glm::dvec3 offset = approach.rayPoint - approach.segmentPoint;
-        const double scoreA = glm::dot(glm::dvec3(FaceNormal(solid, solid.faces[adjacent.a])), offset);
-        const double scoreB = glm::dot(glm::dvec3(FaceNormal(solid, solid.faces[adjacent.b])), offset);
-
-        found = true;
-        bestDistance = approach.distance;
-        out = { static_cast<size_t>(scoreA >= scoreB ? adjacent.a : adjacent.b), approach.rayT, true };
-    }
-    return found;
+    out = {};
+    out.kind = ExtrudePick::Kind::Horizon;
+    out.solidIndex = best->solidIndex;
+    out.face = best->dragFace;
+    out.distance = best->rayDistance;
+    out.handlePoint = best->handlePoint;
+    out.referenceNormal = orthographic ? ray.dir : best->visibleNormal;
+    return true;
 }

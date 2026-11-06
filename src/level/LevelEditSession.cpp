@@ -366,6 +366,18 @@ bool LevelEditSession::editFaces(const std::vector<FaceRef>& faces, std::string 
     return commit(std::move(name), std::move(changes), coalesceTag);
 }
 
+std::vector<uint64_t> LevelEditSession::contextSolids() const
+{
+    if (!m_selectedSolids.empty()) return m_selectedSolids;
+
+    std::vector<uint64_t> solids;
+    for (const FaceRef& ref : m_selectedFaces)
+    {
+        if (std::find(solids.begin(), solids.end(), ref.solidUid) == solids.end()) solids.push_back(ref.solidUid);
+    }
+    return solids;
+}
+
 const Solid* LevelEditSession::findSolid(uint64_t uid) const
 {
     for (const Solid& solid : m_document.solids)

@@ -15,7 +15,7 @@
 namespace
 {
     constexpr float kVertexPickPixels = 10.0f;
-    constexpr float kEdgePickPixels = 8.0f;
+    constexpr float kEdgeHandlePixels = 12.0f;   // ребро берётся за ручку-ромб в его середине
     constexpr float kDragPixels = 4.0f;
     constexpr float kSamePosition = 0.02f;
     constexpr double kGuideLength = 4096.0;
@@ -23,6 +23,7 @@ namespace
     const glm::vec4 kVertexColor{0.85f, 0.85f, 0.85f, 1.0f};
     const glm::vec4 kHoverColor{1.0f, 0.95f, 0.2f, 1.0f};
     const glm::vec4 kSelectedColor{1.0f, 0.45f, 0.1f, 1.0f};
+    const glm::vec4 kEdgeHandleColor{0.25f, 0.85f, 0.9f, 1.0f};   // ручки рёбер бирюзовые, вершин серые: режимы различимы с первого взгляда
     const glm::vec4 kPreviewColor{1.0f, 1.0f, 1.0f, 1.0f};
     const glm::vec4 kAxisColors[3] = {
         {1.0f, 0.25f, 0.25f, 1.0f}, {0.35f, 1.0f, 0.35f, 1.0f}, {0.4f, 0.55f, 1.0f, 1.0f}
@@ -143,7 +144,7 @@ void VertexTool::selectAllVertices(const LevelEditSession& session)
 VertexTool::Hover VertexTool::pickElement(const LevelEditSession& session, const ViewportPointer& pointer) const
 {
     Hover best;
-    float bestDistance = (m_mode == Mode::Vertex) ? kVertexPickPixels : kEdgePickPixels;
+    float bestDistance = (m_mode == Mode::Vertex) ? kVertexPickPixels : kEdgeHandlePixels;
 
     for (uint64_t uid : session.selectedSolids())
     {
@@ -163,12 +164,15 @@ VertexTool::Hover VertexTool::pickElement(const LevelEditSession& session, const
         }
         else
         {
+            // Ребро берётся только за ручку в середине: что видно, то и можно взять, и у углов рёбра не спорят друг с другом
             for (const auto& [ia, ib] : UniqueEdges(*solid))
             {
-                glm::vec2 pa, pb;
-                if (!ProjectToPixels(pointer, solid->vertices[ia], pa) || !ProjectToPixels(pointer, solid->vertices[ib], pb)) continue;
+                const glm::vec3 middle = (solid->vertices[ia] + solid->vertices[ib]) * 0.5f;
 
-                const float d = PixelDistanceToSegment(pointer.mousePx, pa, pb);
+                glm::vec2 px;
+                if (!ProjectToPixels(pointer, middle, px)) continue;
+
+                const float d = glm::length(px - pointer.mousePx);
                 if (d < bestDistance) { bestDistance = d; best = { true, true, uid, solid->vertices[ia], solid->vertices[ib] }; }
             }
         }
@@ -423,26 +427,47 @@ void VertexTool::finishGrab(LevelEditSession& session)
 
 std::string VertexTool::hint() const
 {
+    const char* mode = m_mode == Mode::Vertex ? "[Vertex mode: square handles] " : "[Edge mode: diamond handles at edge centers] ";
+
     if (m_grab.active)
     {
-        return std::string("X / Y / Z: axis, Shift+axis: plane  |  ") + (m_grab.fromDrag ? "release: apply" : "click / Enter: apply") + "  |  Esc: cancel";
+        return std::string(mode) + "X / Y / Z: axis, Shift+axis: plane  |  " + (m_grab.fromDrag ? "release: apply" : "click / Enter: apply") + "  |  Esc: cancel";
     }
     if (m_selected.empty())
     {
-        return m_mode == Mode::Vertex ? "Click a vertex (select a solid first)  |  A: all  |  2: edges"
-                                      : "Click an edge (select a solid first)  |  A: all vertices  |  1: vertices";
+        return std::string(mode) + (m_mode == Mode::Vertex ? "Click a vertex (select a solid first)  |  A: all  |  2: edge mode"
+                                                            : "Click an edge handle (select a solid first)  |  A: all  |  1: vertex mode");
     }
-    return "Drag or G: move  |  Ctrl+click: toggle  |  A: all  |  1: vertices  2: edges  |  V: select tool";
+    return std::string(mode) + "Drag or G: move  |  Ctrl+click: toggle  |  A: all  |  1: vertices  2: edges  |  V: select tool";
 }
 
 void VertexTool::collectPreview(const LevelEditSession& session, ToolPreview& out) const
 {
+    using Shape = ToolPreview::Shape;
+
     if (m_grab.active)
     {
         for (const SolidEdit& edit : m_grab.edits)
         {
             out.addSolidEdges(edit.preview, kPreviewColor);
-            for (uint32_t index : edit.moved) out.addPoint(edit.preview.vertices[index], kSelectedColor, 9.0f);
+
+            if (m_mode == Mode::Vertex)
+            {
+                for (uint32_t index : edit.moved) out.addPoint(edit.preview.vertices[index], kSelectedColor, 9.0f);
+            }
+            else
+            {
+                // Режим рёбер: ромбы в серединах двигаемых рёбер (ребро двигается, когда оба его конца в движении)
+                for (const auto& [ia, ib] : UniqueEdges(edit.preview))
+                {
+                    const bool movedA = std::find(edit.moved.begin(), edit.moved.end(), ia) != edit.moved.end();
+                    const bool movedB = std::find(edit.moved.begin(), edit.moved.end(), ib) != edit.moved.end();
+                    if (!movedA || !movedB) continue;
+
+                    out.addLine(edit.preview.vertices[ia], edit.preview.vertices[ib], kSelectedColor);
+                    out.addPoint((edit.preview.vertices[ia] + edit.preview.vertices[ib]) * 0.5f, kSelectedColor, 11.0f, Shape::Diamond);
+                }
+            }
         }
 
         // Направляющие осей через исходный якорь
@@ -470,24 +495,45 @@ void VertexTool::collectPreview(const LevelEditSession& session, ToolPreview& ou
         const Solid* solid = session.findSolid(uid);
         if (!solid) continue;
 
-        // Рёбра, оба конца которых выбраны, подсвечиваем (и в режиме вершин тоже)
-        for (const auto& [ia, ib] : UniqueEdges(*solid))
+        // Рёбра, оба конца которых выбраны, подсвечиваем (в обоих режимах)
+        const auto edges = UniqueEdges(*solid);
+        for (const auto& [ia, ib] : edges)
         {
             if (isSelectedAt(uid, solid->vertices[ia]) && isSelectedAt(uid, solid->vertices[ib]))
                 out.addLine(solid->vertices[ia], solid->vertices[ib], kSelectedColor);
         }
 
-        for (const glm::vec3& v : solid->vertices)
+        if (m_mode == Mode::Vertex)
         {
-            const bool selected = isSelectedAt(uid, v);
-            out.addPoint(v, selected ? kSelectedColor : kVertexColor, selected ? 9.0f : 6.0f);
+            // Режим вершин: квадраты в вершинах, рёбра ручек не имеют
+            for (const glm::vec3& v : solid->vertices)
+            {
+                const bool selected = isSelectedAt(uid, v);
+                out.addPoint(v, selected ? kSelectedColor : kVertexColor, selected ? 9.0f : 6.0f);
+            }
+        }
+        else
+        {
+            // Режим рёбер: ромбы в серединах рёбер, вершины не рисуются
+            for (const auto& [ia, ib] : edges)
+            {
+                const bool selected = isSelectedAt(uid, solid->vertices[ia]) && isSelectedAt(uid, solid->vertices[ib]);
+                out.addPoint((solid->vertices[ia] + solid->vertices[ib]) * 0.5f, selected ? kSelectedColor : kEdgeHandleColor,
+                             selected ? 11.0f : 8.0f, Shape::Diamond);
+            }
         }
     }
 
     if (m_hover.valid)
     {
-        if (m_hover.isEdge) out.addLine(m_hover.a, m_hover.b, kHoverColor);
-        out.addPoint(m_hover.a, kHoverColor, 10.0f);
-        if (m_hover.isEdge) out.addPoint(m_hover.b, kHoverColor, 10.0f);
+        if (m_hover.isEdge)
+        {
+            out.addLine(m_hover.a, m_hover.b, kHoverColor);
+            out.addPoint((m_hover.a + m_hover.b) * 0.5f, kHoverColor, 13.0f, Shape::Diamond);
+        }
+        else
+        {
+            out.addPoint(m_hover.a, kHoverColor, 10.0f);
+        }
     }
 }

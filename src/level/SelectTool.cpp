@@ -10,7 +10,7 @@
 
 namespace
 {
-    constexpr float kPickPixels = 48.0f;   // насколько далеко от силуэта курсор ещё "рядом" с гранью
+    constexpr float kEdgeHandlePixels = 8.0f;   // ортографика: насколько близко к ребру курсор внутри силуэта берёт грань
     constexpr float kDragPixels = 4.0f;    // дрожание руки при клике не должно сдвигать солиды
 
     const glm::vec4 kAxisColors[3] = {
@@ -46,6 +46,7 @@ namespace
     }
 
     const glm::vec4 kCandidateColor{1.0f, 0.95f, 0.2f, 1.0f};
+    const glm::vec4 kAltFaceColor{0.3f, 1.0f, 1.0f, 1.0f};
     const glm::vec4 kPreviewColor{1.0f, 1.0f, 1.0f, 1.0f};
 }
 
@@ -77,20 +78,32 @@ void SelectTool::onPointer(LevelEditSession& session, uint32_t viewId, const Vie
 
     m_pushPullMode = pointer.shift && !session.selectedSolids().empty();
 
+    // Alt при выбранном солиде (или гранях): работаем только с гранями этого солида
+    const std::vector<uint64_t> context = session.contextSolids();
+    m_altMode = !m_pushPullMode && pointer.alt && !context.empty();
+
     // Кандидата сбрасывает только вид, который его выставил: соседняя панель без курсора его не гасит
     if (!pointer.over || pointer.capturing)
     {
-        if (m_candidateView == viewId) m_hasCandidate = false;
+        if (m_candidateView == viewId) { m_hasCandidate = false; m_altValid = false; }
         return;
     }
 
     m_hasCandidate = false;
+    m_altValid = false;
     m_candidateView = viewId;
 
     if (m_pushPullMode)
     {
         updateCandidate(session, pointer);
         if (pointer.pressed && m_hasCandidate) beginDrag(session, viewId, pointer);
+        return;
+    }
+
+    if (m_altMode)
+    {
+        updateAltFace(session, pointer, context);
+        if (pointer.pressed && m_altValid) session.selectFace(m_altSolid, m_altFaceUid, pointer.ctrl);   // Ctrl+Alt добавляет / убирает
         return;
     }
 
@@ -212,24 +225,65 @@ bool SelectTool::onKey(LevelEditSession& session, LevelKey key, bool shift)
 
 void SelectTool::updateCandidate(const LevelEditSession& session, const ViewportPointer& pointer)
 {
-    const Edit::Ray ray = MakeRay(pointer);
-    const Edit::PickTolerance tolerance = PixelTolerance(pointer, kPickPixels);
-
-    double bestDistance = 0.0;
+    // Только выбранные солиды: остальной уровень луч не заслоняет
+    std::vector<const Solid*> solids;
+    std::vector<uint64_t> uids;
     for (uint64_t uid : session.selectedSolids())
+    {
+        if (const Solid* solid = session.findSolid(uid)) { solids.push_back(solid); uids.push_back(uid); }
+    }
+    if (solids.empty()) return;
+
+    // Ортографика: внутри силуэта грань берётся только у самого ребра, радиус ручки в мировых единицах
+    const double radius = pointer.camera.ortho ? PixelTolerance(pointer, kEdgeHandlePixels).base : 0.0;
+
+    ExtrudePick pick;
+    if (!PickExtrudeFace(solids, MakeRay(pointer), pointer.camera.ortho, radius, pick)) return;
+
+    m_hasCandidate = true;
+    m_candidatePick = pick;
+    m_candidateSolid = uids[pick.solidIndex];
+    m_candidateFace = pick.face;
+}
+
+void SelectTool::updateAltFace(const LevelEditSession& session, const ViewportPointer& pointer, const std::vector<uint64_t>& context)
+{
+    const Edit::Ray ray = MakeRay(pointer);
+
+    // Сначала грани контекстных солидов (за другими солидами тоже), и только промахнувшись берём то, что под курсором в уровне
+    double best = 0.0;
+    for (uint64_t uid : context)
     {
         const Solid* solid = session.findSolid(uid);
         if (!solid) continue;
 
-        FacePick pick;
-        if (!PickResizeFace(*solid, ray, tolerance, pick)) continue;
-        if (m_hasCandidate && pick.distance >= bestDistance) continue;
+        float distance = 0.0f;
+        size_t face = 0;
+        if (!RaycastSolid(*solid, glm::vec3(ray.origin), glm::vec3(ray.dir), static_cast<float>(ray.maxDistance), distance, face)) continue;
+        if (m_altValid && distance >= best) continue;
 
-        m_hasCandidate = true;
-        bestDistance = pick.distance;
-        m_candidateSolid = uid;
-        m_candidateFace = pick.face;
+        m_altValid = true;
+        best = distance;
+        m_altSolid = uid;
+        m_altFaceUid = solid->faces[face].uid;
     }
+
+    if (!m_altValid && session.hasHover())
+    {
+        m_altValid = true;
+        m_altSolid = session.hover().solidUid;
+        m_altFaceUid = session.hover().faceUid;
+    }
+}
+
+bool SelectTool::DragParam(const Drag& drag, const Edit::Ray& ray, double& out)
+{
+    if (!drag.usePlane) return Edit::ClosestLineParam(ray, drag.referencePoint, drag.normal, out);
+
+    double t = 0.0;
+    if (!Edit::RayPlane(ray, drag.referencePoint, drag.referenceNormal, t)) return false;
+    out = glm::dot(ray.at(t) - drag.referencePoint, drag.normal);   // курсор в опорной плоскости, смещение это проекция на нормаль
+    return true;
 }
 
 bool SelectTool::beginDrag(const LevelEditSession& session, uint32_t viewId, const ViewportPointer& pointer)
@@ -244,10 +298,12 @@ bool SelectTool::beginDrag(const LevelEditSession& session, uint32_t viewId, con
     drag.solidUid = m_candidateSolid;
     drag.normal = drag.planes[drag.face].normal;
     drag.baseDistance = drag.planes[drag.face].distance;
-    drag.linePoint = FaceCentroid(*solid, solid->faces[drag.face]);
+    drag.usePlane = m_candidatePick.kind == ExtrudePick::Kind::Horizon;
+    drag.referencePoint = m_candidatePick.handlePoint;
+    drag.referenceNormal = m_candidatePick.referenceNormal;
 
-    // Если луч идёт почти вдоль нормали грани (смотрим на неё в упор), протяжка не определена: не начинаем
-    if (!Edit::ClosestLineParam(MakeRay(pointer), drag.linePoint, drag.normal, drag.startParam)) return false;
+    // Если курсор не определяет смещение (луч параллелен прямой или плоскости), протяжка не начинается
+    if (!DragParam(drag, MakeRay(pointer), drag.startParam)) return false;
 
     drag.preview = drag.source;
     drag.view = viewId;
@@ -261,7 +317,7 @@ void SelectTool::updateDrag(LevelEditSession& session, const ViewportPointer& po
     if (!pointer.capturing)   // во время полёта камеры курсор скрыт: замираем на последней форме
     {
         double param = 0.0;
-        if (Edit::ClosestLineParam(MakeRay(pointer), m_drag.linePoint, m_drag.normal, param))
+        if (DragParam(m_drag, MakeRay(pointer), param))
         {
             const double delta = Edit::Snap(param - m_drag.startParam, session.gridSize());
             if (delta != m_drag.delta)
@@ -302,6 +358,7 @@ std::string SelectTool::hint() const
     }
     if (m_drag.active) return "Drag to move the face, release to apply (Esc: cancel)";
     if (m_pushPullMode) return m_hasCandidate ? "Drag the highlighted face" : "Move the cursor near a face of the selected solid";
+    if (m_altMode) return "Alt+click: select a face of the selected solid (even behind other solids), Ctrl+Alt+click: add / remove";
     return "Click: select  |  Drag or G: move  |  Shift+D: duplicate  |  Ctrl+click: toggle  |  Alt+click: face  |  Shift: push/pull  |  B: box  E: vertices";
 }
 
@@ -342,6 +399,18 @@ void SelectTool::collectPreview(const LevelEditSession& session, ToolPreview& ou
 
         const glm::vec3 center = glm::vec3(FaceCentroid(m_drag.preview, m_drag.preview.faces[m_drag.face]));
         out.addText(center, (m_drag.delta > 0 ? "+" : "") + FormatUnits(m_drag.delta), kCandidateColor);
+        return;
+    }
+
+    if (m_altMode && m_altValid)
+    {
+        if (const Solid* solid = session.findSolid(m_altSolid))
+        {
+            for (const Face& face : solid->faces)
+            {
+                if (face.uid == m_altFaceUid) out.addFaceOutline(*solid, face, kAltFaceColor);
+            }
+        }
         return;
     }
 

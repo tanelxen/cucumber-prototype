@@ -88,6 +88,10 @@ public:
     void selectSolid(uint64_t uid, bool toggle);
     const Solid* findSolid(uint64_t uid) const;
 
+    // Солиды, с гранями которых работаем: выбранные, а если выбраны только грани, то их солиды. С ними ограничивается
+    // пикинг граней (Alt, Shift), поэтому грани, спрятанные за другими солидами, достижимы.
+    std::vector<uint64_t> contextSolids() const;
+
     // Выбор граней (взаимоисключающ с выбором солидов). toggle добавляет / убирает грань, иначе выбор заменяется.
     const std::vector<FaceRef>& selectedFaces() const { return m_selectedFaces; }
     bool isFaceSelected(uint64_t faceUid) const;

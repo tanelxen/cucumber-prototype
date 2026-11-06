@@ -38,7 +38,9 @@ struct ToolPreview
 {
     struct Line { glm::vec3 a, b; glm::vec4 color; };
     struct Text { glm::vec3 position; std::string text; glm::vec4 color; };
-    struct Point { glm::vec3 position; glm::vec4 color; float sizePx; };   // маркер постоянного экранного размера
+    // Маркер постоянного экранного размера. Форма различает типы ручек: квадрат это вершина, ромб это ребро
+    enum class Shape { Square, Diamond };
+    struct Point { glm::vec3 position; glm::vec4 color; float sizePx; Shape shape = Shape::Square; };
 
     std::vector<Line> lines;
     std::vector<Text> texts;
@@ -49,7 +51,7 @@ struct ToolPreview
     void addSolidEdges(const Solid& solid, const glm::vec4& color);
     void addFaceOutline(const Solid& solid, const Face& face, const glm::vec4& color, float lift = 0.1f);
     void addText(const glm::vec3& position, std::string text, const glm::vec4& color);
-    void addPoint(const glm::vec3& position, const glm::vec4& color, float sizePx);
+    void addPoint(const glm::vec3& position, const glm::vec4& color, float sizePx, Shape shape = Shape::Square);
 };
 
 // Число для подписи: целые без дробной части, остальные с одним знаком

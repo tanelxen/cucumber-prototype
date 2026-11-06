@@ -57,9 +57,9 @@ void ToolPreview::addText(const glm::vec3& position, std::string text, const glm
     texts.push_back({ position, std::move(text), color });
 }
 
-void ToolPreview::addPoint(const glm::vec3& position, const glm::vec4& color, float sizePx)
+void ToolPreview::addPoint(const glm::vec3& position, const glm::vec4& color, float sizePx, Shape shape)
 {
-    points.push_back({ position, color, sizePx });
+    points.push_back({ position, color, sizePx, shape });
 }
 
 std::string FormatUnits(double value)
