@@ -147,6 +147,9 @@ set(SRC_RENDERER
         src/ShadowSystem.cpp
         src/ShadowSystem.h
         src/ShadowTypes.h
+        
+        src/renderer/OverlayRender.cpp
+        src/renderer/OverlayRender.h
 )
 
 set(SRC_GameUI

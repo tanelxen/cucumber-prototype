@@ -24,6 +24,7 @@
 #include "SpriteRenderer.h"
 #include "DecalManager.h"
 #include "GizmoRender.h"
+#include "renderer/OverlayRender.h"
 #include "GameUI.h"
 
 #include <glad/glad.h>
@@ -447,6 +448,11 @@ namespace RenderDevice {
             GizmoRender::Get().Flush(desc.camera.view, desc.camera.proj);
         }
         
+        if (desc.flags & ViewFlag::EditOverlay)
+        {
+            OverlayRender::Get().Flush(desc.camera.view, desc.camera.proj, desc.size);
+        }
+        
         // FIXME: Resize должен быть не тут
         if (desc.flags & ViewFlag::GameUI)
         {
@@ -488,6 +494,7 @@ namespace RenderDevice {
         
         // Очереди чистим ВСЕГДА, даже когда видов нет (все панели свёрнуты): иначе гизмо и спрайты копились бы вечно
         GizmoRender::Get().Clear();
+        OverlayRender::Get().Clear();
         SpriteRenderer::Clear();
         GameUI::Clear();
     }

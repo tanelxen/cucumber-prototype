@@ -39,6 +39,7 @@ void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioLis
     if (drawSkybox)    v.flags |= ViewFlag::Sky;
     if (drawGrid)      v.flags |= ViewFlag::Grid;
     if (drawGizmos)    v.flags |= ViewFlag::Debug;
+    if (drawEditOverlay) v.flags |= ViewFlag::EditOverlay;
     if (audioListener) v.flags |= ViewFlag::AudioListener;
     if (drawGizmos || drawEditOverlay) v.flags |= ViewFlag::Debug;
 

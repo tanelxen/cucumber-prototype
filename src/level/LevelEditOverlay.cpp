@@ -5,30 +5,47 @@
 
 #include "LevelEditOverlay.h"
 
-#include "GizmoRender.h"
 #include "level/LevelEditSession.h"
+#include "renderer/OverlayRender.h"
 
 #include <imgui.h>
 
 namespace
 {
+    // Рёбра выбранного солида рисуются без теста глубины: видны все, в том числе тыльные и закрытые другими солидами
+    // (так удобно при push/pull). Depth::XRay сделал бы скрытые части приглушёнными, Depth::Tested как обычную геометрию.
+    constexpr OverlayRender::Depth kSelectionDepth = OverlayRender::Depth::Always;
+
+    constexpr float kSelectedWidth = 2.0f;
+    constexpr float kFaceWidth = 3.0f;
+
     const glm::vec4 kSelectedSolid{1.0f, 0.60f, 0.10f, 1.0f};
     const glm::vec4 kSelectedFace {1.0f, 0.95f, 0.20f, 1.0f};
     const glm::vec4 kHoverSolid   {0.6f, 0.90f, 1.00f, 0.8f};
     const glm::vec4 kHoverFace    {0.3f, 1.00f, 1.00f, 1.0f};
 
-    void DrawSolidEdges(const Solid& solid, const glm::vec4& color)
+    OverlayRender::Depth ToDepth(bool onTop)
     {
-        ToolPreview preview;
-        preview.addSolidEdges(solid, color);
-        for (const ToolPreview::Line& line : preview.lines) GizmoRender::Get().DrawLine(line.a, line.b, line.color);
+        return onTop ? OverlayRender::Depth::Always : OverlayRender::Depth::Tested;
     }
 
-    void DrawFaceOutline(const Solid& solid, const Face& face, const glm::vec4& color)
+    OverlayRender::Shape ToShape(ToolPreview::Shape shape)
     {
-        ToolPreview preview;
-        preview.addFaceOutline(solid, face, color);
-        for (const ToolPreview::Line& line : preview.lines) GizmoRender::Get().DrawLine(line.a, line.b, line.color);
+        switch (shape)
+        {
+            case ToolPreview::Shape::Diamond: return OverlayRender::Shape::Diamond;
+            case ToolPreview::Shape::Circle:  return OverlayRender::Shape::Circle;
+            default:                          return OverlayRender::Shape::Square;
+        }
+    }
+
+    void Submit(const ToolPreview& preview, OverlayRender::Depth overrideDepth, bool useOverride)
+    {
+        OverlayRender& overlay = OverlayRender::Get();
+        for (const ToolPreview::Line& line : preview.lines)
+            overlay.DrawLine(line.a, line.b, line.color, line.width, useOverride ? overrideDepth : ToDepth(line.onTop));
+        for (const ToolPreview::Point& point : preview.points)
+            overlay.DrawPoint(point.position, point.color, point.sizePx, ToShape(point.shape), OverlayRender::Depth::Always);
     }
 
     const Face* FindFace(const Solid& solid, uint64_t uid)
@@ -39,97 +56,77 @@ namespace
         }
         return nullptr;
     }
-
-    ImU32 ToColor(const glm::vec4& c)
-    {
-        return IM_COL32(int(c.x * 255.0f), int(c.y * 255.0f), int(c.z * 255.0f), int(c.w * 255.0f));
-    }
 }
 
 void DrawLevelEditOverlay(const LevelEditSession& session)
 {
+    // Выбранные солиды: все рёбра, без теста глубины
     for (uint64_t uid : session.selectedSolids())
     {
-        if (const Solid* solid = session.findSolid(uid)) DrawSolidEdges(*solid, kSelectedSolid);
-    }
-
-    for (const FaceRef& ref : session.selectedFaces())
-    {
-        if (const Solid* solid = session.findSolid(ref.solidUid))
+        if (const Solid* solid = session.findSolid(uid))
         {
-            if (const Face* face = FindFace(*solid, ref.faceUid)) DrawFaceOutline(*solid, *face, kSelectedFace);
+            ToolPreview preview;
+            preview.addSolidEdges(*solid, kSelectedSolid, kSelectedWidth);
+            Submit(preview, kSelectionDepth, true);
         }
     }
 
+    // Выбранные грани: контур потолще
+    for (const FaceRef& ref : session.selectedFaces())
+    {
+        const Solid* solid = session.findSolid(ref.solidUid);
+        const Face* face = solid ? FindFace(*solid, ref.faceUid) : nullptr;
+        if (!face) continue;
+
+        ToolPreview preview;
+        preview.addFaceOutline(*solid, *face, kSelectedFace, 0.1f, kFaceWidth);
+        Submit(preview, kSelectionDepth, true);
+    }
+
+    // Подсветка солида под курсором выключена по умолчанию (см. LevelEditSession::hoverHighlight): лишний визуальный шум
     if (session.hoverHighlight() && session.hasHover() && session.activeTool().showsHover())
     {
         const LevelHit& hit = session.hover();
         if (const Solid* solid = session.findSolid(hit.solidUid))
         {
-            if (!session.isSolidSelected(hit.solidUid)) DrawSolidEdges(*solid, kHoverSolid);
-            if (const Face* face = FindFace(*solid, hit.faceUid)) DrawFaceOutline(*solid, *face, kHoverFace);
+            ToolPreview preview;
+            if (!session.isSolidSelected(hit.solidUid)) preview.addSolidEdges(*solid, kHoverSolid, 1.5f);
+            if (const Face* face = FindFace(*solid, hit.faceUid)) preview.addFaceOutline(*solid, *face, kHoverFace, 0.1f, kFaceWidth);
+            Submit(preview, kSelectionDepth, true);
         }
     }
 
+    // Превью и ручки активного инструмента: у каждой линии своя толщина и режим глубины
     ToolPreview preview;
     session.activeTool().collectPreview(session, preview);
-    for (const ToolPreview::Line& line : preview.lines) GizmoRender::Get().DrawLine(line.a, line.b, line.color);
+    Submit(preview, OverlayRender::Depth::Always, false);
 }
 
 void DrawLevelEditLabels(const LevelEditSession& session, const CameraData& camera, float x, float y, float width, float height)
 {
     ToolPreview preview;
     session.activeTool().collectPreview(session, preview);
-    if (preview.texts.empty() && preview.points.empty()) return;
+    if (preview.texts.empty()) return;
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const glm::mat4 viewProj = camera.viewProj();
 
-    // Мировая точка в экранные координаты ImGui; false, если позади камеры или за краем вида
-    const auto project = [&](const glm::vec3& world, ImVec2& out)
-    {
-        const glm::vec4 clip = viewProj * glm::vec4(world, 1.0f);
-        if (clip.w <= 1e-4f) return false;   // позади камеры (в ортографии w = 1)
-
-        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
-        if (ndc.x < -1.0f || ndc.x > 1.0f || ndc.y < -1.0f || ndc.y > 1.0f) return false;
-
-        out = ImVec2(x + (ndc.x * 0.5f + 0.5f) * width, y + (1.0f - (ndc.y * 0.5f + 0.5f)) * height);
-        return true;
-    };
-
-    // Маркеры постоянного экранного размера с тёмной обводкой. Квадрат это вершина, ромб это ребро: ручки разных
-    // режимов правки различаются формой, а не только цветом
-    for (const ToolPreview::Point& point : preview.points)
-    {
-        ImVec2 center;
-        if (!project(point.position, center)) continue;
-
-        const float h = point.sizePx * 0.5f;
-        if (point.shape == ToolPreview::Shape::Diamond)
-        {
-            const float r = h * 1.35f;   // ромб при той же "стороне" заметно меньше квадрата: чуть увеличиваем
-            const ImVec2 top(center.x, center.y - r), right(center.x + r, center.y), bottom(center.x, center.y + r), left(center.x - r, center.y);
-            drawList->AddQuadFilled(top, right, bottom, left, ToColor(point.color));
-            drawList->AddQuad(top, right, bottom, left, IM_COL32(0, 0, 0, 200));
-        }
-        else
-        {
-            drawList->AddRectFilled(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), ToColor(point.color));
-            drawList->AddRect(ImVec2(center.x - h, center.y - h), ImVec2(center.x + h, center.y + h), IM_COL32(0, 0, 0, 200));
-        }
-    }
-
     for (const ToolPreview::Text& label : preview.texts)
     {
-        ImVec2 center;
-        if (!project(label.position, center)) continue;
+        const glm::vec4 clip = viewProj * glm::vec4(label.position, 1.0f);
+        if (clip.w <= 1e-4f) continue;   // позади камеры (в ортографике w = 1)
+
+        const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        if (ndc.x < -1.0f || ndc.x > 1.0f || ndc.y < -1.0f || ndc.y > 1.0f) continue;
 
         const ImVec2 size = ImGui::CalcTextSize(label.text.c_str());
-        const ImVec2 position(center.x - size.x * 0.5f, center.y - size.y * 0.5f);
+        const ImVec2 position(x + (ndc.x * 0.5f + 0.5f) * width - size.x * 0.5f,
+                              y + (1.0f - (ndc.y * 0.5f + 0.5f)) * height - size.y * 0.5f);
 
+        const ImU32 color = IM_COL32(int(label.color.x * 255.0f), int(label.color.y * 255.0f),
+                                     int(label.color.z * 255.0f), int(label.color.w * 255.0f));
         drawList->AddRectFilled(ImVec2(position.x - 4, position.y - 2), ImVec2(position.x + size.x + 4, position.y + size.y + 2),
                                 IM_COL32(0, 0, 0, 160), 3.0f);
-        drawList->AddText(position, ToColor(label.color), label.text.c_str());
+        drawList->AddText(position, color, label.text.c_str());
     }
 }

@@ -33,23 +33,26 @@ enum class LevelKey
     DuplicateMove   // копия выбранных солидов и сразу перемещение (Shift+D в Blender)
 };
 
-// Превью без привязки к рендеру: линии рисует GizmoRender, подписи панель вьюпорта (экранный текст ImGui)
+// Превью без привязки к рендеру: линии и маркеры рисует OverlayRender (GPU, толщина и сглаживание), подписи панель
+// вьюпорта (экранный текст ImGui)
 struct ToolPreview
 {
-    struct Line { glm::vec3 a, b; glm::vec4 color; };
+    // width в логических пикселях. onTop: рисуется поверх сцены без теста глубины (так нужно большинству оверлеев
+    // редактора: рёбра выбранного солида видны целиком, и это особенно удобно при push/pull).
+    struct Line { glm::vec3 a, b; glm::vec4 color; float width = 2.0f; bool onTop = true; };
     struct Text { glm::vec3 position; std::string text; glm::vec4 color; };
     // Маркер постоянного экранного размера. Форма различает типы ручек: квадрат это вершина, ромб это ребро
-    enum class Shape { Square, Diamond };
+    enum class Shape { Square, Diamond, Circle };
     struct Point { glm::vec3 position; glm::vec4 color; float sizePx; Shape shape = Shape::Square; };
 
     std::vector<Line> lines;
     std::vector<Text> texts;
     std::vector<Point> points;
 
-    void addLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color);
-    void addBox(const glm::dvec3& mins, const glm::dvec3& maxs, const glm::vec4& color);
-    void addSolidEdges(const Solid& solid, const glm::vec4& color);
-    void addFaceOutline(const Solid& solid, const Face& face, const glm::vec4& color, float lift = 0.1f);
+    void addLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color, float width = 2.0f, bool onTop = true);
+    void addBox(const glm::dvec3& mins, const glm::dvec3& maxs, const glm::vec4& color, float width = 2.0f);
+    void addSolidEdges(const Solid& solid, const glm::vec4& color, float width = 2.0f);
+    void addFaceOutline(const Solid& solid, const Face& face, const glm::vec4& color, float lift = 0.1f, float width = 3.0f);
     void addText(const glm::vec3& position, std::string text, const glm::vec4& color);
     void addPoint(const glm::vec3& position, const glm::vec4& color, float sizePx, Shape shape = Shape::Square);
 };

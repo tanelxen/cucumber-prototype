@@ -12,6 +12,7 @@
 #include "RenderDevice.h"
 #include "AudioSystem.h"
 #include "GizmoRender.h"
+#include "renderer/OverlayRender.h"
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
 #include "DecalManager.h"
@@ -196,6 +197,7 @@ void Application::initSubSystems()
     m_pRenderer->init();                          // создаёт карты теней, нужен GL
     
     GizmoRender::Get().Initialize();
+    OverlayRender::Get().Initialize();
     
     AudioSystem::Get().Initialize();
     SpriteRenderer::Init();

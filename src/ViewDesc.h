@@ -44,6 +44,7 @@ namespace ViewFlag
     constexpr ViewFlagMask Debug         = 1 << 2; // gizmo / debug draw
     constexpr ViewFlagMask GameUI        = 1 << 3;
     constexpr ViewFlagMask AudioListener = 1 << 4; // отсюда берём позицию слушателя
+    constexpr ViewFlagMask EditOverlay   = 1 << 5; // оверлей редактора уровня (OverlayRender)
 }
 
 struct ViewDesc

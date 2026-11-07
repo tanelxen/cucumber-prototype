@@ -8,12 +8,12 @@
 #include <cmath>
 #include <cstdio>
 
-void ToolPreview::addLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color)
+void ToolPreview::addLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color, float width, bool onTop)
 {
-    lines.push_back({ a, b, color });
+    lines.push_back({ a, b, color, width, onTop });
 }
 
-void ToolPreview::addBox(const glm::dvec3& mins, const glm::dvec3& maxs, const glm::vec4& color)
+void ToolPreview::addBox(const glm::dvec3& mins, const glm::dvec3& maxs, const glm::vec4& color, float width)
 {
     glm::vec3 c[8];
     for (int i = 0; i < 8; ++i)
@@ -25,12 +25,12 @@ void ToolPreview::addBox(const glm::dvec3& mins, const glm::dvec3& maxs, const g
     {
         for (int bit = 1; bit <= 4; bit <<= 1)
         {
-            if (!(i & bit)) addLine(c[i], c[i | bit], color);
+            if (!(i & bit)) addLine(c[i], c[i | bit], color, width);
         }
     }
 }
 
-void ToolPreview::addSolidEdges(const Solid& solid, const glm::vec4& color)
+void ToolPreview::addSolidEdges(const Solid& solid, const glm::vec4& color, float width)
 {
     for (const Face& face : solid.faces)
     {
@@ -38,17 +38,17 @@ void ToolPreview::addSolidEdges(const Solid& solid, const glm::vec4& color)
         {
             const uint32_t a = face.loop[i];
             const uint32_t b = face.loop[(i + 1) % face.loop.size()];
-            if (a < b) addLine(solid.vertices[a], solid.vertices[b], color);   // каждое ребро делят две грани: рисуем одно направление
+            if (a < b) addLine(solid.vertices[a], solid.vertices[b], color, width);   // каждое ребро делят две грани: рисуем одно направление
         }
     }
 }
 
-void ToolPreview::addFaceOutline(const Solid& solid, const Face& face, const glm::vec4& color, float lift)
+void ToolPreview::addFaceOutline(const Solid& solid, const Face& face, const glm::vec4& color, float lift, float width)
 {
     const glm::vec3 offset = FaceNormal(solid, face) * lift;
     for (size_t i = 0; i < face.loop.size(); ++i)
     {
-        addLine(solid.vertices[face.loop[i]] + offset, solid.vertices[face.loop[(i + 1) % face.loop.size()]] + offset, color);
+        addLine(solid.vertices[face.loop[i]] + offset, solid.vertices[face.loop[(i + 1) % face.loop.size()]] + offset, color, width);
     }
 }
 
