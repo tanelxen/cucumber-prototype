@@ -95,7 +95,8 @@ bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSet
         if (it != textureCache.end()) return it->second;
 
         TextureInfo info;
-        auto textureAsset = TextureManager::Get().loadTexture("wolf/textures/" + name);
+        auto texturePath = mapData.m_basepath / "textures" / name;
+        auto textureAsset = TextureManager::Get().loadTexture(texturePath.string());
         if (textureAsset)
         {
             info.width = textureAsset->getWidth();

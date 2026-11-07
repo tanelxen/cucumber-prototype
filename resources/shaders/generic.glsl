@@ -268,17 +268,20 @@ void main()
     
     if (baseColor.a < uAlphaCutoff) discard;
 
+    vec3 diffuseTotal = vec3(0.0);
     vec3 albedo = baseColor.rgb;
     vec3 baked = vec3(0.0);
 
 #ifdef HAS_LIGHT_MAP
     baked = texture(s_lightMap, g_TexCoord2).rgb;
+#else
+    diffuseTotal = vec3(0.1);
 // #else
 //     float fakeLight = getFakeLight(v_Normal);
 //     albedo *= fakeLight * 2.0;
 #endif
 
-    vec3 diffuseTotal = vec3(0.0);
+
 
     for(int i = 0; i < uLightCount; i++)
     {

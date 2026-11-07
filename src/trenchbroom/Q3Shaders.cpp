@@ -17,13 +17,16 @@ namespace fs = std::filesystem;
 
 void Quake3Shaders::initFromDir(const std::string& path)
 {
-    for (const auto& entry : fs::directory_iterator(path))
-    {
-        if (fs::is_regular_file(entry) && entry.path().extension() == ".shader")
+    try {
+        for (const auto& entry : fs::directory_iterator(path))
         {
-            readFile(entry.path().string());
-//            break;
+            if (fs::is_regular_file(entry) && entry.path().extension() == ".shader")
+            {
+                readFile(entry.path().string());
+            }
         }
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Ошибка при чтении директории: " << path << std::endl;
     }
 }
 

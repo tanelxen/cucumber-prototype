@@ -48,7 +48,7 @@ UIManager::UIManager()
 {
     const char* home = std::getenv("HOME");
     const std::string defaultLocation = home
-    ? (std::filesystem::path(home) / "Projects").string()
+    ? (std::filesystem::path(home) / "Cucumber Projects").string()
     : std::filesystem::current_path().string();
     std::snprintf(m_projectLocationBuffer, sizeof(m_projectLocationBuffer), "%s", defaultLocation.c_str());
     
