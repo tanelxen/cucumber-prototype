@@ -66,6 +66,10 @@ struct ViewDesc
     int order = 0;
 
     ViewFlagMask flags = ViewFlag::Sky;
+    
+    // Постоянный набор линий OverlayRender (OverlayRender::LineSetId), рисуется после сцены и под оверлеем правки.
+    // 0 = нет. Движок не знает, что в наборе (каркас уровня, сетка и т. п.): его собирает тот, кто создал вид.
+    uint32_t overlayLines = 0;
 };
 
 // Луч из пикселя вида. mouse — в пикселях относительно левого верхнего угла вида.

@@ -33,7 +33,7 @@ public:
     void draw() override;
 
     // Вызывается Application раз в кадр после обновления сцены.
-    void collectViews(WorldScene& scene, std::vector<ViewDesc>& out);
+    void collectViews(WorldScene& scene, std::vector<ViewDesc>& out, uint32_t wireframeLines = 0);
 
     EditorViewport& viewport() { return m_viewport; }
     bool isHovered() const { return m_isHovered; }

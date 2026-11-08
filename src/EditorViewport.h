@@ -14,6 +14,12 @@
 
 #include <vector>
 
+enum class ShadeMode
+{
+    Shaded,
+    Wireframe
+};
+
 class EditorViewport
 {
 public:
@@ -35,12 +41,15 @@ public:
     void applyPendingSize();
 
     // Добавляет редакторский вид этого вьюпорта.
-    void produceEditorView(std::vector<ViewDesc>& out, bool audioListener);
+    // wireframeLines: id набора линий каркаса уровня (LevelWireframe::sync), используется в режиме Wireframe
+    void produceEditorView(std::vector<ViewDesc>& out, bool audioListener, uint32_t wireframeLines = 0);
 
     bool drawGrid = true;
     bool drawGizmos = false;
     bool drawSkybox = true;
     bool drawEditOverlay = false;
+    
+    ShadeMode shadeMode = ShadeMode::Shaded;
 
 private:
     uint32_t m_id;

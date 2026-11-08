@@ -271,6 +271,13 @@ void OverlayRender::Shutdown()
     m_vao = m_lineBuffer = m_pointBuffer = 0;
     m_lineCapacity = m_pointCapacity = 0;
     m_initialized = false;
+    
+    for (auto& entry : m_lineSets)
+    {
+        glDeleteBuffers(1, &entry.second.buffer);
+    }
+    m_lineSets.clear();
+    
     GLState::invalidate();
 }
 
@@ -361,104 +368,77 @@ void OverlayRender::upload()
     m_uploaded = true;
 }
 
-void OverlayRender::drawLayer(Layer layer, bool depthTest, float alphaScale, const glm::mat4& viewProj,
-                              const glm::vec2& viewport, float scale)
+OverlayRender::LineSetId OverlayRender::CreateLineSet()
 {
-    if (depthTest) glEnable(GL_DEPTH_TEST);
-    else           glDisable(GL_DEPTH_TEST);
-
-    const auto setUniforms = [&](const Program& program)
-    {
-        glUseProgram(program.id);
-        glUniformMatrix4fv(program.viewProj, 1, GL_FALSE, &viewProj[0][0]);
-        glUniform2f(program.viewport, viewport.x, viewport.y);
-        glUniform1f(program.scale, scale);
-        glUniform1f(program.depthBias, depthTest ? m_depthBias : 0.0f);
-        glUniform1f(program.alphaScale, alphaScale);
-    };
-
-    const size_t lineFirst = m_lineOffsets[layer];
-    const size_t lineCount = m_lineOffsets[layer + 1] - lineFirst;
-    if (lineCount > 0)
-    {
-        setUniforms(m_lineProgram);
-        glBindBuffer(GL_ARRAY_BUFFER, m_lineBuffer);
-
-        const GLsizei stride = sizeof(LineInstance);
-        const char* base = reinterpret_cast<const char*>(lineFirst * sizeof(LineInstance));
-        const auto attribute = [&](GLuint index, GLint size, GLenum type, GLboolean normalized, size_t offset)
-        {
-            glEnableVertexAttribArray(index);
-            glVertexAttribPointer(index, size, type, normalized, stride, base + offset);
-            glVertexAttribDivisor(index, 1);
-        };
-        attribute(0, 3, GL_FLOAT, GL_FALSE, offsetof(LineInstance, a));
-        attribute(1, 1, GL_FLOAT, GL_FALSE, offsetof(LineInstance, width));
-        attribute(2, 3, GL_FLOAT, GL_FALSE, offsetof(LineInstance, b));
-        attribute(3, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(LineInstance, color));
-
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, static_cast<GLsizei>(lineCount));
-    }
-
-    const size_t pointFirst = m_pointOffsets[layer];
-    const size_t pointCount = m_pointOffsets[layer + 1] - pointFirst;
-    if (pointCount > 0)
-    {
-        setUniforms(m_pointProgram);
-        glBindBuffer(GL_ARRAY_BUFFER, m_pointBuffer);
-
-        const GLsizei stride = sizeof(PointInstance);
-        const char* base = reinterpret_cast<const char*>(pointFirst * sizeof(PointInstance));
-        const auto attribute = [&](GLuint index, GLint size, GLenum type, GLboolean normalized, size_t offset)
-        {
-            glEnableVertexAttribArray(index);
-            glVertexAttribPointer(index, size, type, normalized, stride, base + offset);
-            glVertexAttribDivisor(index, 1);
-        };
-        attribute(0, 3, GL_FLOAT, GL_FALSE, offsetof(PointInstance, position));
-        attribute(1, 1, GL_FLOAT, GL_FALSE, offsetof(PointInstance, size));
-        attribute(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(PointInstance, color));
-        attribute(3, 1, GL_FLOAT, GL_FALSE, offsetof(PointInstance, shape));
-
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, static_cast<GLsizei>(pointCount));
-    }
+    if (!m_initialized) return 0;
+    
+    LineSet set;
+    glGenBuffers(1, &set.buffer);
+    
+    const LineSetId id = m_nextLineSet++;
+    m_lineSets.emplace(id, set);
+    return id;
 }
 
-void OverlayRender::Flush(const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize)
+void OverlayRender::UpdateLineSet(LineSetId id, const std::vector<StaticLine>& lines, float widthPx)
 {
-    if (!m_initialized || (lineCount() == 0 && pointCount() == 0)) return;
-    if (!m_uploaded) upload();
+    const auto it = m_lineSets.find(id);
+    if (it == m_lineSets.end()) return;
+    
+    std::vector<LineInstance> instances;
+    instances.reserve(lines.size());
+    for (const StaticLine& line : lines)
+        instances.push_back({ line.a, widthPx, line.b, PackColor(line.color) });
+    
+    glBindBuffer(GL_ARRAY_BUFFER, it->second.buffer);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(instances.size() * sizeof(LineInstance)),
+                 instances.empty() ? nullptr : instances.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    it->second.count = instances.size();
+    GLState::invalidate();
+}
 
+void OverlayRender::DestroyLineSet(LineSetId id)
+{
+    const auto it = m_lineSets.find(id);
+    if (it == m_lineSets.end()) return;
+    
+    glDeleteBuffers(1, &it->second.buffer);
+    m_lineSets.erase(it);
+}
+
+bool OverlayRender::beginDraw(const glm::ivec2& logicalSize, glm::vec2& viewport, float& scale, SavedState& saved)
+{
     // Физический размер цели берём из GL: желаемая толщина в логических пикселях, масштаб retina получается сам
     GLint viewportRect[4] = {};
     glGetIntegerv(GL_VIEWPORT, viewportRect);
-    if (viewportRect[2] <= 0 || viewportRect[3] <= 0) return;
-
-    const glm::vec2 viewport(static_cast<float>(viewportRect[2]), static_cast<float>(viewportRect[3]));
-    const float scale = viewport.x / static_cast<float>(std::max(1, logicalSize.x));
-    const glm::mat4 viewProj = proj * view;
-
+    if (viewportRect[2] <= 0 || viewportRect[3] <= 0) return false;
+    
+    viewport = glm::vec2(static_cast<float>(viewportRect[2]), static_cast<float>(viewportRect[3]));
+    scale = viewport.x / static_cast<float>(std::max(1, logicalSize.x));
+    
     // Состояние, которое трогаем
-    const GLboolean depthWasEnabled = glIsEnabled(GL_DEPTH_TEST);
-    const GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
-    const GLboolean cullWasEnabled = glIsEnabled(GL_CULL_FACE);
     GLboolean depthMask = GL_TRUE;
     glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
-    GLint previousProgram = 0, previousVao = 0;
-    glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVao);
-
+    saved.depthMask = depthMask == GL_TRUE;
+    saved.depthTest = glIsEnabled(GL_DEPTH_TEST) == GL_TRUE;
+    saved.blend = glIsEnabled(GL_BLEND) == GL_TRUE;
+    saved.cull = glIsEnabled(GL_CULL_FACE) == GL_TRUE;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &saved.program);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &saved.vao);
+    
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
     glDepthFunc(GL_LEQUAL);
     glBindVertexArray(m_vao);
+    return true;
+}
 
-    drawLayer(XRayHidden, false, m_xrayAlpha, viewProj, viewport, scale);   // скрытая часть XRay, приглушённо
-    drawLayer(TestedLayer, true, 1.0f, viewProj, viewport, scale);          // видимое с тестом глубины
-    drawLayer(AlwaysLayer, false, 1.0f, viewProj, viewport, scale);         // поверх всего
-
+void OverlayRender::endDraw(const SavedState& saved)
+{
     // Указатели на инстансы выставлены в нашем VAO: сбрасываем делители, чтобы не влиять на чужие атрибуты
     for (GLuint index = 0; index < 4; ++index)
     {
@@ -466,13 +446,129 @@ void OverlayRender::Flush(const glm::mat4& view, const glm::mat4& proj, const gl
         glDisableVertexAttribArray(index);
     }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(static_cast<GLuint>(previousVao));
-    glUseProgram(static_cast<GLuint>(previousProgram));
-    glDepthMask(depthMask);
-    if (depthWasEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
-    if (blendWasEnabled) glEnable(GL_BLEND);      else glDisable(GL_BLEND);
-    if (cullWasEnabled)  glEnable(GL_CULL_FACE);  else glDisable(GL_CULL_FACE);
-
+    
+    glBindVertexArray(static_cast<GLuint>(saved.vao));
+    glUseProgram(static_cast<GLuint>(saved.program));
+    glDepthMask(saved.depthMask ? GL_TRUE : GL_FALSE);
+    if (saved.depthTest) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+    if (saved.blend)     glEnable(GL_BLEND);      else glDisable(GL_BLEND);
+    if (saved.cull)      glEnable(GL_CULL_FACE);  else glDisable(GL_CULL_FACE);
+    
     GLState::invalidate();
+}
+
+void OverlayRender::setUniforms(const Program& program, bool depthTest, float alphaScale, const glm::mat4& viewProj,
+                                const glm::vec2& viewport, float scale)
+{
+    glUseProgram(program.id);
+    glUniformMatrix4fv(program.viewProj, 1, GL_FALSE, &viewProj[0][0]);
+    glUniform2f(program.viewport, viewport.x, viewport.y);
+    glUniform1f(program.scale, scale);
+    glUniform1f(program.depthBias, depthTest ? m_depthBias : 0.0f);
+    glUniform1f(program.alphaScale, alphaScale);
+}
+
+void OverlayRender::drawLineInstances(unsigned int buffer, size_t first, size_t count)
+{
+    if (count == 0) return;
+    
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    
+    const GLsizei stride = sizeof(LineInstance);
+    const char* base = reinterpret_cast<const char*>(first * sizeof(LineInstance));
+    const auto attribute = [&](GLuint index, GLint size, GLenum type, GLboolean normalized, size_t offset)
+    {
+        glEnableVertexAttribArray(index);
+        glVertexAttribPointer(index, size, type, normalized, stride, base + offset);
+        glVertexAttribDivisor(index, 1);
+    };
+    attribute(0, 3, GL_FLOAT, GL_FALSE, offsetof(LineInstance, a));
+    attribute(1, 1, GL_FLOAT, GL_FALSE, offsetof(LineInstance, width));
+    attribute(2, 3, GL_FLOAT, GL_FALSE, offsetof(LineInstance, b));
+    attribute(3, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(LineInstance, color));
+    
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, static_cast<GLsizei>(count));
+}
+
+void OverlayRender::drawPointInstances(size_t first, size_t count)
+{
+    if (count == 0) return;
+    
+    glBindBuffer(GL_ARRAY_BUFFER, m_pointBuffer);
+    
+    const GLsizei stride = sizeof(PointInstance);
+    const char* base = reinterpret_cast<const char*>(first * sizeof(PointInstance));
+    const auto attribute = [&](GLuint index, GLint size, GLenum type, GLboolean normalized, size_t offset)
+    {
+        glEnableVertexAttribArray(index);
+        glVertexAttribPointer(index, size, type, normalized, stride, base + offset);
+        glVertexAttribDivisor(index, 1);
+    };
+    attribute(0, 3, GL_FLOAT, GL_FALSE, offsetof(PointInstance, position));
+    attribute(1, 1, GL_FLOAT, GL_FALSE, offsetof(PointInstance, size));
+    attribute(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(PointInstance, color));
+    attribute(3, 1, GL_FLOAT, GL_FALSE, offsetof(PointInstance, shape));
+    
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, static_cast<GLsizei>(count));
+}
+
+void OverlayRender::drawLayer(Layer layer, bool depthTest, float alphaScale, const glm::mat4& viewProj,
+                              const glm::vec2& viewport, float scale)
+{
+    if (depthTest) glEnable(GL_DEPTH_TEST);
+    else           glDisable(GL_DEPTH_TEST);
+    
+    const size_t lineFirst = m_lineOffsets[layer];
+    const size_t lineCount = m_lineOffsets[layer + 1] - lineFirst;
+    if (lineCount > 0)
+    {
+        setUniforms(m_lineProgram, depthTest, alphaScale, viewProj, viewport, scale);
+        drawLineInstances(m_lineBuffer, lineFirst, lineCount);
+    }
+    
+    const size_t pointFirst = m_pointOffsets[layer];
+    const size_t pointCount = m_pointOffsets[layer + 1] - pointFirst;
+    if (pointCount > 0)
+    {
+        setUniforms(m_pointProgram, depthTest, alphaScale, viewProj, viewport, scale);
+        drawPointInstances(pointFirst, pointCount);
+    }
+}
+
+void OverlayRender::DrawLineSet(LineSetId id, const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize)
+{
+    if (!m_initialized) return;
+    
+    const auto it = m_lineSets.find(id);
+    if (it == m_lineSets.end() || it->second.count == 0) return;
+    
+    glm::vec2 viewport;
+    float scale = 1.0f;
+    SavedState saved;
+    if (!beginDraw(logicalSize, viewport, scale, saved)) return;
+    
+    glDisable(GL_DEPTH_TEST);
+    setUniforms(m_lineProgram, false, 1.0f, proj * view, viewport, scale);
+    drawLineInstances(it->second.buffer, 0, it->second.count);
+    
+    endDraw(saved);
+}
+
+void OverlayRender::Flush(const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize)
+{
+    if (!m_initialized || (lineCount() == 0 && pointCount() == 0)) return;
+    if (!m_uploaded) upload();
+    
+    glm::vec2 viewport;
+    float scale = 1.0f;
+    SavedState saved;
+    if (!beginDraw(logicalSize, viewport, scale, saved)) return;
+    
+    const glm::mat4 viewProj = proj * view;
+    
+    drawLayer(XRayHidden, false, m_xrayAlpha, viewProj, viewport, scale);   // скрытая часть XRay, приглушённо
+    drawLayer(TestedLayer, true, 1.0f, viewProj, viewport, scale);          // видимое с тестом глубины
+    drawLayer(AlwaysLayer, false, 1.0f, viewProj, viewport, scale);         // поверх всего
+    
+    endDraw(saved);
 }

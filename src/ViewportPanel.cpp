@@ -421,7 +421,7 @@ void ViewportPanel::update(float dt)
     }
 }
 
-void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
+void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out, uint32_t wireframeLines)
 {
     // Свёрнутые / скрытые панели вообще не рендерим.
     if (!isVisible || !m_windowOpen) return;
@@ -441,9 +441,9 @@ void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
     }
 
     const bool audioListener = simulating ? m_isPlayViewport : m_focused;
-    m_viewport.produceEditorView(out, audioListener);
     
     m_viewport.drawEditOverlay = ActiveEditSession(scene) != nullptr;
+    m_viewport.produceEditorView(out, audioListener, wireframeLines);
 }
 
 void ViewportPanel::draw()
@@ -472,14 +472,24 @@ void ViewportPanel::draw()
     ImGui::SameLine();
     ImGui::Checkbox("Gizmos", &m_viewport.drawGizmos);
     ImGui::SameLine();
-    ImGui::Checkbox("Sky", &m_viewport.drawSkybox);
-    ImGui::SameLine();
 
     int mode = static_cast<int>(camera.mode());
     ImGui::SetNextItemWidth(110);
     if (ImGui::Combo("##ViewMode", &mode, "Perspective\0Top\0Front\0Side\0"))
     {
         camera.setMode(static_cast<EditorViewMode>(mode));
+        
+        // Как в TrenchBroom / Hammer: ортографика по умолчанию каркасная, перспектива закрашенная
+        // (0 = Perspective, порядок как в комбо). Строку можно удалить, если режим должен быть независим от проекции.
+        m_viewport.shadeMode = (mode == 0) ? ShadeMode::Shaded : ShadeMode::Wireframe;
+    }
+    
+    ImGui::SameLine();
+    int shading = static_cast<int>(m_viewport.shadeMode);
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::Combo("##ShadeMode", &shading, "Shaded\0Wireframe\0"))
+    {
+        m_viewport.shadeMode = static_cast<ShadeMode>(shading);
     }
 
     ImGui::SameLine();

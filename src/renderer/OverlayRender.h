@@ -24,6 +24,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
 
 #include <glm/glm.hpp>
 
@@ -65,6 +66,19 @@ public:
 
     size_t lineCount() const;
     size_t pointCount() const;
+    
+public:
+    // --- Постоянные наборы линий ---
+    // Для статичных данных (каркас уровня): линии заливаются в GPU один раз при изменении, а не накапливаются
+    // каждый кадр. Рисуются без теста глубины, одной толщины на весь набор. Накопленное через DrawLine / DrawPoint
+    // к ним отношения не имеет и рисуется своим Flush.
+    struct StaticLine { glm::vec3 a; glm::vec3 b; glm::vec4 color; };
+    using LineSetId = uint32_t;     // 0 = нет набора
+    
+    LineSetId CreateLineSet();
+    void UpdateLineSet(LineSetId id, const std::vector<StaticLine>& lines, float widthPx = 1.0f);
+    void DestroyLineSet(LineSetId id);
+    void DrawLineSet(LineSetId id, const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize);
 
 private:
     struct LineInstance
@@ -102,7 +116,6 @@ private:
 
     Program buildProgram(const char* vertex, const char* fragment) const;
     void upload();
-    void drawLayer(Layer layer, bool depthTest, float alphaScale, const glm::mat4& viewProj, const glm::vec2& viewport, float scale);
 
     Batch m_batches[LayerCount];
 
@@ -120,4 +133,28 @@ private:
     float m_xrayAlpha = 0.35f;
     float m_depthBias = 2e-4f;
     bool m_initialized = false;
+    
+private:
+    struct SavedState
+    {
+        bool depthTest = false, blend = false, cull = false, depthMask = true;
+        int program = 0, vao = 0;
+    };
+    
+    struct LineSet
+    {
+        unsigned int buffer = 0;
+        size_t count = 0;
+    };
+    
+    bool beginDraw(const glm::ivec2& logicalSize, glm::vec2& viewport, float& scale, SavedState& saved);
+    void endDraw(const SavedState& saved);
+    void setUniforms(const Program& program, bool depthTest, float alphaScale, const glm::mat4& viewProj,
+                     const glm::vec2& viewport, float scale);
+    void drawLineInstances(unsigned int buffer, size_t first, size_t count);
+    void drawPointInstances(size_t first, size_t count);
+    void drawLayer(Layer layer, bool depthTest, float alphaScale, const glm::mat4& viewProj, const glm::vec2& viewport, float scale);
+    
+    std::unordered_map<LineSetId, LineSet> m_lineSets;
+    LineSetId m_nextLineSet = 1;
 };

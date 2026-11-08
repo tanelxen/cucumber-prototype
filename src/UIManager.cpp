@@ -106,9 +106,15 @@ void UIManager::update(float dt)
 
 void UIManager::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
 {
+    // Каркас уровня строится только если есть панель в режиме Wireframe
+    uint32_t wireframeLines = 0;
+    const bool wantsWireframe = std::any_of(m_viewportPanels.begin(), m_viewportPanels.end(),
+                                            [](ViewportPanel* panel) { return panel->viewport().shadeMode == ShadeMode::Wireframe; });
+    if (wantsWireframe) wireframeLines = m_levelWireframe.sync(scene.getMap());
+    
     for (auto* panel : m_viewportPanels)
     {
-        panel->collectViews(scene, out);
+        panel->collectViews(scene, out, wireframeLines);
     }
     
     // Оверлей правки уровня накапливается один раз за кадр, а виды с ViewFlag::EditOverlay рисуют его при Flush

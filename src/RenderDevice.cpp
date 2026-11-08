@@ -443,6 +443,11 @@ namespace RenderDevice {
         SpriteRenderer::Flush(desc.camera.view, desc.camera.proj);
         DecalManager::Flush(desc.camera.view, desc.camera.proj);
         
+        if (desc.overlayLines != 0)
+        {
+            OverlayRender::Get().DrawLineSet(desc.overlayLines, desc.camera.view, desc.camera.proj, desc.size);
+        }
+        
         if (desc.flags & ViewFlag::Debug)
         {
             GizmoRender::Get().Flush(desc.camera.view, desc.camera.proj);

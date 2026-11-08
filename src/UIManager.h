@@ -8,6 +8,7 @@
 #pragma once
 
 #include "IViewProvider.h"
+#include "level/LevelWireframe.h"
 
 #include <vector>
 #include <filesystem>
@@ -68,6 +69,8 @@ private:
     char m_projectNameBuffer[128] = "MyProject";
     char m_projectLocationBuffer[1024] = {};
     std::string m_projectError;
+    
+    LevelWireframe m_levelWireframe;
 };
 
 inline UIManager* g_UIManager;

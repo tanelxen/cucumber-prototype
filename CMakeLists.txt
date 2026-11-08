@@ -260,6 +260,9 @@ set(SRC_LEVEL
     
     src/level/LevelClipboard.cpp
     src/level/LevelClipboard.h
+    
+    src/level/LevelWireframe.cpp
+    src/level/LevelWireframe.h
 )
 
 set(SRC_IMGUI
