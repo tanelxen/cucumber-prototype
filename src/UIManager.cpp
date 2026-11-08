@@ -24,6 +24,9 @@
 #include "ScriptEngine.h"
 #include "ProjectManager.h"
 
+#include "MapComponent.h"
+#include "level/LevelEditOverlay.h"
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 
@@ -40,6 +43,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <algorithm>
 
 static void DrawScriptConsoleWindow();
 
@@ -105,6 +109,17 @@ void UIManager::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
     for (auto* panel : m_viewportPanels)
     {
         panel->collectViews(scene, out);
+    }
+    
+    // Оверлей правки уровня накапливается один раз за кадр, а виды с ViewFlag::EditOverlay рисуют его при Flush
+    // (см. RenderDevice::renderView). Нет таких видов (панели свёрнуты, идёт игра) значит копить нечего.
+    const bool overlayWanted = std::any_of(out.begin(), out.end(),
+                                           [](const ViewDesc& view) { return (view.flags & ViewFlag::EditOverlay) != 0; });
+    if (!overlayWanted) return;
+    
+    if (auto* map = scene.getMap())
+    {
+        if (auto* edit = map->editSession()) DrawLevelEditOverlay(*edit);
     }
 }
 

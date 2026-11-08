@@ -16,7 +16,6 @@
 #include "Mesh.h"
 #include "trenchbroom/MapMesh.h"
 #include "trenchbroom/LevelEditMesh.h"
-#include "level/LevelEditOverlay.h"
 
 #include <cstdint>
 #include <type_traits>
@@ -61,7 +60,6 @@ void ExtractRenderScene(WorldScene& world, RenderScene& out)
     {
         map = RawPtr(mapComponent->mesh);
         editMesh = mapComponent->editMesh();
-        if (auto* edit = mapComponent->editSession()) DrawLevelEditOverlay(*edit);
     }
     
     const uint64_t staticKey = editMesh ? editMesh->getRevision() : (map ? map->getRevision() : 0);
