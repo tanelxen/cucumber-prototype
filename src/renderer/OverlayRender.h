@@ -47,7 +47,7 @@ public:
     void Shutdown();
 
     // Накопление, мировые координаты. widthPx / sizePx в логических пикселях.
-    void DrawLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color, float widthPx = 2.0f, Depth depth = Depth::Always);
+    void DrawLine(const glm::vec3& a, const glm::vec3& b, const glm::vec4& color, float widthPx = 1.0f, Depth depth = Depth::Always);
     void DrawPoint(const glm::vec3& position, const glm::vec4& color, float sizePx, Shape shape = Shape::Square, Depth depth = Depth::Always);
 
     // Рисует накопленное. Вызывать при привязанной цели вида (глубина сцены нужна для Tested и XRay).

@@ -14,12 +14,12 @@ namespace
 {
     // Рёбра выбранного солида рисуются без теста глубины: видны все, в том числе тыльные и закрытые другими солидами
     // (так удобно при push/pull). Depth::XRay сделал бы скрытые части приглушёнными, Depth::Tested как обычную геометрию.
-    constexpr OverlayRender::Depth kSelectionDepth = OverlayRender::Depth::Always;
+    constexpr OverlayRender::Depth kSelectionDepth = OverlayRender::Depth::XRay;
 
-    constexpr float kSelectedWidth = 2.0f;
-    constexpr float kFaceWidth = 3.0f;
+    constexpr float kSelectedWidth = 1.0f;
+    constexpr float kFaceWidth = 1.0f;
 
-    const glm::vec4 kSelectedSolid{1.0f, 0.60f, 0.10f, 1.0f};
+    const glm::vec4 kSelectedSolid{1.0f, 0.10f, 0.10f, 1.0f};
     const glm::vec4 kSelectedFace {1.0f, 0.95f, 0.20f, 1.0f};
     const glm::vec4 kHoverSolid   {0.6f, 0.90f, 1.00f, 0.8f};
     const glm::vec4 kHoverFace    {0.3f, 1.00f, 1.00f, 1.0f};
