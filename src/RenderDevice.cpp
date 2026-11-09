@@ -414,15 +414,7 @@ namespace RenderDevice {
         
         if (desc.flags & ViewFlag::Grid)
         {
-            if (desc.camera.ortho)
-            {
-                GizmoRender::Get().DrawOrthoGrid(desc.camera.view, desc.camera.proj, desc.gridStep, desc.size);
-            }
-            else
-            {
-                GizmoRender::Get().DrawGrid(desc.camera.view, desc.camera.proj);
-            }
-            
+            GizmoRender::Get().DrawGrid(desc.camera.view, desc.camera.proj, desc.camera.ortho, desc.gridStep, desc.size);
             GLState::invalidate();
         }
         
