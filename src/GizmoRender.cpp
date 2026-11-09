@@ -74,10 +74,10 @@ const char* texFS = R"(
 
 // ======================== GRID =================================
 #include "ShaderVariant.h"
-//#include "RenderDevice.h"
 #include "VertexBuffer.h"
 #include "VertexArray.h"
 #include "IndexBuffer.h"
+#include <algorithm>
 
 class Grid
 {
@@ -141,6 +141,77 @@ void Grid::draw(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) 
 static Grid g_grid;
 // ======================== GRID =================================
 
+
+// ======================== ORTHO GRID ===========================
+// Бесконечная сетка для ортографических видов: один треугольник на весь экран, линии считает фрагментный шейдер.
+// Плоскость сетки определяется камерой (оси right / up берутся из матрицы вида), поэтому Top, Front и Side
+// рисуются одним кодом.
+class OrthoGrid
+{
+public:
+    void init();
+    void draw(const glm::mat4& view, const glm::mat4& proj, float step, const glm::ivec2& logicalSize) const;
+    
+private:
+    unsigned int m_vao = 0;     // пустой: вершины из gl_VertexID, но core profile требует VAO
+};
+
+static ShaderVariant s_orthoGridShader;
+
+static glm::vec3 AxisColor(const glm::vec3& axis)
+{
+    const glm::vec3 a = glm::abs(axis);
+    if (a.x >= a.y && a.x >= a.z) return { 1.0f, 0.2f, 0.2f };   // X
+    if (a.y >= a.z)               return { 0.2f, 1.0f, 0.2f };   // Y
+    return { 0.25f, 0.4f, 1.0f };                                 // Z
+}
+
+void OrthoGrid::init()
+{
+    glGenVertexArrays(1, &m_vao);
+    s_orthoGridShader.init("resources/shaders/grid_ortho.glsl");
+}
+
+void OrthoGrid::draw(const glm::mat4& view, const glm::mat4& proj, float step, const glm::ivec2& logicalSize) const
+{
+    if (!s_orthoGridShader.isValid() || step <= 0.0f) return;
+    
+    GLint viewportRect[4] = {};
+    glGetIntegerv(GL_VIEWPORT, viewportRect);
+    const float pixelScale = viewportRect[2] > 0
+    ? static_cast<float>(viewportRect[2]) / static_cast<float>(std::max(1, logicalSize.x))
+    : 1.0f;
+    
+    // Оси вида в мире: строки матрицы вида
+    const glm::vec3 right(view[0][0], view[1][0], view[2][0]);
+    const glm::vec3 up(view[0][1], view[1][1], view[2][1]);
+    
+    s_orthoGridShader.bind();
+    s_orthoGridShader.setUniform("uInvViewProj", glm::inverse(proj * view));
+    s_orthoGridShader.setUniform("uRight", right);
+    s_orthoGridShader.setUniform("uUp", up);
+    s_orthoGridShader.setUniform("uStep", step);
+    s_orthoGridShader.setUniform("uMajorEvery", 8.0f);
+    s_orthoGridShader.setUniform("uPixelScale", pixelScale);
+    s_orthoGridShader.setUniform("uAxisColorU", AxisColor(up));      // линия u = 0 идёт вдоль up
+    s_orthoGridShader.setUniform("uAxisColorV", AxisColor(right));   // линия v = 0 идёт вдоль right
+    
+    // Состояние как у Grid::draw: после вызова RenderDevice делает GLState::invalidate()
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    
+    glBindVertexArray(m_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    
+    s_orthoGridShader.unbind();
+    glDepthMask(GL_TRUE);
+}
+
+static OrthoGrid g_orthoGrid;
+// ======================== ORTHO GRID ===========================
+
 void GizmoRender::Initialize()
 {
     CompileShaders();
@@ -177,6 +248,7 @@ void GizmoRender::Initialize()
     GenerateAtlas("resources/fonts/Ruda/Ruda-Medium.ttf");
     
     g_grid.init();
+    g_orthoGrid.init();
 }
 
 void GizmoRender::GenerateAtlas(const std::string& fontPath)
@@ -583,4 +655,9 @@ void GizmoRender::Shutdown()
 void GizmoRender::DrawGrid(const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatrix)
 {
     g_grid.draw(viewMatrix, projectionMatrix);
+}
+
+void GizmoRender::DrawOrthoGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, float step, const glm::ivec2& logicalSize)
+{
+    g_orthoGrid.draw(viewMatrix, projectionMatrix, step, logicalSize);
 }

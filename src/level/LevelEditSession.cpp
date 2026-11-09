@@ -5,6 +5,7 @@
 
 #include "LevelEditSession.h"
 
+#include "UIManager.h"
 #include "BlockTool.h"
 #include "LevelClipboard.h"
 #include "SelectTool.h"
@@ -25,7 +26,7 @@ LevelEditSession::~LevelEditSession() = default;
 
 double LevelEditSession::gridSize() const
 {
-    return m_document.settings.gridSnap > 0.0f ? static_cast<double>(m_document.settings.gridSnap) : 1.0;
+    return g_UIManager->gridSize;
 }
 
 void LevelEditSession::notify(const ChangeSet& changes)

@@ -20,6 +20,13 @@ enum class ShadeMode
     Wireframe
 };
 
+// То, что UIManager раз в кадр сообщает всем видам редактора (общее для панелей, не настройка конкретного вида)
+struct EditorViewContext
+{
+    uint32_t wireframeLines = 0;    // LevelWireframe::sync
+    float gridStep = 8.0f;          // шаг сетки документа (MapComponent::gridSize)
+};
+
 class EditorViewport
 {
 public:
@@ -41,8 +48,7 @@ public:
     void applyPendingSize();
 
     // Добавляет редакторский вид этого вьюпорта.
-    // wireframeLines: id набора линий каркаса уровня (LevelWireframe::sync), используется в режиме Wireframe
-    void produceEditorView(std::vector<ViewDesc>& out, bool audioListener, uint32_t wireframeLines = 0);
+    void produceEditorView(std::vector<ViewDesc>& out, bool audioListener, const EditorViewContext& context = {});
 
     bool drawGrid = true;
     bool drawGizmos = false;

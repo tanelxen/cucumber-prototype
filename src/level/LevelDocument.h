@@ -55,17 +55,11 @@ struct Solid
     std::vector<Face> faces;
 };
 
-struct LevelSettings
-{
-    float gridSnap = 8.0f;            // шаг привязки к сетке в редакторе
-};
-
 struct LevelDocument
 {
     static constexpr uint32_t kCurrentVersion = 1;
 
     uint32_t version = kCurrentVersion;
-    LevelSettings settings;
     std::vector<std::string> materials;   // пути материалов (как в .map, относительно каталога текстур)
     std::vector<Solid> solids;
 

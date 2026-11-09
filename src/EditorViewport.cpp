@@ -24,7 +24,7 @@ void EditorViewport::applyPendingSize()
     m_target.resize(m_pendingW, m_pendingH, m_pendingScale); // реаллокация только при реальном изменении
 }
 
-void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioListener, uint32_t wireframeLines)
+void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioListener, const EditorViewContext& context)
 {
     ViewDesc v;
     v.id = m_id * 64;
@@ -49,8 +49,10 @@ void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioLis
         // Поверхности карты это слой Static: не берём их в вид, а рёбра рисует набор линий каркаса
         v.layerMask &= ~RenderLayers::Static;
         v.clearColor = glm::vec4(0.11f, 0.11f, 0.12f, 1.0f);
-        v.overlayLines = wireframeLines;
+        v.overlayLines = context.wireframeLines;
     }
+    
+    v.gridStep = context.gridStep;
 
     out.push_back(std::move(v));
 }

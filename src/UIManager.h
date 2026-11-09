@@ -50,6 +50,8 @@ public:
     
     void collectViews(WorldScene& scene, std::vector<ViewDesc>& out) override;
     
+    float gridSize = 16.0f;
+    
 private:
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;

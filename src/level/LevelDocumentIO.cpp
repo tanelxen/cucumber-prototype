@@ -187,7 +187,6 @@ bool LevelDocumentIO::ToString(const LevelDocument& document, std::string& out, 
         stream << "  \"source\": " << Json(document.sourceMap).dump() << ",\n";
     }
     
-    stream << "  \"settings\": " << Json({ { "gridSnap", Exact(document.settings.gridSnap) } }).dump() << ",\n";
     stream << "  \"materials\": " << Json(document.materials).dump() << ",\n";
     stream << "  \"solids\": [\n";
     
@@ -230,11 +229,6 @@ bool LevelDocumentIO::FromString(const std::string& text, LevelDocument& out, st
     out.version = version;
     
     out.sourceMap = root.value("source", "");
-
-    if (root.contains("settings") && root["settings"].is_object())
-    {
-        out.settings.gridSnap = root["settings"].value("gridSnap", out.settings.gridSnap);
-    }
 
     if (!root.contains("materials") || !root["materials"].is_array())
     {

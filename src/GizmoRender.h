@@ -38,6 +38,10 @@ public:
     
     void DrawGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
     
+    // Бесконечная сетка для ортографического вида в плоскости вида. step в мировых единицах,
+    // logicalSize = ViewDesc::size (по нему и GL_VIEWPORT считается масштаб retina).
+    void DrawOrthoGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, float step, const glm::ivec2& logicalSize);
+    
 private:
     GizmoRender() = default;
     

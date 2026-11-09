@@ -127,10 +127,14 @@ namespace
         return rayStart + rayDirection * (forwardDistance / rayForward);
     }
 
-    glm::vec3 SnapPivotToGrid(const glm::vec3& position)
+    float SceneGridStep(WorldScene& scene)
     {
-        constexpr float kGridStep = 16.0f;
-        return glm::round(position / kGridStep) * kGridStep;
+        
+    }
+    
+    glm::vec3 SnapPivotToGrid(const glm::vec3& position, float step)
+    {
+        return glm::round(position / step) * step;
     }
 
     void CreateMeshEntity(WorldScene& scene, const AssetDragPayload& payload,
@@ -165,7 +169,7 @@ namespace
             return;
         }
 
-        createdEntity->getTransform().setPosition(SnapPivotToGrid(position));
+        createdEntity->getTransform().setPosition(SnapPivotToGrid(position, g_UIManager->gridSize));
 
         g_UIManager->setEntity(createdEntity);
     }
@@ -189,7 +193,7 @@ namespace
             return;
         }
 
-        root->getTransform().setPosition(SnapPivotToGrid(position));
+        root->getTransform().setPosition(SnapPivotToGrid(position, SceneGridStep(scene)));
         SceneSerializer::InitializePrefabComponents(root);
         g_UIManager->setEntity(root);
     }
@@ -421,7 +425,7 @@ void ViewportPanel::update(float dt)
     }
 }
 
-void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out, uint32_t wireframeLines)
+void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out, const EditorViewContext& context)
 {
     // Свёрнутые / скрытые панели вообще не рендерим.
     if (!isVisible || !m_windowOpen) return;
@@ -443,7 +447,7 @@ void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out, 
     const bool audioListener = simulating ? m_isPlayViewport : m_focused;
     
     m_viewport.drawEditOverlay = ActiveEditSession(scene) != nullptr;
-    m_viewport.produceEditorView(out, audioListener, wireframeLines);
+    m_viewport.produceEditorView(out, audioListener, context);
 }
 
 void ViewportPanel::draw()
@@ -490,6 +494,34 @@ void ViewportPanel::draw()
     if (ImGui::Combo("##ShadeMode", &shading, "Shaded\0Wireframe\0"))
     {
         m_viewport.shadeMode = static_cast<ShadeMode>(shading);
+    }
+    
+    if (auto* map = scene->getMap())
+    {
+        ImGui::SameLine();
+        char preview[16];
+        std::snprintf(preview, sizeof(preview), "%g", g_UIManager->gridSize);
+        
+        ImGui::SetNextItemWidth(64);
+        if (ImGui::BeginCombo("##GridSize", preview))
+        {
+            for (float step : { 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f, 128.0f, 256.0f })
+            {
+                char label[16];
+                std::snprintf(label, sizeof(label), "%g", step);
+                if (ImGui::Selectable(label, step == g_UIManager->gridSize)) g_UIManager->gridSize = step;
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid size  ( [ / ] )");
+        
+        // [ и ]: шаг вдвое меньше / больше. Обрабатывает только панель в фокусе, иначе при нескольких панелях
+        // клавиша сработала бы дважды.
+        if (m_focused && !ImGui::GetIO().WantTextInput)
+        {
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftBracket, false)) g_UIManager->gridSize = std::max(1.0f, g_UIManager->gridSize * 0.5f);
+            if (ImGui::IsKeyPressed(ImGuiKey_RightBracket, false)) g_UIManager->gridSize = std::min(1024.0f, g_UIManager->gridSize * 2.0f);
+        }
     }
 
     ImGui::SameLine();
