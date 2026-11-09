@@ -46,6 +46,8 @@ out vec4 FragColor;
 
 uniform bool uPerspective;
 uniform vec3 uCameraPos;
+uniform vec3 uCameraForward;
+uniform float uPixelSize;       // мировых единиц на физический пиксель (в перспективе при единичной глубине)
 uniform vec3 uRight;
 uniform vec3 uUp;
 
@@ -68,6 +70,7 @@ const float kAxisAlpha = 0.60;
 const float kFadeStart = 2048.0;
 const float kFadeEnd = 8192.0;
 const float kHorizonFade = 0.08;    // модуль sin угла луча к плоскости, ниже которого сетка гаснет
+const float kMinGrazing = 0.05;     // нижняя граница sin угла при расчёте детализации (клетки вдоль взгляда сжаты в 1/sin раз)
 
 // Покрытие пикселя линиями сетки с шагом step (1 на линии, 0 между, края сглажены).
 // unitsPerPx: размер пикселя в мировых единицах по каждой оси сетки; widthPx: толщина линии в физических пикселях.
@@ -92,6 +95,7 @@ void main()
     vec2 plane = vPlane;
     float visibility = 1.0;
     bool hitsPlane = true;
+    float lodUnitsPerPx = uPixelSize;   // ортографика: размер пикселя постоянный
 
     if (uPerspective)   // uniform: ветвление не мешает производным ниже
     {
@@ -104,13 +108,18 @@ void main()
         float grazing = abs(normalize(dir).y);
         visibility = (1.0 - smoothstep(kFadeStart, kFadeEnd, length(hit - uCameraPos)))
                    * smoothstep(0.0, kHorizonFade, grazing);
+
+        // Размер пикселя на плоскости для выбора уровня детализации считаем аналитически (глубина и угол луча),
+        // а не по fwidth: производные берутся по блокам 2x2 пикселя и дают рваные границы уровней
+        float viewDepth = max(dot(hit - uCameraPos, uCameraForward), 0.0);
+        lodUnitsPerPx = uPixelSize * viewDepth / max(grazing, kMinGrazing);
     }
 
-    // Производные берём до любого discard
+    // Производные нужны только для сглаживания краёв линий. Берём до любого discard
     vec2 unitsPerPx = max(fwidth(plane), vec2(1e-6));
     if (!hitsPlane) discard;
 
-    float upp = max(unitsPerPx.x, unitsPerPx.y);
+    float upp = max(lodUnitsPerPx, 1e-6);
     float minSpacing = kMinSpacingPx * uPixelScale;
     float lineWidth = kLineWidthPx * uPixelScale;
 

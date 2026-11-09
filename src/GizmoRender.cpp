@@ -136,6 +136,17 @@ void PlaneGrid::draw(const glm::mat4& view, const glm::mat4& proj, bool ortho, f
     s_gridShader.setUniform("uAxisColorU", AxisColor(up));      // линия u = 0 идёт вдоль up
     s_gridShader.setUniform("uAxisColorV", AxisColor(right));   // линия v = 0 идёт вдоль right
     
+    
+    // Размер пикселя в мировых единицах: в ортографике постоянный, в перспективе при единичной глубине.
+    // Из матрицы проекции: 2 / (proj[1][1] * высота) верно для обоих видов.
+    const float pixelSize = 2.0f / (std::abs(proj[1][1]) * static_cast<float>(std::max(1, viewportRect[3])));
+    
+    // Направление взгляда: третья строка матрицы вида это -forward
+    const glm::vec3 cameraForward = -glm::vec3(view[0][2], view[1][2], view[2][2]);
+    
+    s_gridShader.setUniform("uPixelSize", pixelSize);
+    s_gridShader.setUniform("uCameraForward", cameraForward);
+    
     // Состояние как у прежней сетки: после вызова RenderDevice делает GLState::invalidate()
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
