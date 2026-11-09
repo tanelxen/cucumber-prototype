@@ -126,11 +126,6 @@ namespace
         const float rayForward = glm::dot(rayDirection, cameraData.forward);
         return rayStart + rayDirection * (forwardDistance / rayForward);
     }
-
-    float SceneGridStep(WorldScene& scene)
-    {
-        
-    }
     
     glm::vec3 SnapPivotToGrid(const glm::vec3& position, float step)
     {
@@ -193,7 +188,7 @@ namespace
             return;
         }
 
-        root->getTransform().setPosition(SnapPivotToGrid(position, SceneGridStep(scene)));
+        root->getTransform().setPosition(SnapPivotToGrid(position, g_UIManager->gridSize));
         SceneSerializer::InitializePrefabComponents(root);
         g_UIManager->setEntity(root);
     }

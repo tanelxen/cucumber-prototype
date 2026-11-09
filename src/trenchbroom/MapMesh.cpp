@@ -93,7 +93,7 @@ bool MapMesh::buildFrom(const std::filesystem::path& basePath, const CookFunctio
         if (it != textureCache.end()) return it->second;
 
         TextureInfo info;
-        auto texturePath = mapData.m_basepath / "textures" / name;
+        auto texturePath = basePath / "textures" / name;
         auto textureAsset = TextureManager::Get().loadTexture(texturePath.string());
         if (textureAsset)
         {
