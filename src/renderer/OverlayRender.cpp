@@ -25,7 +25,7 @@ layout(location = 3) in vec4 aColor;
 uniform mat4 uViewProj;
 uniform vec2 uViewport;     // физические пиксели
 uniform float uScale;       // физических пикселей на логический
-uniform float uDepthBias;
+uniform vec2 uDepthBias;    // clip z += x + y / w: сдвиг к камере в мировых единицах, коэффициенты считает CPU
 
 out vec4 vColor;
 noperspective out float vAlong;     // экранное расстояние от центра отрезка вдоль него
@@ -77,7 +77,7 @@ void main()
     vHalfLength = halfLength;
 
     // xy умножаем на w конца: интерполяция остаётся корректной в перспективе
-    gl_Position = vec4((p / uViewport * 2.0 - 1.0) * c.w, c.z - uDepthBias * c.w, c.w);
+    gl_Position = vec4((p / uViewport * 2.0 - 1.0) * c.w, c.z + uDepthBias.x + uDepthBias.y / c.w, c.w);
 }
 )";
 
@@ -408,7 +408,7 @@ void OverlayRender::DestroyLineSet(LineSetId id)
     m_lineSets.erase(it);
 }
 
-bool OverlayRender::beginDraw(const glm::ivec2& logicalSize, glm::vec2& viewport, float& scale, SavedState& saved)
+bool OverlayRender::beginDraw(const glm::mat4& proj, const glm::ivec2& logicalSize, glm::vec2& viewport, float& scale, SavedState& saved)
 {
     // Физический размер цели берём из GL: желаемая толщина в логических пикселях, масштаб retina получается сам
     GLint viewportRect[4] = {};
@@ -427,6 +427,13 @@ bool OverlayRender::beginDraw(const glm::ivec2& logicalSize, glm::vec2& viewport
     saved.cull = glIsEnabled(GL_CULL_FACE) == GL_TRUE;
     glGetIntegerv(GL_CURRENT_PROGRAM, &saved.program);
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &saved.vao);
+    
+    // Сдвиг глубины в мировых единицах. Глубина в NDC нелинейна, поэтому константа в NDC на расстоянии
+    // превращается в десятки единиц (рёбра за стенами просвечивают). Пересчёт сдвига на delta единиц к камере:
+    //   перспектива: ndc = -A + B / w, значит clip z += B * delta / w, где delta = constant + perDistance * w
+    //   ортографика: clip z = A * zView + B, значит clip z += A * delta
+    const bool ortho = proj[3][3] != 0.0f;
+    m_biasCoef = ortho ? glm::vec2(proj[2][2] * m_depthBias, 0.0f) : glm::vec2(proj[3][2] * m_depthBiasPerDistance, proj[3][2] * m_depthBias);
     
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
@@ -464,7 +471,7 @@ void OverlayRender::setUniforms(const Program& program, bool depthTest, float al
     glUniformMatrix4fv(program.viewProj, 1, GL_FALSE, &viewProj[0][0]);
     glUniform2f(program.viewport, viewport.x, viewport.y);
     glUniform1f(program.scale, scale);
-    glUniform1f(program.depthBias, depthTest ? m_depthBias : 0.0f);
+    glUniform2f(program.depthBias, depthTest ? m_biasCoef.x : 0.0f, depthTest ? m_biasCoef.y : 0.0f);
     glUniform1f(program.alphaScale, alphaScale);
 }
 
@@ -535,7 +542,7 @@ void OverlayRender::drawLayer(Layer layer, bool depthTest, float alphaScale, con
     }
 }
 
-void OverlayRender::DrawLineSet(LineSetId id, const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize)
+void OverlayRender::DrawLineSet(LineSetId id, const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize, bool depthTest, float alpha)
 {
     if (!m_initialized) return;
     
@@ -545,10 +552,13 @@ void OverlayRender::DrawLineSet(LineSetId id, const glm::mat4& view, const glm::
     glm::vec2 viewport;
     float scale = 1.0f;
     SavedState saved;
-    if (!beginDraw(logicalSize, viewport, scale, saved)) return;
+    if (!beginDraw(proj, logicalSize, viewport, scale, saved)) return;
     
-    glDisable(GL_DEPTH_TEST);
-    setUniforms(m_lineProgram, false, 1.0f, proj * view, viewport, scale);
+    // Тот же сдвиг глубины, что у слоя Tested: рёбра брашей лежат ровно на краях граней
+    if (depthTest) glEnable(GL_DEPTH_TEST);
+    else           glDisable(GL_DEPTH_TEST);
+    
+    setUniforms(m_lineProgram, depthTest, alpha, proj * view, viewport, scale);
     drawLineInstances(it->second.buffer, 0, it->second.count);
     
     endDraw(saved);
@@ -562,7 +572,7 @@ void OverlayRender::Flush(const glm::mat4& view, const glm::mat4& proj, const gl
     glm::vec2 viewport;
     float scale = 1.0f;
     SavedState saved;
-    if (!beginDraw(logicalSize, viewport, scale, saved)) return;
+    if (!beginDraw(proj, logicalSize, viewport, scale, saved)) return;
     
     const glm::mat4 viewProj = proj * view;
     

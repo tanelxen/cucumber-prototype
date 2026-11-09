@@ -51,6 +51,15 @@ void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioLis
         v.clearColor = glm::vec4(0.11f, 0.11f, 0.12f, 1.0f);
         v.overlayLines = context.wireframeLines;
     }
+    else if (drawEditOverlay)
+    {
+        // Режим правки: рёбра брашей поверх закрашенной геометрии, с проверкой глубины (скрытые рёбра не видны).
+        // Прозрачность меньше единицы, чтобы каркас не забивал текстуры.
+        constexpr float kShadedEdgeAlpha = 0.6f;
+        v.overlayLines = context.wireframeLines;
+        v.overlayLinesDepthTest = true;
+        v.overlayLinesAlpha = kShadedEdgeAlpha;
+    }
     
     v.gridStep = context.gridStep;
 

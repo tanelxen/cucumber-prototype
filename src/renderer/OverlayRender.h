@@ -60,9 +60,9 @@ public:
     // Альфа скрытых частей у Depth::XRay
     void SetXRayAlpha(float alpha) { m_xrayAlpha = alpha; }
 
-    // Смещение глубины линий к камере в NDC: чтобы линии на поверхности не мерцали от z-fighting.
-    // Если у проекта обратная глубина (reversed-Z), знак надо поменять.
-    void SetDepthBias(float bias) { m_depthBias = bias; }
+    // Сдвиг линий к камере при тесте глубины, чтобы рёбра на краях граней не пропадали из-за z-fighting.
+    // В мировых единицах: constant + perDistance * расстояние до камеры (в ортографике только constant).
+    void SetDepthBias(float constant, float perDistance) { m_depthBias = constant; m_depthBiasPerDistance = perDistance; }
 
     size_t lineCount() const;
     size_t pointCount() const;
@@ -78,7 +78,9 @@ public:
     LineSetId CreateLineSet();
     void UpdateLineSet(LineSetId id, const std::vector<StaticLine>& lines, float widthPx = 1.0f);
     void DestroyLineSet(LineSetId id);
-    void DrawLineSet(LineSetId id, const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize);
+    
+    // depthTest: прятать линии за закрашенной геометрией (рисовать после сцены); alpha: общая прозрачность набора
+    void DrawLineSet(LineSetId id, const glm::mat4& view, const glm::mat4& proj, const glm::ivec2& logicalSize, bool depthTest = false, float alpha = 1.0f);
 
 private:
     struct LineInstance
@@ -131,7 +133,11 @@ private:
     size_t m_pointOffsets[LayerCount + 1] = {};
 
     float m_xrayAlpha = 0.35f;
-    float m_depthBias = 2e-4f;
+    
+    float m_depthBias = 0.01f;
+    float m_depthBiasPerDistance = 0.0015f;
+    glm::vec2 m_biasCoef{0.0f};     // clip z += x + y / w, считается в beginDraw по проекции
+    
     bool m_initialized = false;
     
 private:
@@ -147,7 +153,7 @@ private:
         size_t count = 0;
     };
     
-    bool beginDraw(const glm::ivec2& logicalSize, glm::vec2& viewport, float& scale, SavedState& saved);
+    bool beginDraw(const glm::mat4& proj, const glm::ivec2& logicalSize, glm::vec2& viewport, float& scale, SavedState& saved);
     void endDraw(const SavedState& saved);
     void setUniforms(const Program& program, bool depthTest, float alphaScale, const glm::mat4& viewProj,
                      const glm::vec2& viewport, float scale);

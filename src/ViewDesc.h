@@ -71,6 +71,10 @@ struct ViewDesc
     // 0 = нет. Движок не знает, что в наборе (каркас уровня, сетка и т. п.): его собирает тот, кто создал вид.
     uint32_t overlayLines = 0;
     
+    // Как рисовать набор overlayLines: с проверкой глубины (поверх закрашенной геометрии) и с общей прозрачностью
+    bool overlayLinesDepthTest = false;
+    float overlayLinesAlpha = 1.0f;
+    
     // Шаг сетки вида в мировых единицах (ViewFlag::Grid)
     float gridStep = 8.0f;
 };

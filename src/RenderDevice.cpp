@@ -445,7 +445,7 @@ namespace RenderDevice {
         
         if (desc.overlayLines != 0)
         {
-            OverlayRender::Get().DrawLineSet(desc.overlayLines, desc.camera.view, desc.camera.proj, desc.size);
+            OverlayRender::Get().DrawLineSet(desc.overlayLines, desc.camera.view, desc.camera.proj, desc.size, desc.overlayLinesDepthTest, desc.overlayLinesAlpha);
         }
         
         if (desc.flags & ViewFlag::Debug)

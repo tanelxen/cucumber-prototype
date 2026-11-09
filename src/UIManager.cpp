@@ -110,10 +110,13 @@ void UIManager::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
     EditorViewContext context;
     context.gridStep = gridSize;
     
-    // Каркас уровня строится только если есть панель в режиме Wireframe
-    const bool wantsWireframe = std::any_of(m_viewportPanels.begin(), m_viewportPanels.end(),
-                                            [](ViewportPanel* panel) { return panel->viewport().shadeMode == ShadeMode::Wireframe; });
-    if (wantsWireframe) context.wireframeLines = m_levelWireframe.sync(scene.getMap());
+    auto* map = scene.getMap();
+    
+    // Каркас нужен панелям в режиме Wireframe и всем видам, пока идёт правка уровня
+    const bool editing = map && map->editSession();
+    const bool wantsWireframe = editing || std::any_of(m_viewportPanels.begin(), m_viewportPanels.end(),
+                                                       [](ViewportPanel* panel) { return panel->viewport().shadeMode == ShadeMode::Wireframe; });
+    if (wantsWireframe) context.wireframeLines = m_levelWireframe.sync(map);
     
     for (auto* panel : m_viewportPanels)
     {
