@@ -134,6 +134,7 @@ void Application::run()
         glfwPollEvents();
         updateInputState();
         
+        m_pUIManager->startFrame();
         m_pUIManager->update(elapsedTime);
         
         auto activeScene = SceneManager::Get().getActiveScene();

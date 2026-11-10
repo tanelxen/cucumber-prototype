@@ -41,6 +41,7 @@ public:
     void setMaterial(Material* material);
     void drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position);
     
+    void startFrame();
     void update(float dt);
     void draw();
     EditorCamera& editorCamera();

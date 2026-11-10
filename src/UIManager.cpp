@@ -135,13 +135,16 @@ void UIManager::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
     }
 }
 
-void UIManager::draw()
+void UIManager::startFrame()
 {
-    glEnable(GL_FRAMEBUFFER_SRGB);
-    
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+}
+
+void UIManager::draw()
+{
+    glEnable(GL_FRAMEBUFFER_SRGB);
     
     if (m_showProjectLauncher)
     {

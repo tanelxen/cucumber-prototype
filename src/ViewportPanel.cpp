@@ -572,6 +572,10 @@ void ViewportPanel::draw()
         
         ImGui::SetCursorScreenPos(ImVec2(m_imageLeft + 8, m_imageTop + 8));
         ImGui::TextColored(ImVec4(1, 1, 1, 0.85f), "%s: %s", edit->activeTool().name(), edit->activeTool().hint().c_str());
+        
+        ImGui::SetCursorScreenPos(ImVec2(m_imageLeft + 8, m_imageTop + 32));
+        ImGui::Text("Mouse wheel: %.1f", ImGui::GetIO().MouseWheel);
+//        ImGui::TextColored(ImVec4(1, 1, 1, 0.85f), "g_wheel %f", g_wheel);
     }
 
     if (!scene->isSimulationMode() && ImGui::BeginDragDropTarget())

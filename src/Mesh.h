@@ -1,6 +1,6 @@
 //
-//  Cube.h
-//  TryOpenGL
+//  Mesh.h
+//  Cucumber
 //
 //  Created by Fedor Artemenkov on 21.10.24.
 //
