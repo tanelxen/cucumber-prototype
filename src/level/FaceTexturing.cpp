@@ -253,4 +253,33 @@ namespace FaceTexturing
             return true;
         });
     }
+    
+    bool Summarize(const LevelEditSession& session, const std::vector<FaceRef>& targets, Summary& out)
+    {
+        const Solid* firstSolid = session.findSolid(targets.front().solidUid);
+        const Face* firstFace = session.findFace(targets.front());
+        if (!firstSolid || !firstFace) return false;
+        
+        out.material = firstFace->material;
+        out.uv = firstFace->uv;
+        out.rotation = Rotation(FaceNormal(*firstSolid, *firstFace), firstFace->uv);
+        
+        for (const FaceRef& ref : targets)
+        {
+            const Solid* solid = session.findSolid(ref.solidUid);
+            const Face* face = session.findFace(ref);
+            if (!solid || !face) continue;
+            
+            ++out.total;
+            if (face->flags & FaceFlag::NoDraw) ++out.noDrawCount;
+            
+            out.mixedMaterial = out.mixedMaterial || face->material != out.material;
+            out.mixedShift = out.mixedShift || face->uv.shift != out.uv.shift;
+            out.mixedScale = out.mixedScale || face->uv.scale != out.uv.scale;
+            
+            const float rotation = Rotation(FaceNormal(*solid, *face), face->uv);
+            out.mixedRotation = out.mixedRotation || std::abs(NormalizeDegrees(rotation - out.rotation)) > 1e-3f;
+        }
+        return true;
+    }
 }

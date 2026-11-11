@@ -6,70 +6,20 @@
 #include "TexturingPanel.h"
 
 #include "MapComponent.h"
-#include "ProjectManager.h"
 #include "SceneManager.h"
 #include "TextureLibrary.h"
-#include "TextureManager.h"
+#include "UIManager.h"
 #include "World.h"
 
 #include <imgui.h>
 
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <filesystem>
+#include <string>
 
 namespace
 {
     ImTextureID ToImGuiTexture(unsigned int handle)
     {
         return (ImTextureID)(intptr_t)handle;   // handle_t это имя GL-текстуры (так же во ViewportPanel)
-    }
-
-    // Сводка по целям: значения первой грани и признак, что у остальных граней они отличаются.
-    // Хранит копии, а не указатели: любая правка внутри кадра переприсваивает грани документа, и указатели повисли бы
-    // к следующему виджету.
-    struct Summary
-    {
-        uint32_t material = 0;
-        FaceUV uv;
-        float rotation = 0.0f;
-
-        bool mixedMaterial = false;
-        bool mixedShift = false;
-        bool mixedScale = false;
-        bool mixedRotation = false;
-        int noDrawCount = 0;
-        int total = 0;
-    };
-
-    bool Summarize(const LevelEditSession& session, const std::vector<FaceRef>& targets, Summary& out)
-    {
-        const Solid* firstSolid = session.findSolid(targets.front().solidUid);
-        const Face* firstFace = session.findFace(targets.front());
-        if (!firstSolid || !firstFace) return false;
-
-        out.material = firstFace->material;
-        out.uv = firstFace->uv;
-        out.rotation = FaceTexturing::Rotation(FaceNormal(*firstSolid, *firstFace), firstFace->uv);
-
-        for (const FaceRef& ref : targets)
-        {
-            const Solid* solid = session.findSolid(ref.solidUid);
-            const Face* face = session.findFace(ref);
-            if (!solid || !face) continue;
-
-            ++out.total;
-            if (face->flags & FaceFlag::NoDraw) ++out.noDrawCount;
-
-            out.mixedMaterial = out.mixedMaterial || face->material != out.material;
-            out.mixedShift = out.mixedShift || face->uv.shift != out.uv.shift;
-            out.mixedScale = out.mixedScale || face->uv.scale != out.uv.scale;
-
-            const float rotation = FaceTexturing::Rotation(FaceNormal(*solid, *face), face->uv);
-            out.mixedRotation = out.mixedRotation || std::abs(FaceTexturing::NormalizeDegrees(rotation - out.rotation)) > 1e-3f;
-        }
-        return true;
     }
 
     // Подпись поля: звёздочка, если у выбранных граней значения различаются
@@ -82,91 +32,6 @@ namespace
 TexturingPanel::TexturingPanel(const std::string& name)
     : EditorPanel(name)
 {
-}
-
-void TexturingPanel::refreshCatalog()
-{
-    m_catalogLoaded = true;
-    m_catalog.clear();
-    for (const auto& entry : TextureLibrary::Get().entries()) m_catalog.push_back(entry.name);
-}
-
-bool TexturingPanel::materialMatchesFilter(const std::string& name) const
-{
-    if (m_filter[0] == '\0') return true;
-
-    std::string haystack = name;
-    std::string needle = m_filter;
-    std::transform(haystack.begin(), haystack.end(), haystack.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    std::transform(needle.begin(), needle.end(), needle.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return haystack.find(needle) != std::string::npos;
-}
-
-void TexturingPanel::drawMaterialGrid(const char* id, const std::vector<std::string>& names, const std::string& current, float height)
-{
-    if (!ImGui::BeginChild(id, ImVec2(0, height), true)) { ImGui::EndChild(); return; }
-
-    const float cell = m_thumbnailSize;
-    const float spacing = ImGui::GetStyle().ItemSpacing.x;
-    const float labelHeight = ImGui::GetTextLineHeight();
-    const int columns = std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + spacing) / (cell + spacing)));
-    const int rows = (static_cast<int>(names.size()) + columns - 1) / columns;
-
-    // Текстуры грузятся только для видимых строк: каталог может содержать тысячи файлов
-    ImGuiListClipper clipper;
-    clipper.Begin(rows, cell + labelHeight + ImGui::GetStyle().ItemSpacing.y);
-    while (clipper.Step())
-    {
-        for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
-        {
-            for (int column = 0; column < columns; ++column)
-            {
-                const int index = row * columns + column;
-                if (index >= static_cast<int>(names.size())) break;
-                if (column > 0) ImGui::SameLine();
-
-                const std::string& name = names[index];
-                const auto& info = TextureLibrary::Get().info(name);
-
-                ImGui::PushID(index);
-                ImGui::BeginGroup();
-
-                const ImVec2 position = ImGui::GetCursorScreenPos();
-                if (info.handle != 0)
-                {
-                    // Вписываем с сохранением пропорций
-                    const float aspect = info.height > 0 ? static_cast<float>(info.width) / info.height : 1.0f;
-                    const ImVec2 size = aspect >= 1.0f ? ImVec2(cell, cell / aspect) : ImVec2(cell * aspect, cell);
-                    ImGui::SetCursorScreenPos(ImVec2(position.x + (cell - size.x) * 0.5f, position.y + (cell - size.y) * 0.5f));
-                    ImGui::Image(ToImGuiTexture(info.handle), size);
-                }
-                else
-                {
-                    ImGui::GetWindowDrawList()->AddRectFilled(position, ImVec2(position.x + cell, position.y + cell), IM_COL32(60, 40, 40, 255));
-                }
-
-                ImGui::SetCursorScreenPos(position);
-                if (ImGui::InvisibleButton("##material", ImVec2(cell, cell))) m_pendingMaterial = name;   // применяем в конце кадра
-
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s\n%d x %d", name.c_str(), info.width, info.height);
-                if (name == current)
-                {
-                    ImGui::GetWindowDrawList()->AddRect(position, ImVec2(position.x + cell, position.y + cell), IM_COL32(255, 160, 30, 255), 0.0f, 0, 2.0f);
-                }
-
-                // Подпись: хвост имени без каталога, обрезанный по ширине ячейки
-                const std::string shortName = name.substr(name.find_last_of('/') == std::string::npos ? 0 : name.find_last_of('/') + 1);
-                ImGui::PushClipRect(position, ImVec2(position.x + cell, position.y + cell + labelHeight + 2), true);
-                ImGui::SetCursorScreenPos(ImVec2(position.x, position.y + cell));
-                ImGui::TextUnformatted(shortName.c_str());
-                ImGui::PopClipRect();
-
-                ImGui::EndGroup();
-                ImGui::PopID();
-            }
-        }
-    }
-    ImGui::EndChild();
 }
 
 void TexturingPanel::draw()
@@ -201,8 +66,8 @@ void TexturingPanel::draw()
         return;
     }
 
-    Summary summary;
-    if (!Summarize(*session, targets, summary))
+    FaceTexturing::Summary summary;
+    if (!FaceTexturing::Summarize(*session, targets, summary))
     {
         ImGui::End();
         return;
@@ -212,52 +77,24 @@ void TexturingPanel::draw()
     else                                   ImGui::Text("All faces of %d solid(s) (%d)", static_cast<int>(session->selectedSolids().size()), summary.total);
     ImGui::Separator();
 
-    // ---- Материал ----
+    // ---- Материал: только текущий, выбирать в TextureBrowserPanel ----
     LevelDocument& document = session->document();
     const std::string currentName = document.materials[summary.material];
     {
-        const auto& info = TextureLibrary::Get().info(currentName);
+        const TextureLibrary::Info& info = TextureLibrary::Get().info(currentName);
         if (info.handle != 0) ImGui::Image(ToImGuiTexture(info.handle), ImVec2(64, 64));
         else                  ImGui::Dummy(ImVec2(64, 64));
 
         ImGui::SameLine();
         ImGui::BeginGroup();
         ImGui::TextUnformatted(summary.mixedMaterial ? "(several materials)" : currentName.c_str());
-        if (!summary.mixedMaterial) ImGui::TextDisabled("%d x %d", info.width, info.height);
+        if (!summary.mixedMaterial)
+        {
+            if (info.found) ImGui::TextDisabled("%d x %d", info.width, info.height);
+            else            ImGui::TextDisabled("file not found");
+        }
+        if (ImGui::Button("Browse textures...") && m_manager) m_manager->showTextureBrowser();
         ImGui::EndGroup();
-    }
-
-    if (!m_catalogLoaded) refreshCatalog();
-
-    ImGui::SetNextItemWidth(-130.0f);
-    ImGui::InputTextWithHint("##filter", "Filter materials", m_filter, sizeof(m_filter));
-    ImGui::SameLine();
-    if (ImGui::Button("Refresh")) TextureLibrary::Get().refresh(); refreshCatalog();
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(60.0f);
-    ImGui::DragFloat("##thumb", &m_thumbnailSize, 1.0f, 32.0f, 160.0f, "%.0f px");
-
-    {
-        // Материалы уровня первыми: в них могут быть и шейдерные имена, которых нет на диске
-        std::vector<std::string> inLevel, onDisk;
-        for (const std::string& name : document.materials)
-        {
-            if (materialMatchesFilter(name)) inLevel.push_back(name);
-        }
-        for (const std::string& name : m_catalog)
-        {
-            if (materialMatchesFilter(name) && std::find(document.materials.begin(), document.materials.end(), name) == document.materials.end())
-                onDisk.push_back(name);
-        }
-
-        const float available = std::max(160.0f, ImGui::GetContentRegionAvail().y * 0.45f);
-
-        ImGui::TextDisabled("In this level (%d)", static_cast<int>(inLevel.size()));
-        drawMaterialGrid("##level_materials", inLevel, summary.mixedMaterial ? std::string() : currentName,
-                         std::min(available * 0.5f, m_thumbnailSize * 2.0f + 40.0f));
-
-        ImGui::TextDisabled("Textures (%d)", static_cast<int>(onDisk.size()));
-        drawMaterialGrid("##disk_materials", onDisk, std::string(), available);
     }
 
     ImGui::Separator();
@@ -315,9 +152,9 @@ void TexturingPanel::draw()
     ImGui::SameLine();
     if (ImGui::Button("Fit to face"))
     {
-        FaceTexturing::FitToFace(*session, targets, [this](const std::string& name)
+        FaceTexturing::FitToFace(*session, targets, [](const std::string& name)
         {
-            const auto& info = TextureLibrary::Get().info(name);
+            const TextureLibrary::Info& info = TextureLibrary::Get().info(name);
             return glm::ivec2(info.width, info.height);
         }, m_repeat);
     }
@@ -344,13 +181,6 @@ void TexturingPanel::draw()
     ImGui::SameLine();
     ImGui::Checkbox("UV", &m_pasteUV);
     if (m_clipboard.valid) ImGui::TextDisabled("Clipboard: %s", m_clipboard.materialName.c_str());
-
-    // Выбор материала в сетке применяем здесь: SetMaterial может добавить материал в таблицу документа (реаллокация)
-    if (!m_pendingMaterial.empty())
-    {
-        FaceTexturing::SetMaterial(*session, targets, m_pendingMaterial);
-        m_pendingMaterial.clear();
-    }
 
     ImGui::End();
 }

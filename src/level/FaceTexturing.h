@@ -71,4 +71,23 @@ namespace FaceTexturing
 
     bool Copy(const LevelEditSession& session, const FaceRef& source, FaceClipboard& out);
     bool Paste(LevelEditSession& session, const std::vector<FaceRef>& targets, const FaceClipboard& clipboard, bool material, bool uv);
+    
+    
+    struct Summary
+    {
+        uint32_t material = 0;
+        FaceUV uv;
+        float rotation = 0.0f;
+        
+        bool mixedMaterial = false;
+        bool mixedShift = false;
+        bool mixedScale = false;
+        bool mixedRotation = false;
+        int noDrawCount = 0;
+        int total = 0;
+    };
+    
+    // Значения первой цели и признаки расхождения у остальных. Копии, а не указатели: правка внутри кадра
+    // переприсваивает грани документа.
+    bool Summarize(const LevelEditSession& session, const std::vector<FaceRef>& targets, Summary& out);
 }

@@ -183,6 +183,8 @@ set(SRC_PANELS
         src/EditorViewport.cpp
         src/EditorViewport.h
         
+        src/TextureBrowserPanel.cpp
+        src/TextureBrowserPanel.h
         src/TexturingPanel.cpp
         src/TexturingPanel.h
 )

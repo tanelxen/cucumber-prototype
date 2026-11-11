@@ -22,6 +22,7 @@ class AssetsPanel;
 class HierarchyPanel;
 class EditorCamera;
 class TexturingPanel;
+class TextureBrowserPanel;
 
 class WorldScene;
 struct ViewDesc;
@@ -41,6 +42,8 @@ public:
     void setMaterial(Material* material);
     void drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position);
     
+    void showTextureBrowser();
+    
     void startFrame();
     void update(float dt);
     void draw();
@@ -58,6 +61,7 @@ private:
     AssetsPanel* m_pAssetsPanel;
     HierarchyPanel* m_pHierarchyPanel;
     TexturingPanel* m_pTexturingPanel;
+    TextureBrowserPanel* m_pTextureBrowserPanel;
     
 private:
     void drawMenuBar();

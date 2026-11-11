@@ -15,6 +15,7 @@
 #include "AssetsPanel.h"
 #include "HierarchyPanel.h"
 #include "TexturingPanel.h"
+#include "TextureBrowserPanel.h"
 
 #include "LightComponent.h"
 
@@ -61,29 +62,32 @@ UIManager::UIManager()
     m_pViewportPanel = new ViewportPanel(ICON_MDI_CAMERA " Viewport", 0);
     m_viewportPanels.push_back(m_pViewportPanel);
     m_pViewportPanel->m_manager = this;
+    m_panels.push_back(m_pViewportPanel);
     
 //    auto m_pViewportPanel2 = new ViewportPanel(ICON_MDI_CAMERA " Viewport2", 1);
 //    m_viewportPanels.push_back(m_pViewportPanel2);
 //    m_pViewportPanel2->m_manager = this;
+//    m_panels.push_back(m_pViewportPanel2);
     
     m_pHierarchyPanel = new HierarchyPanel();
     m_pHierarchyPanel->m_manager = this;
+    m_panels.push_back(m_pHierarchyPanel);
     
     m_pInspectorPanel = new InspectorPanel();
     m_pInspectorPanel->m_manager = this;
+    m_panels.push_back(m_pInspectorPanel);
     
     m_pAssetsPanel = new AssetsPanel();
     m_pAssetsPanel->m_manager = this;
+    m_panels.push_back(m_pAssetsPanel);
     
     m_pTexturingPanel = new TexturingPanel("Texturing");
     m_pTexturingPanel->m_manager = this;
-    
-    m_panels.push_back(m_pViewportPanel);
-//    m_panels.push_back(m_pViewportPanel2);
-    m_panels.push_back(m_pHierarchyPanel);
-    m_panels.push_back(m_pInspectorPanel);
-    m_panels.push_back(m_pAssetsPanel);
     m_panels.push_back(m_pTexturingPanel);
+    
+    m_pTextureBrowserPanel = new TextureBrowserPanel("Textures");
+    m_pTextureBrowserPanel->m_manager = this;
+    m_panels.push_back(m_pTextureBrowserPanel);
     
     g_UIManager = this;
     
@@ -298,6 +302,12 @@ void UIManager::init(struct GLFWwindow *window)
     
     //    // ScrollBar
     colors[ImGuiCol_ScrollbarBg]         = ImVec4(0.15, 0.15, 0.15, 1.0);
+}
+
+void UIManager::showTextureBrowser()
+{
+    m_pTextureBrowserPanel->isVisible = true;
+    m_pTextureBrowserPanel->requestFocus();
 }
 
 #include "SceneSerializer.h"

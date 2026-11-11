@@ -2,9 +2,8 @@
 //  TexturingPanel.h
 //  Cucumber
 //
-//  Панель текстурирования граней уровня. Работает только в режиме правки геометрии (MapComponent::editSession()).
-//  Цель правок: выбранные грани (Alt+клик, Ctrl+Alt+клик добавляет), а если граней нет, все грани выбранных солидов.
-//  Все правки идут через LevelEditSession (undo / redo); перетаскивание полей сливается в одну запись undo.
+//  Параметры наложения текстуры на выбранные грани: смещение, масштаб, поворот, быстрые операции, флаги, буфер.
+//  Выбор самой текстуры вынесен в TextureBrowserPanel (кнопка Browse открывает её).
 //
 
 #pragma once
@@ -14,8 +13,6 @@
 
 #include <glm/glm.hpp>
 #include <string>
-#include <unordered_map>
-#include <vector>
 
 class TexturingPanel : public EditorPanel
 {
@@ -26,20 +23,6 @@ public:
     void draw() override;
 
 private:
-    void refreshCatalog();
-    bool materialMatchesFilter(const std::string& name) const;
-    // Клик по материалу кладёт имя в m_pendingMaterial; применяется в конце кадра
-    void drawMaterialGrid(const char* id, const std::vector<std::string>& names, const std::string& current, float height);
-
-    // Каталог текстур на диске (wolf/textures, без расширения); обновляется кнопкой Refresh
-    std::vector<std::string> m_catalog;
-    bool m_catalogLoaded = false;
-
-    std::string m_pendingMaterial;
-
-    char m_filter[128] = "";
-    float m_thumbnailSize = 72.0f;
-
     glm::vec2 m_repeat{1.0f, 1.0f};
     float m_nudgeStep = 0.0f;              // 0: шаг сетки документа
 
