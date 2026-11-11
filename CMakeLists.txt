@@ -57,6 +57,8 @@ set(SRC_COMMON
         
         src/TextureManager.cpp
         src/TextureManager.h
+        src/TextureLibrary.cpp
+        src/TextureLibrary.h
         
         src/Bounds.h
         src/SpatialGrid.h
@@ -186,8 +188,6 @@ set(SRC_PANELS
 )
 
 set(SRC_TRENCHBROOM
-        src/trenchbroom/Q3Shaders.cpp
-        src/trenchbroom/Q3Shaders.h
         src/trenchbroom/MapAsset.cpp
         src/trenchbroom/MapAsset.h
         src/trenchbroom/MapMesh.cpp

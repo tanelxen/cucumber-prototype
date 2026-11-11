@@ -57,7 +57,7 @@ struct Solid
 
 struct LevelDocument
 {
-    static constexpr uint32_t kCurrentVersion = 1;
+    static constexpr uint32_t kCurrentVersion = 2;
 
     uint32_t version = kCurrentVersion;
     std::vector<std::string> materials;   // пути материалов (как в .map, относительно каталога текстур)

@@ -17,9 +17,10 @@
 #include "MapAsset.h"
 #include "RenderDevice.h"
 #include "TextureManager.h"
+#include "TextureLibrary.h"
 #include "VertexArray.h"
 #include "VertexBuffer.h"
-#include "Q3Shaders.h"
+//#include "Q3Shaders.h"
 
 #include "LevelCooker.h"
 #include "level/LevelDocument.h"
@@ -30,10 +31,8 @@
 #include <string>
 #include <unordered_map>
 
-namespace
-{
-Quake3Shaders s_q3shaders;
-uint64_t s_nextRevision = 1;
+namespace {
+    uint64_t s_nextRevision = 1;
 }
 
 MapMesh::MapMesh() = default;
@@ -77,39 +76,15 @@ bool MapMesh::buildFrom(const std::filesystem::path& basePath, const CookFunctio
 
     m_revision = s_nextRevision++;
 
-    const auto scriptsPath = basePath / "scripts";
-    s_q3shaders.initFromDir(scriptsPath.string().c_str());
-
-    struct TextureInfo
-    {
-        int width = 256;
-        int height = 256;
-        RenderDevice::handle_t handle = 0;
-    };
-    std::unordered_map<std::string, TextureInfo> textureCache;
-    const auto getTexture = [&](const std::string& name) -> const TextureInfo&
-    {
-        auto it = textureCache.find(name);
-        if (it != textureCache.end()) return it->second;
-
-        TextureInfo info;
-        auto texturePath = basePath / "textures" / name;
-        auto textureAsset = TextureManager::Get().loadTexture(texturePath.string());
-        if (textureAsset)
-        {
-            info.width = textureAsset->getWidth();
-            info.height = textureAsset->getHeight();
-            info.handle = textureAsset->getHandle();
-        }
-        return textureCache.emplace(name, info).first->second;
-    };
-
     MapMeshBuildResult build;
     std::string error;
-    const auto resolveDimensions = [&](const std::string& name) {
-        const auto& texture = getTexture(name);
+    
+    const auto resolveDimensions = [](const std::string& name)
+    {
+        const auto& texture = TextureLibrary::Get().info(name);
         return glm::ivec2(texture.width, texture.height);
     };
+    
     if (!cook(resolveDimensions, build, error))
     {
         std::cerr << "[MapMesh] Failed to build map mesh: " << error << std::endl;
@@ -119,19 +94,17 @@ bool MapMesh::buildFrom(const std::filesystem::path& basePath, const CookFunctio
     std::unordered_map<std::string, uint32_t> materialSlotByTexture;
     m_surfaces.reserve(build.surfaces.size());
     m_surfaceBounds.reserve(build.surfaces.size());
+    
     for (const auto& buildSurface : build.surfaces)
     {
         auto slotIt = materialSlotByTexture.find(buildSurface.materialName);
+        
         if (slotIt == materialSlotByTexture.end())
         {
-            std::string mapParam = buildSurface.materialName;
-            BlendMode blendMode = BlendMode::Opaque;
-            s_q3shaders.getBaseTextureName("textures/" + buildSurface.materialName, mapParam, blendMode);
-
             Material material;
             material.m_name = buildSurface.materialName;
-            material.blendMode = blendMode;
-            material.albedoMap = getTexture(buildSurface.materialName).handle;
+            material.blendMode = BlendMode::Opaque;
+            material.albedoMap = TextureLibrary::Get().info(buildSurface.materialName).handle;
 
             slotIt = materialSlotByTexture.emplace(
                 buildSurface.materialName, static_cast<uint32_t>(m_materials.size())).first;

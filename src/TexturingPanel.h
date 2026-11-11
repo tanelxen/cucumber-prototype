@@ -26,14 +26,6 @@ public:
     void draw() override;
 
 private:
-    struct TextureInfo
-    {
-        int width = 256;       // как в MapMesh: нет файла, считаем 256 x 256
-        int height = 256;
-        unsigned int handle = 0;
-    };
-
-    const TextureInfo& texture(const std::string& name);
     void refreshCatalog();
     bool materialMatchesFilter(const std::string& name) const;
     // Клик по материалу кладёт имя в m_pendingMaterial; применяется в конце кадра
@@ -43,7 +35,6 @@ private:
     std::vector<std::string> m_catalog;
     bool m_catalogLoaded = false;
 
-    std::unordered_map<std::string, TextureInfo> m_textures;
     std::string m_pendingMaterial;
 
     char m_filter[128] = "";

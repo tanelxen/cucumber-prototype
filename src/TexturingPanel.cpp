@@ -8,6 +8,7 @@
 #include "MapComponent.h"
 #include "ProjectManager.h"
 #include "SceneManager.h"
+#include "TextureLibrary.h"
 #include "TextureManager.h"
 #include "World.h"
 
@@ -20,16 +21,6 @@
 
 namespace
 {
-    // Тот же корень, что жёстко зашит в MapMesh ("wolf/textures/" + имя материала)
-    constexpr const char* kTextureRoot = "wolf/textures";
-
-    bool HasImageExtension(const std::filesystem::path& path)
-    {
-        std::string ext = path.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga" || ext == ".bmp";
-    }
-
     ImTextureID ToImGuiTexture(unsigned int handle)
     {
         return (ImTextureID)(intptr_t)handle;   // handle_t это имя GL-текстуры (так же во ViewportPanel)
@@ -93,44 +84,11 @@ TexturingPanel::TexturingPanel(const std::string& name)
 {
 }
 
-const TexturingPanel::TextureInfo& TexturingPanel::texture(const std::string& name)
-{
-    const auto it = m_textures.find(name);
-    if (it != m_textures.end()) return it->second;
-
-    TextureInfo info;
-    if (auto asset = TextureManager::Get().loadTexture(std::string(kTextureRoot) + "/" + name))
-    {
-        info.width = asset->getWidth();
-        info.height = asset->getHeight();
-        info.handle = asset->getHandle();
-    }
-    return m_textures.emplace(name, info).first->second;
-}
-
 void TexturingPanel::refreshCatalog()
 {
-    m_catalog.clear();
     m_catalogLoaded = true;
-
-    const std::filesystem::path root = ProjectManager::Get().assetsPath() / kTextureRoot;
-    std::error_code ec;
-    if (!std::filesystem::exists(root, ec)) return;
-
-    for (std::filesystem::recursive_directory_iterator it(root, std::filesystem::directory_options::skip_permission_denied, ec), end;
-         !ec && it != end; it.increment(ec))
-    {
-        if (!it->is_regular_file(ec) || !HasImageExtension(it->path())) continue;
-
-        std::filesystem::path relative = std::filesystem::relative(it->path(), root, ec);
-        if (ec) { ec.clear(); continue; }
-
-        relative.replace_extension();
-        m_catalog.push_back(relative.generic_string());
-    }
-
-    std::sort(m_catalog.begin(), m_catalog.end());
-    m_catalog.erase(std::unique(m_catalog.begin(), m_catalog.end()), m_catalog.end());
+    m_catalog.clear();
+    for (const auto& entry : TextureLibrary::Get().entries()) m_catalog.push_back(entry.name);
 }
 
 bool TexturingPanel::materialMatchesFilter(const std::string& name) const
@@ -168,7 +126,7 @@ void TexturingPanel::drawMaterialGrid(const char* id, const std::vector<std::str
                 if (column > 0) ImGui::SameLine();
 
                 const std::string& name = names[index];
-                const TextureInfo& info = texture(name);
+                const auto& info = TextureLibrary::Get().info(name);
 
                 ImGui::PushID(index);
                 ImGui::BeginGroup();
@@ -258,7 +216,7 @@ void TexturingPanel::draw()
     LevelDocument& document = session->document();
     const std::string currentName = document.materials[summary.material];
     {
-        const TextureInfo& info = texture(currentName);
+        const auto& info = TextureLibrary::Get().info(currentName);
         if (info.handle != 0) ImGui::Image(ToImGuiTexture(info.handle), ImVec2(64, 64));
         else                  ImGui::Dummy(ImVec2(64, 64));
 
@@ -274,7 +232,7 @@ void TexturingPanel::draw()
     ImGui::SetNextItemWidth(-130.0f);
     ImGui::InputTextWithHint("##filter", "Filter materials", m_filter, sizeof(m_filter));
     ImGui::SameLine();
-    if (ImGui::Button("Refresh")) refreshCatalog();
+    if (ImGui::Button("Refresh")) TextureLibrary::Get().refresh(); refreshCatalog();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(60.0f);
     ImGui::DragFloat("##thumb", &m_thumbnailSize, 1.0f, 32.0f, 160.0f, "%.0f px");
@@ -359,7 +317,7 @@ void TexturingPanel::draw()
     {
         FaceTexturing::FitToFace(*session, targets, [this](const std::string& name)
         {
-            const TextureInfo& info = texture(name);
+            const auto& info = TextureLibrary::Get().info(name);
             return glm::ivec2(info.width, info.height);
         }, m_repeat);
     }

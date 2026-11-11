@@ -6,7 +6,7 @@
 #include "LevelEditMesh.h"
 
 #include "GLState.h"
-#include "Q3Shaders.h"
+#include "TextureLibrary.h"
 #include "TextureManager.h"
 #include "VertexArray.h"
 #include "VertexBuffer.h"
@@ -19,10 +19,6 @@
 
 namespace
 {
-    // Скрипты шейдеров разбираются один раз на путь: initFromDir читает каталог, а правок за сеанс сотни
-    Quake3Shaders s_shaders;
-    std::string s_shadersPath;
-
     constexpr uint64_t kEditRevisionBit = 1ull << 63;   // отдельная нумерация: не пересекается с ревизиями MapMesh
     uint64_t s_revisionCounter = 0;
 
@@ -49,34 +45,15 @@ LevelEditMesh::~LevelEditMesh()
     GLState::invalidate();
 }
 
-const LevelEditMesh::TextureInfo& LevelEditMesh::texture(const std::string& name)
-{
-    const auto it = m_textures.find(name);
-    if (it != m_textures.end()) return it->second;
-
-    TextureInfo info;
-    if (auto asset = TextureManager::Get().loadTexture("wolf/textures/" + name))
-    {
-        info.width = asset->getWidth();
-        info.height = asset->getHeight();
-        info.handle = asset->getHandle();
-    }
-    return m_textures.emplace(name, info).first->second;
-}
-
 uint32_t LevelEditMesh::materialSlot(const std::string& name)
 {
     const auto it = m_slotByName.find(name);
     if (it != m_slotByName.end()) return it->second;
 
-    std::string mapParam = name;
-    BlendMode blendMode = BlendMode::Opaque;
-    s_shaders.getBaseTextureName("textures/" + name, mapParam, blendMode);
-
     Material material;
     material.m_name = name;
-    material.blendMode = blendMode;
-    material.albedoMap = texture(name).handle;
+    material.blendMode = BlendMode::Opaque;
+    material.albedoMap = TextureLibrary::Get().info(name).handle;
     material.isEmbedded = false;
 
     const uint32_t slot = static_cast<uint32_t>(m_materials.size());
@@ -87,9 +64,9 @@ uint32_t LevelEditMesh::materialSlot(const std::string& name)
 
 EditGeometry::SizeResolver LevelEditMesh::sizeResolver()
 {
-    return [this](const std::string& name)
+    return [](const std::string& name)
     {
-        const TextureInfo& info = texture(name);
+        const auto& info = TextureLibrary::Get().info(name);
         return glm::ivec2(info.width, info.height);
     };
 }
@@ -269,14 +246,6 @@ void LevelEditMesh::upload(const EditGeometry::UpdateResult& result)
 
 void LevelEditMesh::build(const LevelDocument& level)
 {
-    const std::string scriptsPath = (level.basePath / "scripts").string();
-    if (scriptsPath != s_shadersPath)
-    {
-        s_shaders.initFromDir(scriptsPath.c_str());
-        s_shadersPath = scriptsPath;
-    }
-
-    m_textures.clear();
     m_materials.clear();
     m_slotByName.clear();
 

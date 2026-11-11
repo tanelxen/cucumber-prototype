@@ -8,6 +8,7 @@
 #include "MapAsset.h"
 #include "geometry/Brush.h"
 #include "geometry/Epsilon.h"
+#include "TextureLibrary.h"
 
 namespace
 {
@@ -99,7 +100,7 @@ bool ImportMapAsset(const MapAsset& mapData, LevelDocument& out, MapImportReport
             Face face;
             face.uid = NonZero(Mix((brushIndex + 1) * 1000003ull + sideIndex + 1));
             face.loop = loops[sideIndex];
-            face.material = out.materialIndex(side.texture.textureName);
+            face.material = out.materialIndex(TextureLibrary::CanonicalName(side.texture.textureName, mapData.m_basepath / "textures"));
             face.uv.uAxis = QuakeToEngine(side.texture.uAxis);   // оси преобразуются как векторы; shift и scale не меняются
             face.uv.vAxis = QuakeToEngine(side.texture.vAxis);
             face.uv.shift = { side.texture.uShift, side.texture.vShift };

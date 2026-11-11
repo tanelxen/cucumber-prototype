@@ -12,6 +12,8 @@
 #include "PhysicsSystem.h"
 #include "World.h"
 
+#include "TextureLibrary.h"
+
 #include "trenchbroom/MapAsset.h"
 #include "trenchbroom/LightmapBaker.h"
 #include "trenchbroom/MapMesh.h"
@@ -220,12 +222,30 @@ bool MapComponent::loadLevel(const std::filesystem::path& filepath)
         bakeStatus = "Level load failed: " + error;
         return false;
     }
-    // Как у MapAsset: каталог, в котором лежит scripts/ (иначе пропадут blend-режимы материалов)
-    loaded.basePath = absolute.parent_path().parent_path();
+
+    loaded.basePath = absolute.parent_path().parent_path();   // теперь нужен только для миграции
+    
+    bool migrated = false;
+    if (loaded.version < 2)
+    {
+        const auto texturesRoot = loaded.basePath / "textures";
+        
+        for (std::string& material : loaded.materials)
+        {
+            material = TextureLibrary::CanonicalName(material, texturesRoot);
+        }
+        
+        loaded.version = LevelDocument::kCurrentVersion;
+        migrated = true;
+    }
     
     path = filepath.string();
     level = std::move(loaded);
-    return applyLevel();
+    
+    if (!applyLevel()) return false;
+    if (migrated) m_levelDirty = true;   // уровень сохранится уже в новом формате
+    
+    return true;
 }
 
 bool MapComponent::saveLevel()

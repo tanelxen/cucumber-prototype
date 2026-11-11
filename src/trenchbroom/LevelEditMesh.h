@@ -19,7 +19,6 @@
 
 #pragma once
 
-// Mesh.h не самодостаточен (рассчитывает, что <vector> и <memory> уже подключены): стандартные заголовки идут первыми
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -71,20 +70,12 @@ public:
     const Stats& stats() const { return m_stats; }
 
 private:
-    struct TextureInfo
-    {
-        int width = 256;       // как в MapMesh: нет файла, считаем 256 x 256
-        int height = 256;
-        RenderDevice::handle_t handle = 0;
-    };
-
     struct Buffer
     {
         unsigned int id = 0;
         size_t capacity = 0;   // байт
     };
 
-    const TextureInfo& texture(const std::string& name);
     uint32_t materialSlot(const std::string& name);
     EditGeometry::SizeResolver sizeResolver();
 
@@ -111,7 +102,6 @@ private:
     std::vector<Material> m_materials;
     std::vector<AABB> m_surfaceBounds;
     std::unordered_map<std::string, uint32_t> m_slotByName;
-    std::unordered_map<std::string, TextureInfo> m_textures;
 
     uint64_t m_revision = 0;
     Stats m_stats;
