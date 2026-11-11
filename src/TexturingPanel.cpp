@@ -76,6 +76,17 @@ void TexturingPanel::draw()
     if (!session->selectedFaces().empty()) ImGui::Text("%d selected face(s)", summary.total);
     else                                   ImGui::Text("All faces of %d solid(s) (%d)", static_cast<int>(session->selectedSolids().size()), summary.total);
     ImGui::Separator();
+    
+    // ---- Флаги ----
+    {
+        const bool allNoDraw = summary.noDrawCount == summary.total;
+        bool noDraw = allNoDraw;
+        const char* label = (summary.noDrawCount > 0 && !allNoDraw) ? "No draw (some)" : "No draw";
+        if (ImGui::Checkbox(label, &noDraw)) FaceTexturing::SetFlag(*session, targets, FaceFlag::NoDraw, noDraw);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Face is not rendered, but still shapes the solid and its collision (clip, skip)");
+    }
+    
+    ImGui::Separator();
 
     // ---- Материал: только текущий, выбирать в TextureBrowserPanel ----
     LevelDocument& document = session->document();
@@ -102,19 +113,16 @@ void TexturingPanel::draw()
     // ---- Раскладка ----
     {
         glm::vec2 shift = summary.uv.shift;
-        ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::DragFloat2(Label("Offset", summary.mixedShift).c_str(), &shift.x, 0.5f, 0.0f, 0.0f, "%.2f"))
             FaceTexturing::SetShift(*session, targets, shift, "tex.shift");
         if (ImGui::IsItemDeactivatedAfterEdit()) session->sealEdit();
 
         glm::vec2 scale = summary.uv.scale;
-        ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::DragFloat2(Label("Scale", summary.mixedScale).c_str(), &scale.x, 0.01f, 0.0f, 0.0f, "%.3f"))
             FaceTexturing::SetScale(*session, targets, scale, "tex.scale");
         if (ImGui::IsItemDeactivatedAfterEdit()) session->sealEdit();
 
         float rotation = summary.rotation;
-        ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::DragFloat(Label("Rotation", summary.mixedRotation).c_str(), &rotation, 0.5f, -180.0f, 180.0f, "%.1f deg"))
             FaceTexturing::SetRotation(*session, targets, rotation, "tex.rotation");
         if (ImGui::IsItemDeactivatedAfterEdit()) session->sealEdit();
@@ -160,15 +168,6 @@ void TexturingPanel::draw()
     }
 
     ImGui::Separator();
-
-    // ---- Флаги ----
-    {
-        const bool allNoDraw = summary.noDrawCount == summary.total;
-        bool noDraw = allNoDraw;
-        const char* label = (summary.noDrawCount > 0 && !allNoDraw) ? "No draw (some)" : "No draw";
-        if (ImGui::Checkbox(label, &noDraw)) FaceTexturing::SetFlag(*session, targets, FaceFlag::NoDraw, noDraw);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Face is not rendered, but still shapes the solid and its collision (clip, skip)");
-    }
 
     // ---- Буфер ----
     if (ImGui::Button("Copy from first face")) FaceTexturing::Copy(*session, targets.front(), m_clipboard);
