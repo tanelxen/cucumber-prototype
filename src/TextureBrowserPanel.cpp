@@ -159,36 +159,45 @@ void TextureBrowserPanel::drawGrid(const std::vector<const std::string*>& names,
                 if (column > 0) ImGui::SameLine();
 
                 const std::string& name = *names[index];
-                const TextureLibrary::Info& info = library.info(name);
+                // Только превью: полноразмерная текстура через info() осталась бы в GPU навсегда
+                const TextureLibrary::Preview& preview = library.preview(name);
+                using State = TextureLibrary::Preview::State;
 
                 ImGui::PushID(index);
                 ImGui::BeginGroup();
 
                 const ImVec2 position = ImGui::GetCursorScreenPos();
+                const ImVec2 corner(position.x + cell, position.y + cell);
                 ImDrawList* drawList = ImGui::GetWindowDrawList();
-                if (info.handle != 0)
+                if (preview.state == State::Ready)
                 {
-                    // Вписываем с сохранением пропорций
-                    const float aspect = info.height > 0 ? static_cast<float>(info.width) / info.height : 1.0f;
+                    // Вписываем с сохранением пропорций оригинала
+                    const float aspect = preview.height > 0 ? static_cast<float>(preview.width) / preview.height : 1.0f;
                     const ImVec2 size = aspect >= 1.0f ? ImVec2(cell, cell / aspect) : ImVec2(cell * aspect, cell);
                     ImGui::SetCursorScreenPos(ImVec2(position.x + (cell - size.x) * 0.5f, position.y + (cell - size.y) * 0.5f));
-                    ImGui::Image(ToImGuiTexture(info.handle), size);
+                    ImGui::Image(ToImGuiTexture(preview.handle), size);
+                }
+                else if (preview.state == State::Loading)
+                {
+                    drawList->AddRectFilled(position, corner, IM_COL32(45, 45, 50, 255));   // заглушка, пока декодируется
                 }
                 else
                 {
-                    drawList->AddRectFilled(position, ImVec2(position.x + cell, position.y + cell), IM_COL32(60, 40, 40, 255));
+                    drawList->AddRectFilled(position, corner, IM_COL32(110, 40, 40, 255));  // нет файла или не читается
                 }
-                // Файла нет (материал уровня ссылается на удалённую текстуру): красный налёт поверх запасной картинки
-                if (!info.found)
-                    drawList->AddRectFilled(position, ImVec2(position.x + cell, position.y + cell), IM_COL32(170, 40, 40, 90));
 
                 ImGui::SetCursorScreenPos(position);
                 if (ImGui::InvisibleButton("##texture", ImVec2(cell, cell))) m_pending = name;
 
                 if (ImGui::IsItemHovered())
                 {
-                    if (info.found) ImGui::SetTooltip("%s\n%d x %d", name.c_str(), info.width, info.height);
-                    else            ImGui::SetTooltip("%s\nfile not found", name.c_str());
+                    switch (preview.state)
+                    {
+                        case State::Ready:    ImGui::SetTooltip("%s\n%d x %d", name.c_str(), preview.width, preview.height); break;
+                        case State::Loading:  ImGui::SetTooltip("%s", name.c_str()); break;
+                        case State::Failed:   ImGui::SetTooltip("%s\nfailed to load", name.c_str()); break;
+                        case State::NotFound: ImGui::SetTooltip("%s\nfile not found", name.c_str()); break;
+                    }
                 }
                 if (!highlighted.empty() && name == highlighted)
                     drawList->AddRect(position, ImVec2(position.x + cell, position.y + cell), IM_COL32(255, 160, 30, 255), 0.0f, 0, 2.0f);
@@ -224,6 +233,8 @@ void TextureBrowserPanel::draw()
     }
 
     TextureLibrary& library = TextureLibrary::Get();
+    // Раз в кадр до первого preview(): заливка готовых превью в GPU, снятие устаревших заданий, выгрузка по бюджету
+    library.pumpPreviews(static_cast<uint64_t>(ImGui::GetFrameCount()));
 
     auto* scene = SceneManager::Get().getActiveScene();
     MapComponent* map = scene ? scene->getMap() : nullptr;
@@ -256,7 +267,7 @@ void TextureBrowserPanel::draw()
     if (ImGui::Button("Refresh")) library.refresh();
     ImGui::SameLine();
     ImGui::SetNextItemWidth(70.0f);
-    ImGui::DragFloat("##thumb", &m_thumbnailSize, 1.0f, 32.0f, 200.0f, "%.0f px");
+    ImGui::DragFloat("##thumb", &m_thumbnailSize, 1.0f, 32.0f, static_cast<float>(TextureLibrary::kPreviewEdge), "%.0f px");
 
     if (hasTargets)    ImGui::TextDisabled("Click a texture to apply it to %d face(s)", summary.total);
     else if (session)  ImGui::TextDisabled("Select a solid (click) or faces (Alt+click) to apply textures");

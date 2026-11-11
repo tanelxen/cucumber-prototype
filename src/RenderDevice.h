@@ -35,6 +35,8 @@ namespace RenderDevice {
     void init();
     
     handle_t makeTexture(int width, int height, bool hasAlpha, bool srgb, const void* data);
+    void deleteTexture(handle_t handle);
+    
     handle_t makeVertexBuffer(long size, void* data);
     handle_t makeIndexBuffer(long size, void* data);
     

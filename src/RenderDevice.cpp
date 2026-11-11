@@ -145,6 +145,13 @@ namespace RenderDevice {
         return id;
     }
     
+    void deleteTexture(handle_t handle)
+    {
+        GLuint id = handle;
+        glDeleteTextures(1, &id);
+        GLState::invalidate();   // кэш привязок мог хранить это имя, а GL переиспользует имена
+    }
+    
     handle_t makeVertexBuffer(long size, void* data)
     {
         GLuint id;
