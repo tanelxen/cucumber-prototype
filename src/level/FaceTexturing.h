@@ -53,6 +53,14 @@ namespace FaceTexturing
         bool valid = false;
         std::string materialName;
         FaceUV uv;
+        glm::vec3 normal{0.0f, 1.0f, 0.0f};   // плоскость источника на момент копирования
+        float planeOffset = 0.0f;
+    };
+    
+    enum class UVMode
+    {
+        Wrap,    // продолжать рисунок через ребро (по умолчанию)
+        World    // та же мировая проекция как есть
     };
 
     bool SetMaterial(LevelEditSession& session, const std::vector<FaceRef>& targets, const std::string& materialName);
@@ -70,7 +78,7 @@ namespace FaceTexturing
     bool ResetUV(LevelEditSession& session, const std::vector<FaceRef>& targets);
 
     bool Copy(const LevelEditSession& session, const FaceRef& source, FaceClipboard& out);
-    bool Paste(LevelEditSession& session, const std::vector<FaceRef>& targets, const FaceClipboard& clipboard, bool material, bool uv);
+    bool Paste(LevelEditSession& session, const std::vector<FaceRef>& targets, const FaceClipboard& clipboard, bool material, bool uv, UVMode mode = UVMode::Wrap);
     
     
     struct Summary

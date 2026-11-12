@@ -173,12 +173,23 @@ void TexturingPanel::draw()
     if (ImGui::Button("Copy from first face")) FaceTexturing::Copy(*session, targets.front(), m_clipboard);
     ImGui::SameLine();
     ImGui::BeginDisabled(!m_clipboard.valid);
-    if (ImGui::Button("Paste")) FaceTexturing::Paste(*session, targets, m_clipboard, m_pasteMaterial, m_pasteUV);
+    if (ImGui::Button("Paste"))
+    {
+        FaceTexturing::Paste(*session, targets, m_clipboard, m_pasteMaterial, m_pasteUV,
+                             m_pasteWrap ? FaceTexturing::UVMode::Wrap : FaceTexturing::UVMode::World);
+    }
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::Checkbox("Material", &m_pasteMaterial);
     ImGui::SameLine();
     ImGui::Checkbox("UV", &m_pasteUV);
+    ImGui::BeginDisabled(!m_pasteUV);
+    ImGui::Checkbox("Wrap around edges", &m_pasteWrap);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("On: the pattern continues across the shared edge (like Hammer's align-to-face).\n"
+                          "Off: the same world-space projection is applied as is; fine for parallel faces,\n"
+                          "but stretches the texture on faces turned away from the source.");
     if (m_clipboard.valid) ImGui::TextDisabled("Clipboard: %s", m_clipboard.materialName.c_str());
 
     ImGui::End();

@@ -29,4 +29,5 @@ private:
     FaceTexturing::FaceClipboard m_clipboard;
     bool m_pasteMaterial = true;
     bool m_pasteUV = true;
+    bool m_pasteWrap = true;               // true: продолжать рисунок через ребро; false: та же мировая проекция
 };

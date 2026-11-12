@@ -230,29 +230,94 @@ namespace FaceTexturing
         });
     }
 
+    // Раскладка для грани target, которая продолжает раскладку источника без шва.
+    //
+    // Целевую грань "разворачивают" вокруг линии пересечения плоскостей, пока она не ляжет в плоскость источника,
+    // и берут там раскладку источника. Поворот R вокруг линии (ось axis, угол angle между нормалями):
+    //     u(p) = dot(R(p - o) + o, uAxis) / scale.x + shift.x
+    //          = dot(p, R^-1 uAxis) / scale.x + (shift.x + dot(o - R o, uAxis) / scale.x)
+    // поэтому результат это та же проекция Valve220: оси повёрнуты на -angle, смещение скорректировано, масштаб прежний.
+    // Оси остаются в плоскости цели (если лежали в плоскости источника), так что растяжения нет, а на самой линии
+    // пересечения раскладка совпадает с исходной. Для соседних граней это линия их общего ребра.
+    //
+    // Нормали должны быть заданы одинаково (обе наружу или обе внутрь); offset = dot(normal, любая точка плоскости).
+    FaceUV WrapUV(const FaceUV& source, const glm::vec3& sourceNormal, float sourceOffset,
+                  const glm::vec3& targetNormal, float targetOffset)
+    {
+        const glm::vec3 ns = glm::normalize(sourceNormal);
+        const glm::vec3 nt = glm::normalize(targetNormal);
+        
+        const glm::vec3 hinge = glm::cross(nt, ns);
+        const float sinAngle = glm::length(hinge);
+        
+        // Плоскости параллельны (в том числе смотрят в противоположные стороны, как пол и потолок): проекция остаётся
+        // рабочей, копии достаточно. Для одной плоскости она же даёт бесшовный рисунок, в том числе между разными брашами.
+        if (sinAngle < 1e-4f) return source;
+        
+        const glm::vec3 axis = hinge / sinAngle;
+        const float angle = std::atan2(sinAngle, glm::dot(nt, ns));   // 0..pi
+        
+        // Точка на линии пересечения плоскостей
+        const glm::vec3 lineDirection = glm::cross(ns, nt);
+        const glm::vec3 origin = (sourceOffset * glm::cross(nt, lineDirection) + targetOffset * glm::cross(lineDirection, ns))
+        / glm::dot(lineDirection, lineDirection);
+        const glm::vec3 translation = origin - RotateAround(origin, axis, angle);
+        
+        // Нулевой масштаб ValveUV трактует как 1: делаем так же, иначе смещение разойдётся с тем, что рисуется
+        const float sx = source.scale.x != 0.0f ? source.scale.x : 1.0f;
+        const float sy = source.scale.y != 0.0f ? source.scale.y : 1.0f;
+        
+        FaceUV result = source;
+        result.uAxis = RotateAround(source.uAxis, axis, -angle);
+        result.vAxis = RotateAround(source.vAxis, axis, -angle);
+        result.shift.x += glm::dot(translation, source.uAxis) / sx;
+        result.shift.y += glm::dot(translation, source.vAxis) / sy;
+        return result;
+    }
+    
     bool Copy(const LevelEditSession& session, const FaceRef& source, FaceClipboard& out)
     {
         const Face* face = session.findFace(source);
-        if (!face || face->material >= session.document().materials.size()) return false;
-
+        const Solid* solid = session.findSolid(source.solidUid);
+        if (!face || !solid || face->loop.empty() || face->material >= session.document().materials.size()) return false;
+        
         out.valid = true;
         out.materialName = session.document().materials[face->material];
         out.uv = face->uv;
+        
+        // Снимок плоскости источника на момент копирования: по нему Paste продолжает раскладку на других гранях.
+        // Если источник потом сдвинут, вставка всё равно продолжает рисунок так, как он выглядел при копировании.
+        out.normal = FaceNormal(*solid, *face);
+        out.planeOffset = glm::dot(out.normal, solid->vertices[face->loop.front()]);
         return true;
     }
-
-    bool Paste(LevelEditSession& session, const std::vector<FaceRef>& targets, const FaceClipboard& clipboard, bool material, bool uv)
+    
+    bool Paste(LevelEditSession& session, const std::vector<FaceRef>& targets, const FaceClipboard& clipboard,
+               bool material, bool uv, UVMode mode)
     {
         if (!clipboard.valid || (!material && !uv)) return false;
-
+        
         const uint32_t index = material ? session.document().materialIndex(clipboard.materialName) : 0;
-        return session.editFaces(targets, "Paste texture", {}, [&](const Solid&, Face& face)
-        {
+        return session.editFaces(targets, "Paste texture", {}, [&](const Solid& solid, Face& face)
+                                 {
             if (material) face.material = index;
-            if (uv) face.uv = clipboard.uv;
+            if (uv)
+            {
+                if (mode == UVMode::Wrap && !face.loop.empty())
+                {
+                    const glm::vec3 normal = FaceNormal(solid, face);
+                    const float offset = glm::dot(normal, solid.vertices[face.loop.front()]);
+                    face.uv = WrapUV(clipboard.uv, clipboard.normal, clipboard.planeOffset, normal, offset);
+                }
+                else
+                {
+                    face.uv = clipboard.uv;   // та же мировая проекция на любой грани
+                }
+            }
             return true;
         });
     }
+
     
     bool Summarize(const LevelEditSession& session, const std::vector<FaceRef>& targets, Summary& out)
     {
