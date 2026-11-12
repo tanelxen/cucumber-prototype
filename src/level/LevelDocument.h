@@ -36,7 +36,7 @@ struct FaceUV
     glm::vec3 uAxis{1.0f, 0.0f, 0.0f};
     glm::vec3 vAxis{0.0f, -1.0f, 0.0f};
     glm::vec2 shift{0.0f};
-    glm::vec2 scale{1.0f};
+    glm::vec2 scale{0.25f};
 };
 
 struct Face
