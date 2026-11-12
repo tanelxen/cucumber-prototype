@@ -233,8 +233,6 @@ void TextureBrowserPanel::draw()
     }
 
     TextureLibrary& library = TextureLibrary::Get();
-    // Раз в кадр до первого preview(): заливка готовых превью в GPU, снятие устаревших заданий, выгрузка по бюджету
-    library.pumpPreviews(static_cast<uint64_t>(ImGui::GetFrameCount()));
 
     auto* scene = SceneManager::Get().getActiveScene();
     MapComponent* map = scene ? scene->getMap() : nullptr;

@@ -9,6 +9,7 @@
 #include "ProjectManager.h"
 #include "SceneManager.h"
 #include "SceneSerializer.h"
+#include "TextureLibrary.h"
 #include "World.h"
 #include "Entity.h"
 
@@ -254,6 +255,8 @@ void AssetsPanel::draw()
 
 void AssetsPanel::refresh()
 {
+    TextureLibrary::Get().refresh();
+    
     m_baseDirectory = std::make_shared<DirectoryInfo>();
     m_baseDirectory->filePath = "";
     
@@ -646,8 +649,26 @@ void AssetsPanel::renderGridItems()
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         }
         
-        // Рисуем иконку (Кнопку)
-        if (icon != 0)
+        const TextureLibrary::Preview* texturePreview = nullptr;
+        if (item.type == BrowserItem::Type::File && item.assetType == AssetType_Texture)
+        {
+            const std::string textureName = std::filesystem::relative(item.fullPath, m_rootPath).replace_extension().generic_string();
+            const TextureLibrary::Preview& preview = TextureLibrary::Get().preview(textureName);
+            if (preview.state == TextureLibrary::Preview::State::Ready) texturePreview = &preview;
+        }
+        
+        if (texturePreview)
+        {
+            // Кнопка-подложка нужного размера даёт рамку, hover и выделение; картинка вписывается поверх с сохранением пропорций
+            ImGui::Button("##btn", ImVec2(m_thumbnailSize, m_thumbnailSize));
+            const ImVec2 itemMin = ImGui::GetItemRectMin();
+            const float inner = m_thumbnailSize - 4.0f;
+            const float aspect = texturePreview->height > 0 ? float(texturePreview->width) / texturePreview->height : 1.0f;
+            const ImVec2 size = aspect >= 1.0f ? ImVec2(inner, inner / aspect) : ImVec2(inner * aspect, inner);
+            const ImVec2 p0(itemMin.x + (m_thumbnailSize - size.x) * 0.5f, itemMin.y + (m_thumbnailSize - size.y) * 0.5f);
+            ImGui::GetWindowDrawList()->AddImage((ImTextureID)(uintptr_t)texturePreview->handle, p0, ImVec2(p0.x + size.x, p0.y + size.y));
+        }
+        else if (icon != 0)
         {
             ImVec4 tintColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
             if (item.type == BrowserItem::Type::Directory) {

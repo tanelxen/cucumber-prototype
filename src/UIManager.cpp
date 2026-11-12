@@ -8,6 +8,7 @@
 #include "UIManager.h"
 
 #include "RenderDevice.h"
+#include "TextureLibrary.h"
 
 #include "ViewportPanel.h"
 #include "EditorCamera.h"
@@ -644,6 +645,8 @@ void UIManager::resetEditorCamera()
 
 void UIManager::drawPanels()
 {
+    TextureLibrary::Get().pumpPreviews(static_cast<uint64_t>(ImGui::GetFrameCount()));
+    
     for (auto panel : m_panels)
     {
         if (panel->isVisible)

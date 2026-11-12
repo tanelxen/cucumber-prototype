@@ -9,6 +9,7 @@
 #include "RenderDevice.h"
 #include "TextureManager.h"
 
+// Реализация stb_image подключена в другом .cpp, как и у TextureManager.cpp. Путь поправьте под расположение файла.
 #include "../vendor/stb_image.h"
 
 #include <algorithm>
@@ -16,6 +17,8 @@
 
 namespace
 {
+    // Порядок совпадает со списком в TextureManager::loadTexture: при одинаковом имени побеждает меньший ранг.
+    // Если добавляете формат, например .bmp, добавьте его в обоих местах. -1: не картинка.
     int ExtensionRank(const std::filesystem::path& path)
     {
         std::string ext = path.extension().string();
@@ -72,8 +75,8 @@ void TextureLibrary::refresh()
         std::lock_guard<std::mutex> lock(m_mutex);
         m_jobs.clear();
     }
-
-    ensureIndex();
+    // Индекс пересоберётся при ближайшем обращении: refresh() зовут после каждой файловой операции в AssetsPanel,
+    // и сканировать диск каждый раз, когда никто не смотрит на текстуры, незачем
 }
 
 bool TextureLibrary::contains(const std::string& name)
