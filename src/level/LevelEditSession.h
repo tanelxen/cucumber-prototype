@@ -13,6 +13,7 @@
 #include "LevelPicking.h"
 #include "SolidBuilder.h"
 #include "LevelTool.h"
+#include "TexturePaste.h"
 #include "ViewportPointer.h"
 
 #include <functional>
@@ -168,4 +169,12 @@ private:
     bool m_hoverHighlight = false;
 
     std::string m_lastError;
+    
+public:
+    // Буфер и настройки переноса текстурирования: общие для панели Texturing и жеста Alt+RMB
+    FaceTexturing::FaceClipboard& textureClipboard() { return m_textureClipboard; }
+    FaceTexturing::PasteOptions& pasteOptions() { return m_pasteOptions; }
+private:
+    FaceTexturing::FaceClipboard m_textureClipboard;
+    FaceTexturing::PasteOptions m_pasteOptions;
 };

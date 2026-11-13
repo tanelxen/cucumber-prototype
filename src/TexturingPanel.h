@@ -25,9 +25,5 @@ public:
 private:
     glm::vec2 m_repeat{1.0f, 1.0f};
     float m_nudgeStep = 0.0f;              // 0: шаг сетки документа
-
-    FaceTexturing::FaceClipboard m_clipboard;
-    bool m_pasteMaterial = true;
-    bool m_pasteUV = true;
-    bool m_pasteWrap = true;               // true: продолжать рисунок через ребро; false: та же мировая проекция
+    // Буфер и настройки переноса живут в LevelEditSession (общие с жестом Alt+ПКМ во вьюпорте)
 };

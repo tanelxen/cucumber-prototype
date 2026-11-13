@@ -14,6 +14,7 @@
 #pragma once
 
 #include "LevelEditSession.h"
+#include "TexturePaste.h"
 
 #include <functional>
 #include <string>
@@ -48,21 +49,6 @@ namespace FaceTexturing
 
     using SizeResolver = std::function<glm::ivec2(const std::string& materialName)>;
 
-    struct FaceClipboard
-    {
-        bool valid = false;
-        std::string materialName;
-        FaceUV uv;
-        glm::vec3 normal{0.0f, 1.0f, 0.0f};   // плоскость источника на момент копирования
-        float planeOffset = 0.0f;
-    };
-    
-    enum class UVMode
-    {
-        Wrap,    // продолжать рисунок через ребро (по умолчанию)
-        World    // та же мировая проекция как есть
-    };
-
     bool SetMaterial(LevelEditSession& session, const std::vector<FaceRef>& targets, const std::string& materialName);
     bool SetFlag(LevelEditSession& session, const std::vector<FaceRef>& targets, uint32_t flag, bool enabled);
 
@@ -80,6 +66,9 @@ namespace FaceTexturing
     bool Copy(const LevelEditSession& session, const FaceRef& source, FaceClipboard& out);
     bool Paste(LevelEditSession& session, const std::vector<FaceRef>& targets, const FaceClipboard& clipboard, bool material, bool uv, UVMode mode = UVMode::Wrap);
     
+    bool PasteFromClipboard(LevelEditSession& session, const std::vector<FaceRef>& targets);
+    bool PaintFace(LevelEditSession& session, const FaceRef& target);
+    bool PaintHoveredFace(LevelEditSession& session);   // Alt+RMB
     
     struct Summary
     {

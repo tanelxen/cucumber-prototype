@@ -170,27 +170,35 @@ void TexturingPanel::draw()
     ImGui::Separator();
 
     // ---- Буфер ----
-    if (ImGui::Button("Copy from first face")) FaceTexturing::Copy(*session, targets.front(), m_clipboard);
+    FaceTexturing::FaceClipboard& clipboard = session->textureClipboard();
+    FaceTexturing::PasteOptions& options = session->pasteOptions();
+
+    if (ImGui::Button("Copy from first face")) FaceTexturing::Copy(*session, targets.front(), clipboard);
     ImGui::SameLine();
-    ImGui::BeginDisabled(!m_clipboard.valid);
-    if (ImGui::Button("Paste"))
-    {
-        FaceTexturing::Paste(*session, targets, m_clipboard, m_pasteMaterial, m_pasteUV,
-                             m_pasteWrap ? FaceTexturing::UVMode::Wrap : FaceTexturing::UVMode::World);
-    }
+    ImGui::BeginDisabled(!clipboard.valid);
+    if (ImGui::Button("Paste")) FaceTexturing::PasteFromClipboard(*session, targets);
     ImGui::EndDisabled();
     ImGui::SameLine();
-    ImGui::Checkbox("Material", &m_pasteMaterial);
+    ImGui::Checkbox("Material", &options.material);
     ImGui::SameLine();
-    ImGui::Checkbox("UV", &m_pasteUV);
-    ImGui::BeginDisabled(!m_pasteUV);
-    ImGui::Checkbox("Wrap around edges", &m_pasteWrap);
+    ImGui::Checkbox("UV", &options.uv);
+
+    ImGui::BeginDisabled(!options.uv);
+    ImGui::Checkbox("Wrap around edges", &options.wrap);
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("On: the pattern continues across the shared edge (like Hammer's align-to-face).\n"
                           "Off: the same world-space projection is applied as is; fine for parallel faces,\n"
                           "but stretches the texture on faces turned away from the source.");
-    if (m_clipboard.valid) ImGui::TextDisabled("Clipboard: %s", m_clipboard.materialName.c_str());
+
+    ImGui::Checkbox("Chain", &options.chain);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("After pasting, the painted face becomes the source.\n"
+                          "Click faces one after another and the pattern flows around the corners.\n"
+                          "Off: every face is aligned to the same source face.");
+
+    if (clipboard.valid) ImGui::TextDisabled("Clipboard: %s", clipboard.materialName.c_str());
+    ImGui::TextDisabled("Alt+RMB on a face: apply texture from the selected face (Alt+click selects a face)");
 
     ImGui::End();
 }

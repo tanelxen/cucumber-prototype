@@ -57,6 +57,9 @@ private:
     bool m_rightMouseNavigating = false;
     bool m_openCreatePopup = false;
     float m_rightMouseTravel = 0.0f;
+    
+    bool m_rightMouseAlt = false;          // Alt был зажат при нажатии ПКМ
+    bool m_pendingTexturePaint = false;
 
     bool m_hasImageBounds = false;
     float m_imageLeft = 0, m_imageTop = 0, m_imageRight = 0, m_imageBottom = 0;

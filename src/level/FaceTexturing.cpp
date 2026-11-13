@@ -317,6 +317,66 @@ namespace FaceTexturing
             return true;
         });
     }
+    
+    // Кнопка Paste панели: буфер и настройки берутся из сессии
+    bool PasteFromClipboard(LevelEditSession& session, const std::vector<FaceRef>& targets)
+    {
+        FaceClipboard& clipboard = session.textureClipboard();
+        const PasteOptions& options = session.pasteOptions();
+        
+        const bool changed = Paste(session, targets, clipboard, options.material, options.uv, options.mode());
+        
+        // Chain: буфер переходит на вставленную грань, следующая вставка продолжит рисунок от неё.
+        // Материал сохраняем прежний: при снятой галке Material у цели мог остаться другой.
+        if (options.chain && targets.size() == 1)
+        {
+            const std::string material = clipboard.materialName;
+            if (Copy(session, targets.front(), clipboard)) clipboard.materialName = material;
+        }
+        return changed;
+    }
+    
+    // Alt+ПКМ (как в Hammer): рисунок с эталонной грани на грань target.
+    // Эталон это первая выбранная грань (читается заново, поэтому всегда актуальна); если грани не выбраны, то буфер панели.
+    // При options.chain target после переноса становится выбранной гранью, то есть следующим эталоном.
+    bool PaintFace(LevelEditSession& session, const FaceRef& target)
+    {
+        const PasteOptions& options = session.pasteOptions();
+        
+        FaceClipboard source;
+        if (!session.selectedFaces().empty())
+        {
+            const FaceRef selected = session.selectedFaces().front();
+            if (selected == target) return false;                  // грань на саму себя
+            if (!Copy(session, selected, source)) return false;
+        }
+        else if (session.textureClipboard().valid)
+        {
+            source = session.textureClipboard();
+        }
+        else
+        {
+            session.reportError("No source face: select one (Alt+click) or copy one in the Texturing panel");
+            return false;
+        }
+        
+        const bool changed = Paste(session, { target }, source, options.material, options.uv, options.mode());
+        
+        // Выбор двигаем и когда ничего не изменилось (цель уже выглядит так же): цепочка не должна застревать
+        if (options.chain) session.selectFace(target.solidUid, target.faceUid, false);
+        return changed;
+    }
+    
+    // Грань под курсором: наведение считает активный Select инструмент (hover), другие инструменты его не выставляют
+    bool PaintHoveredFace(LevelEditSession& session)
+    {
+        if (!session.hasHover()) return false;
+        
+        FaceRef target;
+        target.solidUid = session.hover().solidUid;
+        target.faceUid = session.hover().faceUid;
+        return PaintFace(session, target);
+    }
 
     
     bool Summarize(const LevelEditSession& session, const std::vector<FaceRef>& targets, Summary& out)

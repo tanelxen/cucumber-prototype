@@ -21,6 +21,7 @@
 
 #include "level/LevelEditSession.h"
 #include "level/LevelEditOverlay.h"
+#include "level/FaceTexturing.h"
 #include "MapComponent.h"
 
 #include "../vendor/IconsMaterialDesignIcons.h"
@@ -328,6 +329,7 @@ void ViewportPanel::update(float dt)
         m_rightMouseTracking = true;
         m_rightMouseNavigating = false;
         m_rightMouseTravel = 0.0f;
+        m_rightMouseAlt = ImGui::GetIO().KeyAlt;
         m_contextClickPosition = {mouse.x - m_imageLeft, mouse.y - m_imageTop};
         m_contextPopupPosition = {mouse.x, mouse.y};
     }
@@ -342,7 +344,18 @@ void ViewportPanel::update(float dt)
 
     if (rightMouseReleased && m_rightMouseTracking)
     {
-        m_openCreatePopup = !m_rightMouseNavigating && !scene->isSimulationMode();
+        const bool click = !m_rightMouseNavigating && !scene->isSimulationMode();
+        
+        // Alt+ПКМ при правке геометрии: перенос текстурирования (как в Hammer), меню создания не открываем
+        if (click && m_rightMouseAlt && ActiveEditSession(*scene))
+        {
+            m_pendingTexturePaint = true;
+        }
+        else
+        {
+            m_openCreatePopup = click;
+        }
+        
         m_rightMouseTracking = false;
         m_rightMouseNavigating = false;
     }
@@ -377,6 +390,12 @@ void ViewportPanel::update(float dt)
         pointer.alt = io.KeyAlt;
         pointer.capturing = camera.isCapturingMouse();
         edit->handlePointer(m_viewport.id(), pointer);
+        
+        if (m_pendingTexturePaint)
+        {
+            m_pendingTexturePaint = false;
+            FaceTexturing::PaintHoveredFace(*edit);
+        }
         
         if (m_focused && !io.WantTextInput && !pointer.capturing)
         {
@@ -418,6 +437,8 @@ void ViewportPanel::update(float dt)
             }
         }
     }
+    
+    m_pendingTexturePaint = false;
 }
 
 void ViewportPanel::collectViews(WorldScene& scene, std::vector<ViewDesc>& out, const EditorViewContext& context)
@@ -572,10 +593,6 @@ void ViewportPanel::draw()
         
         ImGui::SetCursorScreenPos(ImVec2(m_imageLeft + 8, m_imageTop + 8));
         ImGui::TextColored(ImVec4(1, 1, 1, 0.85f), "%s: %s", edit->activeTool().name(), edit->activeTool().hint().c_str());
-        
-        ImGui::SetCursorScreenPos(ImVec2(m_imageLeft + 8, m_imageTop + 32));
-        ImGui::Text("Mouse wheel: %.1f", ImGui::GetIO().MouseWheel);
-//        ImGui::TextColored(ImVec4(1, 1, 1, 0.85f), "g_wheel %f", g_wheel);
     }
 
     if (!scene->isSimulationMode() && ImGui::BeginDragDropTarget())
