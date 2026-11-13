@@ -671,27 +671,43 @@ void UIManager::setEntity(Entity *entity)
 
 void UIManager::drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position)
 {
-    const auto createEntity = [&](const std::string& name, bool addLight)
+    const auto count = std::to_string(scene.m_entities.size());
+    
+    if (ImGui::MenuItem("Empty"))
     {
-        auto entity = std::make_unique<Entity>(name);
+        auto entity = std::make_unique<Entity>("Entity_" + count);
         entity->scene = &scene;
         entity->getTransform().setPosition(position);
-
-        if (addLight) {
-            entity->addComponent<LightComponent>();
-        }
-
+        
         Entity* createdEntity = entity.get();
         scene.m_entities.push_back(std::move(entity));
         setEntity(createdEntity);
-    };
-
-    const auto count = std::to_string(scene.m_entities.size());
-    if (ImGui::MenuItem("Empty")) {
-        createEntity("Entity_" + count, false);
     }
-    if (ImGui::MenuItem("Light")) {
-        createEntity("Light_" + count, true);
+    
+    if (ImGui::MenuItem("WorldStatic"))
+    {
+        auto entity = std::make_unique<Entity>("Worldspawn");
+        entity->scene = &scene;
+        entity->getTransform().setPosition(position);
+        
+        entity->addComponent<MapComponent>();
+        
+        Entity* createdEntity = entity.get();
+        scene.m_entities.push_back(std::move(entity));
+        setEntity(createdEntity);
+    }
+    
+    if (ImGui::MenuItem("Light"))
+    {
+        auto entity = std::make_unique<Entity>("Entity_" + count);
+        entity->scene = &scene;
+        entity->getTransform().setPosition(position);
+        
+        entity->addComponent<LightComponent>();
+        
+        Entity* createdEntity = entity.get();
+        scene.m_entities.push_back(std::move(entity));
+        setEntity(createdEntity);
     }
 }
 

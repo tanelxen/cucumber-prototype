@@ -43,6 +43,13 @@
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
+static void window_focus_callback(GLFWwindow* window, int focused) {
+    if (!focused) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.ClearInputKeys();
+    }
+}
+
 static Application* s_currentInstance = nullptr;
 
 Application::Application()
@@ -72,6 +79,7 @@ Application::Application()
     m_pWindow = glfwCreateWindow(window_width, window_height, "Cucumber", nullptr, nullptr);
 
     glfwMakeContextCurrent(m_pWindow);
+    glfwSetWindowFocusCallback(m_pWindow, window_focus_callback);
 
     initSubSystems();
     

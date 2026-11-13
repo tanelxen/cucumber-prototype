@@ -212,7 +212,7 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
         if (ImGui::MenuItem("Camera"))          { m_entity->addComponent<CameraComponent>(); }
         if (ImGui::MenuItem("Movement"))        { m_entity->addComponent<MovementComponent>(); }
         if (ImGui::MenuItem("Collision"))       { m_entity->addComponent<CollisionComponent>(); }
-        if (ImGui::MenuItem("TrenchBroom Map")) { m_entity->addComponent<MapComponent>(); }
+        if (ImGui::MenuItem("World Static"))    { m_entity->addComponent<MapComponent>(); }
         
         if (ImGui::BeginMenu("Scripts"))
         {

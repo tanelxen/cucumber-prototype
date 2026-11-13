@@ -403,7 +403,10 @@ static void DrawMapComponent(MapComponent* comp)
         ImGui::TextColored(ImVec4(1, 0.7f, 0.2f, 1), "Lightmap is outdated");
     }
     
-    ImGui::DragFloat("Lightmap texels per unit", &comp->lightmapTexelsPerUnit, 0.01f, 0.01f, 16.0f, "%.3f");
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Lightmap density");
+    ImGui::SameLine();
+    ImGui::DragFloat("##lightmap_density", &comp->lightmapTexelsPerUnit, 0.01f, 0.01f, 16.0f, "%.4f");
     ImGui::TextDisabled("Rebuild UVs after changing this value.");
     
     if (ImGui::Button("Rebuild Lightmap UVs"))
@@ -695,7 +698,7 @@ void RegisterComponentsUI() {
         DrawMeshComponent(comp);
     });
     
-    inspector.Register<MapComponent>("Trenchbroom Map", [](Component* c, InspectorPanel* p) {
+    inspector.Register<MapComponent>("World Static", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<MapComponent*>(c);
         DrawMapComponent(comp);
     });
