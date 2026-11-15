@@ -8,6 +8,7 @@
 #pragma once
 
 #include "IViewProvider.h"
+#include "level/LevelWireframe.h"
 
 #include <vector>
 #include <filesystem>
@@ -20,6 +21,8 @@ class InspectorPanel;
 class AssetsPanel;
 class HierarchyPanel;
 class EditorCamera;
+class TexturingPanel;
+class TextureBrowserPanel;
 
 class WorldScene;
 struct ViewDesc;
@@ -39,6 +42,9 @@ public:
     void setMaterial(Material* material);
     void drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position);
     
+    void showTextureBrowser();
+    
+    void startFrame();
     void update(float dt);
     void draw();
     EditorCamera& editorCamera();
@@ -48,10 +54,14 @@ public:
     
     void collectViews(WorldScene& scene, std::vector<ViewDesc>& out) override;
     
+    float gridSize = 16.0f;
+    
 private:
     InspectorPanel* m_pInspectorPanel;
     AssetsPanel* m_pAssetsPanel;
     HierarchyPanel* m_pHierarchyPanel;
+    TexturingPanel* m_pTexturingPanel;
+    TextureBrowserPanel* m_pTextureBrowserPanel;
     
 private:
     void drawMenuBar();
@@ -66,6 +76,8 @@ private:
     char m_projectNameBuffer[128] = "MyProject";
     char m_projectLocationBuffer[1024] = {};
     std::string m_projectError;
+    
+    LevelWireframe m_levelWireframe;
 };
 
 inline UIManager* g_UIManager;

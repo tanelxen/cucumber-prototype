@@ -14,6 +14,19 @@
 
 #include <vector>
 
+enum class ShadeMode
+{
+    Shaded,
+    Wireframe
+};
+
+// То, что UIManager раз в кадр сообщает всем видам редактора (общее для панелей, не настройка конкретного вида)
+struct EditorViewContext
+{
+    uint32_t wireframeLines = 0;    // LevelWireframe::sync
+    float gridStep = 8.0f;          // шаг сетки документа (MapComponent::gridSize)
+};
+
 class EditorViewport
 {
 public:
@@ -35,11 +48,14 @@ public:
     void applyPendingSize();
 
     // Добавляет редакторский вид этого вьюпорта.
-    void produceEditorView(std::vector<ViewDesc>& out, bool audioListener);
+    void produceEditorView(std::vector<ViewDesc>& out, const EditorViewContext& context = {});
 
     bool drawGrid = true;
     bool drawGizmos = false;
     bool drawSkybox = true;
+    bool drawEditOverlay = false;
+    
+    ShadeMode shadeMode = ShadeMode::Shaded;
 
 private:
     uint32_t m_id;

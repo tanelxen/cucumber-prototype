@@ -74,71 +74,93 @@ const char* texFS = R"(
 
 // ======================== GRID =================================
 #include "ShaderVariant.h"
-//#include "RenderDevice.h"
-#include "VertexBuffer.h"
-#include "VertexArray.h"
-#include "IndexBuffer.h"
+#include <algorithm>
 
-class Grid
+// Бесконечная сетка: один треугольник на весь экран, линии считает фрагментный шейдер (grid.glsl).
+class PlaneGrid
 {
 public:
     void init();
-    void draw(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) const;
+    void draw(const glm::mat4& view, const glm::mat4& proj, bool ortho, float step, const glm::ivec2& logicalSize) const;
     
 private:
-    VertexBuffer* posBuffer;
-    IndexBuffer* indexBuffer;
-    VertexArray* vertexArray;
+    unsigned int m_vao = 0;     // пустой: вершины из gl_VertexID, но core profile требует VAO
 };
 
-static ShaderVariant s_grid_shader;
+static ShaderVariant s_gridShader;
 
-void Grid::init()
+static glm::vec3 AxisColor(const glm::vec3& axis)
 {
-    float positions[] = {
-        -512.0f, 0.0f, -512.0f,
-        -512.0f, 0.0f,  512.0f,
-        512.0f, 0.0f,  512.0f,
-        512.0f, 0.0f, -512.0f,
-    };
-    
-    uint32_t indices[] = {
-        0, 1, 2,
-        2, 3, 0
-    };
-    
-    vertexArray = new VertexArray();
-    
-    posBuffer = new VertexBuffer(positions, sizeof(positions));
-    posBuffer->setLayout({ { VertexAttributeLocation::Position, ShaderDataType::Float3 } });
-    vertexArray->setVertexBuffer(posBuffer);
-    
-    indexBuffer = new IndexBuffer(indices, 6);
-    vertexArray->setIndexBuffer(indexBuffer);
-    
-    s_grid_shader.init("resources/shaders/grid.glsl");
+    const glm::vec3 a = glm::abs(axis);
+    if (a.x >= a.y && a.x >= a.z) return { 1.0f, 0.2f, 0.2f };   // X
+    if (a.y >= a.z)               return { 0.2f, 1.0f, 0.2f };   // Y
+    return { 0.25f, 0.4f, 1.0f };                                 // Z
 }
 
-void Grid::draw(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix) const
+void PlaneGrid::init()
 {
-    s_grid_shader.bind();
-    s_grid_shader.setUniform("uVP", projectionMatrix * viewMatrix);
+    glGenVertexArrays(1, &m_vao);
+    s_gridShader.init("resources/shaders/grid.glsl");
+}
+
+void PlaneGrid::draw(const glm::mat4& view, const glm::mat4& proj, bool ortho, float step, const glm::ivec2& logicalSize) const
+{
+    if (!s_gridShader.isValid() || step <= 0.0f) return;
     
+    GLint viewportRect[4] = {};
+    glGetIntegerv(GL_VIEWPORT, viewportRect);
+    const float pixelScale = viewportRect[2] > 0
+    ? static_cast<float>(viewportRect[2]) / static_cast<float>(std::max(1, logicalSize.x))
+    : 1.0f;
+    
+    // Оси плоскости сетки: в ортографике оси вида (строки матрицы вида), в перспективе плоскость y = 0
+    glm::vec3 right(1.0f, 0.0f, 0.0f);
+    glm::vec3 up(0.0f, 0.0f, 1.0f);
+    if (ortho)
+    {
+        right = glm::vec3(view[0][0], view[1][0], view[2][0]);
+        up = glm::vec3(view[0][1], view[1][1], view[2][1]);
+    }
+    
+    const glm::vec3 cameraPos = glm::vec3(glm::inverse(view)[3]);
+    
+    s_gridShader.bind();
+    s_gridShader.setUniform("uInvViewProj", glm::inverse(proj * view));
+    s_gridShader.setUniform("uPerspective", !ortho);
+    s_gridShader.setUniform("uCameraPos", cameraPos);
+    s_gridShader.setUniform("uRight", right);
+    s_gridShader.setUniform("uUp", up);
+    s_gridShader.setUniform("uStep", step);
+    s_gridShader.setUniform("uMajorEvery", 8.0f);
+    s_gridShader.setUniform("uPixelScale", pixelScale);
+    s_gridShader.setUniform("uAxisColorU", AxisColor(up));      // линия u = 0 идёт вдоль up
+    s_gridShader.setUniform("uAxisColorV", AxisColor(right));   // линия v = 0 идёт вдоль right
+    
+    
+    // Размер пикселя в мировых единицах: в ортографике постоянный, в перспективе при единичной глубине.
+    // Из матрицы проекции: 2 / (proj[1][1] * высота) верно для обоих видов.
+    const float pixelSize = 2.0f / (std::abs(proj[1][1]) * static_cast<float>(std::max(1, viewportRect[3])));
+    
+    // Направление взгляда: третья строка матрицы вида это -forward
+    const glm::vec3 cameraForward = -glm::vec3(view[0][2], view[1][2], view[2][2]);
+    
+    s_gridShader.setUniform("uPixelSize", pixelSize);
+    s_gridShader.setUniform("uCameraForward", cameraForward);
+    
+    // Состояние как у прежней сетки: после вызова RenderDevice делает GLState::invalidate()
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
     glDepthMask(GL_FALSE);
     
-    glBindVertexArray(vertexArray->getID());
-    glDrawElements(GL_TRIANGLES, indexBuffer->getCount(), GL_UNSIGNED_INT, (void *)0);
+    glBindVertexArray(m_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
     
-    s_grid_shader.unbind();
-    
+    s_gridShader.unbind();
     glDepthMask(GL_TRUE);
 }
 
-static Grid g_grid;
+static PlaneGrid g_grid;
 // ======================== GRID =================================
 
 void GizmoRender::Initialize()
@@ -580,7 +602,7 @@ void GizmoRender::Shutdown()
     glDeleteTextures(1, &m_AtlasTexture);
 }
 
-void GizmoRender::DrawGrid(const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatrix)
+void GizmoRender::DrawGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, bool ortho, float step, const glm::ivec2& logicalSize)
 {
-    g_grid.draw(viewMatrix, projectionMatrix);
+    g_grid.draw(viewMatrix, projectionMatrix, ortho, step, logicalSize);
 }

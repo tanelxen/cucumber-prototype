@@ -1,6 +1,6 @@
 //
-//  Cube.h
-//  TryOpenGL
+//  Mesh.h
+//  Cucumber
 //
 //  Created by Fedor Artemenkov on 21.10.24.
 //
@@ -38,7 +38,7 @@ struct Material
     
     std::string m_name;
     std::string m_source;
-    bool isEmbedded;
+    bool isEmbedded = false;
 };
 
 struct VertexPosition {

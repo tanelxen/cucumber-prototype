@@ -90,7 +90,8 @@ void EditorCamera::updateOrtho(const Input::State& input, float scrollWheel, int
 {
     if (scrollWheel != 0.0f)
     {
-        orthoHalfHeight = std::clamp(orthoHalfHeight * std::pow(0.9f, scrollWheel), 8.0f, 32768.0f);
+        const float speed = 0.25f;
+        orthoHalfHeight = std::clamp(orthoHalfHeight * std::pow(0.9f, scrollWheel * speed), 8.0f, 32768.0f);
     }
 
     if (m_capturing)

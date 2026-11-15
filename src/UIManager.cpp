@@ -8,19 +8,25 @@
 #include "UIManager.h"
 
 #include "RenderDevice.h"
+#include "TextureLibrary.h"
 
 #include "ViewportPanel.h"
 #include "EditorCamera.h"
 #include "InspectorPanel.h"
 #include "AssetsPanel.h"
 #include "HierarchyPanel.h"
-#include "LightComponent.h"
+#include "TexturingPanel.h"
+#include "TextureBrowserPanel.h"
 
 #include "SceneManager.h"
 #include "World.h"
-#include "Entity.h"
 #include "ScriptEngine.h"
 #include "ProjectManager.h"
+
+#include "EntityFactory.h"
+
+#include "MapComponent.h"
+#include "level/LevelEditOverlay.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
@@ -38,6 +44,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <algorithm>
 
 static void DrawScriptConsoleWindow();
 
@@ -55,25 +62,32 @@ UIManager::UIManager()
     m_pViewportPanel = new ViewportPanel(ICON_MDI_CAMERA " Viewport", 0);
     m_viewportPanels.push_back(m_pViewportPanel);
     m_pViewportPanel->m_manager = this;
+    m_panels.push_back(m_pViewportPanel);
     
 //    auto m_pViewportPanel2 = new ViewportPanel(ICON_MDI_CAMERA " Viewport2", 1);
 //    m_viewportPanels.push_back(m_pViewportPanel2);
 //    m_pViewportPanel2->m_manager = this;
+//    m_panels.push_back(m_pViewportPanel2);
     
     m_pHierarchyPanel = new HierarchyPanel();
     m_pHierarchyPanel->m_manager = this;
+    m_panels.push_back(m_pHierarchyPanel);
     
     m_pInspectorPanel = new InspectorPanel();
     m_pInspectorPanel->m_manager = this;
+    m_panels.push_back(m_pInspectorPanel);
     
     m_pAssetsPanel = new AssetsPanel();
     m_pAssetsPanel->m_manager = this;
-    
-    m_panels.push_back(m_pViewportPanel);
-//    m_panels.push_back(m_pViewportPanel2);
-    m_panels.push_back(m_pHierarchyPanel);
-    m_panels.push_back(m_pInspectorPanel);
     m_panels.push_back(m_pAssetsPanel);
+    
+    m_pTexturingPanel = new TexturingPanel("Texturing");
+    m_pTexturingPanel->m_manager = this;
+    m_panels.push_back(m_pTexturingPanel);
+    
+    m_pTextureBrowserPanel = new TextureBrowserPanel("Textures");
+    m_pTextureBrowserPanel->m_manager = this;
+    m_panels.push_back(m_pTextureBrowserPanel);
     
     g_UIManager = this;
     
@@ -96,19 +110,45 @@ void UIManager::update(float dt)
 
 void UIManager::collectViews(WorldScene& scene, std::vector<ViewDesc>& out)
 {
+    // Общее для всех видов за этот кадр
+    EditorViewContext context;
+    context.gridStep = gridSize;
+    
+    auto* map = scene.getMap();
+    
+    // Каркас нужен панелям в режиме Wireframe и всем видам, пока идёт правка уровня
+    const bool editing = map && map->editSession();
+    const bool wantsWireframe = editing || std::any_of(m_viewportPanels.begin(), m_viewportPanels.end(),
+                                                       [](ViewportPanel* panel) { return panel->viewport().shadeMode == ShadeMode::Wireframe; });
+    if (wantsWireframe) context.wireframeLines = m_levelWireframe.sync(map);
+    
     for (auto* panel : m_viewportPanels)
     {
-        panel->collectViews(scene, out);
+        panel->collectViews(scene, out, context);
     }
+    
+    // Оверлей правки уровня накапливается один раз за кадр, а виды с ViewFlag::EditOverlay рисуют его при Flush
+    // (см. RenderDevice::renderView). Нет таких видов (панели свёрнуты, идёт игра) значит копить нечего.
+    const bool overlayWanted = std::any_of(out.begin(), out.end(),
+                                           [](const ViewDesc& view) { return (view.flags & ViewFlag::EditOverlay) != 0; });
+    if (!overlayWanted) return;
+    
+    if (auto* map = scene.getMap())
+    {
+        if (auto* edit = map->editSession()) DrawLevelEditOverlay(*edit);
+    }
+}
+
+void UIManager::startFrame()
+{
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 }
 
 void UIManager::draw()
 {
     glEnable(GL_FRAMEBUFFER_SRGB);
-    
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
     
     if (m_showProjectLauncher)
     {
@@ -217,7 +257,7 @@ void UIManager::init(struct GLFWwindow *window)
     ImVec4* colors = ImGui::GetStyle().Colors;
     
     colors[ImGuiCol_WindowBg]            = ImVec4(29.0f/255, 29.0f/255, 37.0f/255, 1.0);
-    colors[ImGuiCol_PopupBg]             = ImVec4(0.15, 0.15, 0.15, 0.95);
+    colors[ImGuiCol_PopupBg]             = ImVec4(0.20, 0.21, 0.21, 1.0);
     colors[ImGuiCol_Text]                = ImVec4(250.0f/255, 250.0f/255, 250.0f/255, 0.6);
     colors[ImGuiCol_ModalWindowDimBg]    = ImVec4(0.0f, 0.0f, 0.0f, 0.6f);
 
@@ -262,6 +302,12 @@ void UIManager::init(struct GLFWwindow *window)
     
     //    // ScrollBar
     colors[ImGuiCol_ScrollbarBg]         = ImVec4(0.15, 0.15, 0.15, 1.0);
+}
+
+void UIManager::showTextureBrowser()
+{
+    m_pTextureBrowserPanel->isVisible = true;
+    m_pTextureBrowserPanel->requestFocus();
 }
 
 #include "SceneSerializer.h"
@@ -598,6 +644,8 @@ void UIManager::resetEditorCamera()
 
 void UIManager::drawPanels()
 {
+    TextureLibrary::Get().pumpPreviews(static_cast<uint64_t>(ImGui::GetFrameCount()));
+    
     for (auto panel : m_panels)
     {
         if (panel->isVisible)
@@ -622,28 +670,13 @@ void UIManager::setEntity(Entity *entity)
 
 void UIManager::drawEntityCreationMenu(WorldScene& scene, const glm::vec3& position)
 {
-    const auto createEntity = [&](const std::string& name, bool addLight)
-    {
-        auto entity = std::make_unique<Entity>(name);
-        entity->scene = &scene;
-        entity->getTransform().setPosition(position);
-
-        if (addLight) {
-            entity->addComponent<LightComponent>();
-        }
-
-        Entity* createdEntity = entity.get();
-        scene.m_entities.push_back(std::move(entity));
-        setEntity(createdEntity);
-    };
-
-    const auto count = std::to_string(scene.m_entities.size());
-    if (ImGui::MenuItem("Empty")) {
-        createEntity("Entity_" + count, false);
-    }
-    if (ImGui::MenuItem("Light")) {
-        createEntity("Light_" + count, true);
-    }
+    Entity* created = nullptr;
+    
+    if (ImGui::MenuItem("Empty"))       created = EntityFactory::CreateEmpty(scene, position);
+    if (ImGui::MenuItem("WorldStatic")) created = EntityFactory::CreateWorldStatic(scene, position);
+    if (ImGui::MenuItem("Light"))       created = EntityFactory::CreateLight(scene, position);
+    
+    if (created) setEntity(created);
 }
 
 static void DrawScriptConsoleWindow()

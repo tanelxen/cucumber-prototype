@@ -44,14 +44,19 @@ struct MapMeshBuildResult
     int lightmapAtlasSize = 0;
 };
 
-class MapMeshBuilder
-{
-public:
+namespace MapMeshBuilder {
     using TextureDimensionsResolver = std::function<glm::ivec2(const std::string&)>;
+}
 
-    static bool build(const MapAsset& mapData,
-                      const LightmapUnwrapSettings& unwrapSettings,
-                      const TextureDimensionsResolver& getTextureDimensions,
-                      MapMeshBuildResult& result,
-                      std::string& error);
-};
+//class MapMeshBuilder
+//{
+//public:
+//    using TextureDimensionsResolver = std::function<glm::ivec2(const std::string&)>;
+//
+////private:
+//    static bool build(const MapAsset& mapData,
+//                      const LightmapUnwrapSettings& unwrapSettings,
+//                      const TextureDimensionsResolver& getTextureDimensions,
+//                      MapMeshBuildResult& result,
+//                      std::string& error);
+//};

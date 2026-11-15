@@ -363,17 +363,27 @@ static void DrawMapComponent(MapComponent* comp)
             
             if (payload->IsDelivery() && isModel)
             {
-                comp->loadTrenchBroomMap(info->path);
+                comp->importTrenchBroomMap(info->path, true);
             }
         }
         ImGui::EndDragDropTarget();
     }
     ImGui::PopStyleColor();
     
-    
-    if (ImGui::Button("Reload"))
+    if (comp->isEditing())
     {
-        comp->reload();
+        if (ImGui::Button("Done")) comp->endEdit();
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) comp->saveLevel();
+        if (comp->isLevelDirty()) ImGui::TextColored(ImVec4(1, 0.7f, 0.2f, 1), "Unsaved changes");
+        return;   // Reload / Bake / Rebuild UVs в режиме правки недоступны
+    }
+    if (ImGui::Button("Edit")) comp->beginEdit();
+    ImGui::SameLine();
+    
+    if (ImGui::Button("Reimport"))
+    {
+        comp->reimportSource();
     }
     
     ImGui::SameLine();
@@ -393,7 +403,10 @@ static void DrawMapComponent(MapComponent* comp)
         ImGui::TextColored(ImVec4(1, 0.7f, 0.2f, 1), "Lightmap is outdated");
     }
     
-    ImGui::DragFloat("Lightmap texels per unit", &comp->lightmapTexelsPerUnit, 0.01f, 0.01f, 16.0f, "%.3f");
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Lightmap density");
+    ImGui::SameLine();
+    ImGui::DragFloat("##lightmap_density", &comp->lightmapTexelsPerUnit, 0.01f, 0.01f, 16.0f, "%.4f");
     ImGui::TextDisabled("Rebuild UVs after changing this value.");
     
     if (ImGui::Button("Rebuild Lightmap UVs"))
@@ -403,7 +416,6 @@ static void DrawMapComponent(MapComponent* comp)
     
     if (!comp->bakeStatus.empty())
     {
-//        ImGui::TextWrapped("%s", comp->bakeStatus.c_str());
         ImGui::TextUnformatted(comp->bakeStatus.c_str());
     }
 }
@@ -686,7 +698,7 @@ void RegisterComponentsUI() {
         DrawMeshComponent(comp);
     });
     
-    inspector.Register<MapComponent>("Trenchbroom Map", [](Component* c, InspectorPanel* p) {
+    inspector.Register<MapComponent>("World Static", [](Component* c, InspectorPanel* p) {
         auto* comp = static_cast<MapComponent*>(c);
         DrawMapComponent(comp);
     });

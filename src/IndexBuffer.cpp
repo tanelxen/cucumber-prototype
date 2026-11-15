@@ -1,28 +1,26 @@
 //
-//  VertexBuffer.cpp
+//  IndexBuffer.cpp
 //  Cucumber
 //
 //  Created by Fedor Artemenkov on 26.07.26.
 //
 
 #include "IndexBuffer.h"
-#include <glad/glad.h>
 
-IndexBuffer::IndexBuffer(const uint32_t* indices, uint32_t count) : m_count(count), m_componentType(GL_UNSIGNED_INT)
+IndexBuffer::IndexBuffer(const uint32_t* indices, uint32_t count) : GpuBuffer(BufferUsage::Static), m_count(count)
 {
-    glGenBuffers(1, &m_id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(uint32_t), indices, GL_STATIC_DRAW);
+    // Раньше конструктор делал bind(GL_ELEMENT_ARRAY_BUFFER): если в этот момент был привязан чужой VAO,
+    // ему молча подменялись индексы. allocate() идёт через GL_COPY_WRITE_BUFFER и этого не делает.
+    allocate(indices, static_cast<size_t>(count) * sizeof(uint32_t));
 }
 
-IndexBuffer::~IndexBuffer()
+IndexBuffer::IndexBuffer(BufferUsage usage) : GpuBuffer(usage)
 {
-    glDeleteBuffers(1, &m_id);
 }
 
 void IndexBuffer::bind() const
 {
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, getID());
 }
 
 void IndexBuffer::unbind() const

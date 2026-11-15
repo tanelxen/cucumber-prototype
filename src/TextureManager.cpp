@@ -96,18 +96,18 @@ void TextureManager::createFallbackTexture()
     // Создаем классическую черно-розовую шахматку 2х2 на случай отсутствия ассетов
     int width = 2;
     int height = 2;
-    unsigned char magenta[3] = { 255, 0, 255 };
-    unsigned char black[3]   = { 0, 0, 0 };
+    unsigned char light[3] = { 128, 128, 128 };
+    unsigned char dark[3]   = { 100, 100, 100 };
     
     unsigned char data[12]; // 4 пикселя * 3 байта (RGB)
     // Пиксель 0,0
-    data[0] = magenta[0]; data[1] = magenta[1]; data[2] = magenta[2];
+    data[0] = light[0]; data[1] = light[1]; data[2] = light[2];
     // Пиксель 1,0
-    data[3] = black[0];   data[4] = black[1];   data[5] = black[2];
+    data[3] = dark[0];  data[4] = dark[1];  data[5] = dark[2];
     // Пиксель 0,1
-    data[6] = black[0];   data[7] = black[1];   data[8] = black[2];
+    data[6] = dark[0];  data[7] = dark[1];  data[8] = dark[2];
     // Пиксель 1,1
-    data[9] = magenta[0]; data[10] = magenta[1]; data[11] = magenta[2];
+    data[9] = light[0]; data[10] = light[1]; data[11] = light[2];
     
     unsigned int textureID;
     glGenTextures(1, &textureID);
@@ -119,5 +119,5 @@ void TextureManager::createFallbackTexture()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     
-    m_fallbackTexture = std::make_shared<Texture>(textureID, width, height, 3);
+    m_fallbackTexture = std::make_shared<Texture>(textureID, 32, 32, 3);
 }

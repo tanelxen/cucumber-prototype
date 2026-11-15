@@ -24,7 +24,6 @@ struct GameViewParams
 
     bool drawSkybox = true;
     bool drawGameUI = true;
-    bool audioListener = true;
 };
 
 // Возвращает false, если в стеке нет живой базовой камеры (вызывающий решает, что рисовать вместо).

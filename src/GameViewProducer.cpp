@@ -82,7 +82,6 @@ bool ProduceGameViews(const CameraManager& cameras, const GameViewParams& params
         v.flags = 0;
         if (params.drawSkybox)                                v.flags |= ViewFlag::Sky;
         if (!offscreen && i == lastMain && params.drawGameUI) v.flags |= ViewFlag::GameUI;
-        if (i == 0 && params.audioListener)                   v.flags |= ViewFlag::AudioListener;
 
         out.push_back(std::move(v));
     }

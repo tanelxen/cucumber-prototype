@@ -12,6 +12,7 @@
 #include "RenderDevice.h"
 #include "AudioSystem.h"
 #include "GizmoRender.h"
+#include "renderer/OverlayRender.h"
 #include "SpriteRenderer.h"
 #include "ParticleSystem.h"
 #include "DecalManager.h"
@@ -42,6 +43,13 @@
 
 static void error_callback(int e, const char *d) { printf("Error %d: %s\n", e, d); }
 
+static void window_focus_callback(GLFWwindow* window, int focused) {
+    if (!focused) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.ClearInputKeys();
+    }
+}
+
 static Application* s_currentInstance = nullptr;
 
 Application::Application()
@@ -71,6 +79,7 @@ Application::Application()
     m_pWindow = glfwCreateWindow(window_width, window_height, "Cucumber", nullptr, nullptr);
 
     glfwMakeContextCurrent(m_pWindow);
+    glfwSetWindowFocusCallback(m_pWindow, window_focus_callback);
 
     initSubSystems();
     
@@ -133,6 +142,7 @@ void Application::run()
         glfwPollEvents();
         updateInputState();
         
+        m_pUIManager->startFrame();
         m_pUIManager->update(elapsedTime);
         
         auto activeScene = SceneManager::Get().getActiveScene();
@@ -196,6 +206,7 @@ void Application::initSubSystems()
     m_pRenderer->init();                          // создаёт карты теней, нужен GL
     
     GizmoRender::Get().Initialize();
+    OverlayRender::Get().Initialize();
     
     AudioSystem::Get().Initialize();
     SpriteRenderer::Init();
@@ -204,20 +215,4 @@ void Application::initSubSystems()
     GameUI::Init();
     
     PhysicsSystem::Get().Init();
-}
-
-static void UpdateAudioListener(const std::vector<ViewDesc>& views)
-{
-    for (const ViewDesc& v : views)
-    {
-        if (!(v.flags & ViewFlag::AudioListener)) continue;
-        
-        ma_engine* engine = AudioSystem::Get().GetEngine();
-        const glm::vec3& p = v.camera.position;
-        const glm::vec3& f = v.camera.forward;
-        ma_engine_listener_set_position(engine, 0, p.x, p.y, p.z);
-        ma_engine_listener_set_direction(engine, 0, f.x, f.y, f.z);
-        ma_engine_listener_set_world_up(engine, 0, 0, 1, 0);
-        return;
-    }
 }

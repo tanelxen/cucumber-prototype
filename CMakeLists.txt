@@ -57,9 +57,14 @@ set(SRC_COMMON
         
         src/TextureManager.cpp
         src/TextureManager.h
+        src/TextureLibrary.cpp
+        src/TextureLibrary.h
         
         src/Bounds.h
         src/SpatialGrid.h
+        
+        src/MapPhysicsBody.cpp
+        src/MapPhysicsBody.h
 )
 
 set(SRC_SCENE
@@ -109,6 +114,8 @@ set(SRC_RENDERER
         src/RenderDevice.h
         src/VertexArray.cpp
         src/VertexArray.h
+        src/GpuBuffer.cpp
+        src/GpuBuffer.h
         src/VertexBuffer.cpp
         src/VertexBuffer.h
         src/VertexLayout.cpp
@@ -147,6 +154,9 @@ set(SRC_RENDERER
         src/ShadowSystem.cpp
         src/ShadowSystem.h
         src/ShadowTypes.h
+        
+        src/renderer/OverlayRender.cpp
+        src/renderer/OverlayRender.h
 )
 
 set(SRC_GameUI
@@ -177,19 +187,42 @@ set(SRC_PANELS
         src/EditorCamera.h
         src/EditorViewport.cpp
         src/EditorViewport.h
+        
+        src/TextureBrowserPanel.cpp
+        src/TextureBrowserPanel.h
+        src/TexturingPanel.cpp
+        src/TexturingPanel.h
+        
+        src/EntityFactory.cpp
+        src/EntityFactory.h
+        src/ViewportPicking.cpp
+        src/ViewportPicking.h
+        
+        src/EditorWidgets.cpp
+        src/EditorWidgets.h
+        src/LevelEditInput.cpp
+        src/LevelEditInput.h
+        src/ViewportAssetDrop.cpp
+        src/ViewportAssetDrop.h
+        src/ViewportGizmo.cpp
+        src/ViewportGizmo.h
+        src/ViewportImageRect.h
+        src/ViewportMouse.cpp
+        src/ViewportMouse.h
+        src/ViewportToolbar.cpp
+        src/ViewportToolbar.h
 )
 
 set(SRC_TRENCHBROOM
-        src/trenchbroom/Q3Shaders.cpp
-        src/trenchbroom/Q3Shaders.h
         src/trenchbroom/MapAsset.cpp
         src/trenchbroom/MapAsset.h
         src/trenchbroom/MapMesh.cpp
         src/trenchbroom/MapMesh.h
-        src/trenchbroom/MapMeshBuilder.cpp
-        src/trenchbroom/MapMeshBuilder.h
+
         src/trenchbroom/LightmapBaker.cpp
         src/trenchbroom/LightmapBaker.h
+        src/trenchbroom/BakeLights.cpp
+        src/trenchbroom/BakeLights.h
         src/trenchbroom/LightmapBakeService.cpp
         src/trenchbroom/LightmapBakeService.h
         src/trenchbroom/LightmapCache.cpp
@@ -198,6 +231,75 @@ set(SRC_TRENCHBROOM
         src/trenchbroom/LightmapController.h
         src/trenchbroom/Parallel.h
         src/trenchbroom/Half.h
+
+        src/trenchbroom/LevelCooker.cpp
+        src/trenchbroom/LevelCooker.h
+        src/trenchbroom/MapImporter.cpp
+        src/trenchbroom/MapImporter.h
+        src/trenchbroom/MapMeshBuilder.h
+        
+        src/trenchbroom/CookCommon.h
+        src/trenchbroom/EditGeometry.cpp
+        src/trenchbroom/EditGeometry.h
+        src/trenchbroom/LevelEditMesh.cpp
+        src/trenchbroom/LevelEditMesh.h
+        
+        src/trenchbroom/GeometryRevision.h
+        src/trenchbroom/ISurfaceGeometry.h
+        src/trenchbroom/MaterialTable.h
+)
+
+set(SRC_GEOMETRY
+    src/geometry/Epsilon.h
+    src/geometry/Plane.h
+    src/geometry/Polygon.cpp
+    src/geometry/Polygon.h
+    src/geometry/Brush.cpp
+    src/geometry/Brush.h
+)
+
+set(SRC_LEVEL
+    src/level/BlockTool.cpp
+    src/level/BlockTool.h
+    src/level/VertexTool.cpp
+    src/level/VertexTool.h
+    src/level/EditMath.cpp
+    src/level/EditMath.h
+    
+    src/level/LevelDocument.cpp
+    src/level/LevelDocument.h
+    src/level/LevelDocumentIO.cpp
+    src/level/LevelDocumentIO.h
+    src/level/LevelEditOverlay.cpp
+    src/level/LevelEditOverlay.h
+    src/level/LevelEditSession.cpp
+    src/level/LevelEditSession.h
+    src/level/LevelHistory.cpp
+    src/level/LevelHistory.h
+    src/level/LevelPicking.cpp
+    src/level/LevelPicking.h
+
+    src/level/LevelTool.cpp
+    src/level/LevelTool.h
+    src/level/SelectTool.cpp
+    src/level/SelectTool.h
+    src/level/SolidBuilder.cpp
+    src/level/SolidBuilder.h
+    src/level/ViewportPointer.h
+    
+    src/level/FaceTexturing.cpp
+    src/level/FaceTexturing.h
+    
+    src/level/LevelClipboard.cpp
+    src/level/LevelClipboard.h
+    
+    src/level/LevelWireframe.cpp
+    src/level/LevelWireframe.h
+    
+    src/LevelEditState.cpp
+    src/LevelEditState.h
+    src/LevelFiles.cpp
+    src/LevelFiles.h
 )
 
 set(SRC_IMGUI
@@ -214,6 +316,8 @@ add_executable( ${PROJECT_NAME}
         ${SRC_PANELS}
         ${SRC_GameUI}
         ${SRC_TRENCHBROOM}
+        ${SRC_GEOMETRY}
+        ${SRC_LEVEL}
         ${SRC_IMGUI}
 )
 
@@ -223,6 +327,8 @@ source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
 source_group("Panels" FILES ${SRC_PANELS})
 source_group("Trenchbroom" FILES ${SRC_TRENCHBROOM})
+source_group("Geometry" FILES ${SRC_GEOMETRY})
+source_group("Level" FILES ${SRC_LEVEL})
 source_group("Quake 3" FILES ${SRC_Q3})
 source_group("Game UI" FILES ${SRC_GameUI})
 source_group("imgui" FILES ${SRC_IMGUI})

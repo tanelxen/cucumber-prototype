@@ -8,28 +8,23 @@
 #include "VertexBuffer.h"
 #include <glad/glad.h>
 
-VertexBuffer::VertexBuffer(const void* data, uint32_t size)
+VertexBuffer::VertexBuffer(const void* data, uint32_t size) : GpuBuffer(BufferUsage::Static)
 {
-    glGenBuffers(1, &m_id);
-    glBindBuffer(GL_ARRAY_BUFFER, m_id);
-    glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
+    allocate(data, size);
 }
 
-VertexBuffer::VertexBuffer(uint32_t size)
+VertexBuffer::VertexBuffer(uint32_t size) : GpuBuffer(BufferUsage::Dynamic)
 {
-    glGenBuffers(1, &m_id);
-    glBindBuffer(GL_ARRAY_BUFFER, m_id);
-    glBufferData(GL_ARRAY_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
+    allocate(nullptr, size);
 }
 
-VertexBuffer::~VertexBuffer()
+VertexBuffer::VertexBuffer(BufferUsage usage) : GpuBuffer(usage)
 {
-    glDeleteBuffers(1, &m_id);
 }
 
 void VertexBuffer::bind() const
 {
-    glBindBuffer(GL_ARRAY_BUFFER, m_id);
+    glBindBuffer(GL_ARRAY_BUFFER, getID());
 }
 
 void VertexBuffer::unbind() const
@@ -39,6 +34,5 @@ void VertexBuffer::unbind() const
 
 void VertexBuffer::setData(const void* data, uint32_t size, uint32_t offset)
 {
-    glBindBuffer(GL_ARRAY_BUFFER, m_id);
-    glBufferSubData(GL_ARRAY_BUFFER, offset, size, data);
+    write(offset, data, size);
 }

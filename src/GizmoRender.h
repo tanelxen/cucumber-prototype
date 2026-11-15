@@ -36,7 +36,9 @@ public:
     void DrawIcon3D(const glm::vec3& worldPos, const glm::vec2& scale, const glm::vec4& color);
     void DrawText3D(const glm::vec3& worldPos, const std::string& text, float scale, const glm::vec4& color);
     
-    void DrawGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
+    // Бесконечная сетка: в ортографике в плоскости вида, в перспективе в плоскости y = 0.
+    // step в мировых единицах, logicalSize = ViewDesc::size (по нему и GL_VIEWPORT считается масштаб retina).
+    void DrawGrid(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix, bool ortho, float step, const glm::ivec2& logicalSize);
     
 private:
     GizmoRender() = default;

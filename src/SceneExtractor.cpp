@@ -14,7 +14,7 @@
 #include "MapComponent.h"
 
 #include "Mesh.h"
-#include "trenchbroom/MapMesh.h"
+#include "trenchbroom/ISurfaceGeometry.h"
 
 #include <cstdint>
 #include <type_traits>
@@ -28,7 +28,7 @@ static auto RawPtr(const P& p)
 }
 
 // Каждая поверхность карты — отдельный статический объект со своим AABB
-static void AddMapSurfaces(const MapMesh& map, RenderScene& out)
+static void AddMapSurfaces(const ISurfaceGeometry& map, RenderScene& out)
 {
     const unsigned int vao = map.vaoId();
     if (vao == 0) return;
@@ -43,7 +43,6 @@ static void AddMapSurfaces(const MapMesh& map, RenderScene& out)
         object.bounds = bounds[i];
         object.layer = RenderLayers::Static;
         object.lightMap = map.lightmapTexture();
-        object.reverseWinding = true;
         out.addStatic(object);
     }
 }
@@ -53,17 +52,14 @@ void ExtractRenderScene(WorldScene& world, RenderScene& out)
     out.beginFrame();
 
     // --- Статика: карта. Перестраиваем только при смене ревизии (загрузка / reload) ---
-    const MapMesh* map = nullptr;
-    if (auto* mapComponent = world.getMap())
-    {
-        map = RawPtr(mapComponent->mesh);
-    }
-
-    const uint64_t staticKey = map ? map->getRevision() : 0;
+    const ISurfaceGeometry* geometry = nullptr;
+    if (auto* mapComponent = world.getMap()) geometry = mapComponent->renderGeometry();
+    
+    const uint64_t staticKey = geometry ? geometry->getRevision() : 0;
     if (staticKey != out.staticKey())
     {
         out.resetStatic(staticKey);
-        if (map) AddMapSurfaces(*map, out);
+        if (geometry) AddMapSurfaces(*geometry, out);
         out.finalizeStatic();
     }
 

@@ -43,7 +43,7 @@ namespace ViewFlag
     constexpr ViewFlagMask Grid          = 1 << 1;
     constexpr ViewFlagMask Debug         = 1 << 2; // gizmo / debug draw
     constexpr ViewFlagMask GameUI        = 1 << 3;
-    constexpr ViewFlagMask AudioListener = 1 << 4; // отсюда берём позицию слушателя
+    constexpr ViewFlagMask EditOverlay   = 1 << 4; // оверлей редактора уровня (OverlayRender)
 }
 
 struct ViewDesc
@@ -65,6 +65,17 @@ struct ViewDesc
     int order = 0;
 
     ViewFlagMask flags = ViewFlag::Sky;
+    
+    // Постоянный набор линий OverlayRender (OverlayRender::LineSetId), рисуется после сцены и под оверлеем правки.
+    // 0 = нет. Движок не знает, что в наборе (каркас уровня, сетка и т. п.): его собирает тот, кто создал вид.
+    uint32_t overlayLines = 0;
+    
+    // Как рисовать набор overlayLines: с проверкой глубины (поверх закрашенной геометрии) и с общей прозрачностью
+    bool overlayLinesDepthTest = false;
+    float overlayLinesAlpha = 1.0f;
+    
+    // Шаг сетки вида в мировых единицах (ViewFlag::Grid)
+    float gridStep = 8.0f;
 };
 
 // Луч из пикселя вида. mouse — в пикселях относительно левого верхнего угла вида.

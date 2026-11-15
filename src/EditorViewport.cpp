@@ -4,6 +4,7 @@
 //
 
 #include "EditorViewport.h"
+#include "RenderDevice.h"
 
 void EditorViewport::requestSize(int width, int height, float scale)
 {
@@ -23,7 +24,7 @@ void EditorViewport::applyPendingSize()
     m_target.resize(m_pendingW, m_pendingH, m_pendingScale); // реаллокация только при реальном изменении
 }
 
-void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioListener)
+void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, const EditorViewContext& context)
 {
     ViewDesc v;
     v.id = m_id * 64;
@@ -39,7 +40,27 @@ void EditorViewport::produceEditorView(std::vector<ViewDesc>& out, bool audioLis
     if (drawSkybox)    v.flags |= ViewFlag::Sky;
     if (drawGrid)      v.flags |= ViewFlag::Grid;
     if (drawGizmos)    v.flags |= ViewFlag::Debug;
-    if (audioListener) v.flags |= ViewFlag::AudioListener;
+    if (drawEditOverlay) v.flags |= ViewFlag::EditOverlay;
+    if (drawGizmos || drawEditOverlay) v.flags |= ViewFlag::Debug;
+    
+    if (shadeMode == ShadeMode::Wireframe)
+    {
+        // Поверхности карты это слой Static: не берём их в вид, а рёбра рисует набор линий каркаса
+        v.layerMask &= ~RenderLayers::Static;
+        v.clearColor = glm::vec4(0.11f, 0.11f, 0.12f, 1.0f);
+        v.overlayLines = context.wireframeLines;
+    }
+    else if (drawEditOverlay)
+    {
+        // Режим правки: рёбра брашей поверх закрашенной геометрии, с проверкой глубины (скрытые рёбра не видны).
+        // Прозрачность меньше единицы, чтобы каркас не забивал текстуры.
+        constexpr float kShadedEdgeAlpha = 0.6f;
+        v.overlayLines = context.wireframeLines;
+        v.overlayLinesDepthTest = true;
+        v.overlayLinesAlpha = kShadedEdgeAlpha;
+    }
+    
+    v.gridStep = context.gridStep;
 
     out.push_back(std::move(v));
 }

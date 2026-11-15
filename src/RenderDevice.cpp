@@ -24,6 +24,7 @@
 #include "SpriteRenderer.h"
 #include "DecalManager.h"
 #include "GizmoRender.h"
+#include "renderer/OverlayRender.h"
 #include "GameUI.h"
 
 #include <glad/glad.h>
@@ -142,6 +143,13 @@ namespace RenderDevice {
         GLState::invalidate(); // привязки текстур изменены мимо кэша
         
         return id;
+    }
+    
+    void deleteTexture(handle_t handle)
+    {
+        GLuint id = handle;
+        glDeleteTextures(1, &id);
+        GLState::invalidate();   // кэш привязок мог хранить это имя, а GL переиспользует имена
     }
     
     handle_t makeVertexBuffer(long size, void* data)
@@ -413,7 +421,7 @@ namespace RenderDevice {
         
         if (desc.flags & ViewFlag::Grid)
         {
-            GizmoRender::Get().DrawGrid(desc.camera.view, desc.camera.proj);
+            GizmoRender::Get().DrawGrid(desc.camera.view, desc.camera.proj, desc.camera.ortho, desc.gridStep, desc.size);
             GLState::invalidate();
         }
         
@@ -442,9 +450,19 @@ namespace RenderDevice {
         SpriteRenderer::Flush(desc.camera.view, desc.camera.proj);
         DecalManager::Flush(desc.camera.view, desc.camera.proj);
         
+        if (desc.overlayLines != 0)
+        {
+            OverlayRender::Get().DrawLineSet(desc.overlayLines, desc.camera.view, desc.camera.proj, desc.size, desc.overlayLinesDepthTest, desc.overlayLinesAlpha);
+        }
+        
         if (desc.flags & ViewFlag::Debug)
         {
             GizmoRender::Get().Flush(desc.camera.view, desc.camera.proj);
+        }
+        
+        if (desc.flags & ViewFlag::EditOverlay)
+        {
+            OverlayRender::Get().Flush(desc.camera.view, desc.camera.proj, desc.size);
         }
         
         // FIXME: Resize должен быть не тут
@@ -488,6 +506,7 @@ namespace RenderDevice {
         
         // Очереди чистим ВСЕГДА, даже когда видов нет (все панели свёрнуты): иначе гизмо и спрайты копились бы вечно
         GizmoRender::Get().Clear();
+        OverlayRender::Get().Clear();
         SpriteRenderer::Clear();
         GameUI::Clear();
     }

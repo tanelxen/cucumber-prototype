@@ -17,21 +17,19 @@
 #include "MapAsset.h"
 #include "RenderDevice.h"
 #include "TextureManager.h"
+#include "TextureLibrary.h"
 #include "VertexArray.h"
 #include "VertexBuffer.h"
-#include "Q3Shaders.h"
+#include "GeometryRevision.h"
+
+#include "LevelCooker.h"
+#include "level/LevelDocument.h"
 
 #include <glad/glad.h>
 
 #include <iostream>
 #include <string>
 #include <unordered_map>
-
-namespace
-{
-Quake3Shaders s_q3shaders;
-uint64_t s_nextRevision = 1;
-}
 
 MapMesh::MapMesh() = default;
 
@@ -49,7 +47,7 @@ unsigned int MapMesh::vaoId() const
     return m_vao ? m_vao->getID() : 0;
 }
 
-bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& unwrapSettings)
+bool MapMesh::buildFrom(const std::filesystem::path& basePath, const CookFunction& cook)
 {
     m_vao.reset();
     m_posBuffer.reset();
@@ -72,77 +70,31 @@ bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSet
         m_lightmapTexture = 0;
     }
 
-    m_revision = s_nextRevision++;
-    if (mapData.entities.empty())
-    {
-        std::cerr << "[MapMesh] Map has no worldspawn entity" << std::endl;
-        return false;
-    }
-
-    const auto scriptsPath = mapData.m_basepath / "scripts";
-    s_q3shaders.initFromDir(scriptsPath.string().c_str());
-
-    struct TextureInfo
-    {
-        int width = 256;
-        int height = 256;
-        RenderDevice::handle_t handle = 0;
-    };
-    std::unordered_map<std::string, TextureInfo> textureCache;
-    const auto getTexture = [&](const std::string& name) -> const TextureInfo&
-    {
-        auto it = textureCache.find(name);
-        if (it != textureCache.end()) return it->second;
-
-        TextureInfo info;
-        auto texturePath = mapData.m_basepath / "textures" / name;
-        auto textureAsset = TextureManager::Get().loadTexture(texturePath.string());
-        if (textureAsset)
-        {
-            info.width = textureAsset->getWidth();
-            info.height = textureAsset->getHeight();
-            info.handle = textureAsset->getHandle();
-        }
-        return textureCache.emplace(name, info).first->second;
-    };
+    m_revision = NextGeometryRevision();
 
     MapMeshBuildResult build;
     std::string error;
-    const auto resolveDimensions = [&](const std::string& name) {
-        const auto& texture = getTexture(name);
+    
+    const auto resolveDimensions = [](const std::string& name)
+    {
+        const auto& texture = TextureLibrary::Get().info(name);
         return glm::ivec2(texture.width, texture.height);
     };
-    if (!MapMeshBuilder::build(mapData, unwrapSettings, resolveDimensions, build, error))
+    
+    if (!cook(resolveDimensions, build, error))
     {
         std::cerr << "[MapMesh] Failed to build map mesh: " << error << std::endl;
         return false;
     }
 
-    std::unordered_map<std::string, uint32_t> materialSlotByTexture;
     m_surfaces.reserve(build.surfaces.size());
     m_surfaceBounds.reserve(build.surfaces.size());
+    
     for (const auto& buildSurface : build.surfaces)
     {
-        auto slotIt = materialSlotByTexture.find(buildSurface.materialName);
-        if (slotIt == materialSlotByTexture.end())
-        {
-            std::string mapParam = buildSurface.materialName;
-            BlendMode blendMode = BlendMode::Opaque;
-            s_q3shaders.getBaseTextureName("textures/" + buildSurface.materialName, mapParam, blendMode);
-
-            Material material;
-            material.m_name = buildSurface.materialName;
-            material.blendMode = blendMode;
-            material.albedoMap = getTexture(buildSurface.materialName).handle;
-
-            slotIt = materialSlotByTexture.emplace(
-                buildSurface.materialName, static_cast<uint32_t>(m_materials.size())).first;
-            m_materials.push_back(std::move(material));
-        }
-
         Surface surface;
         surface.m_name = "surface_" + buildSurface.materialName;
-        surface.materialSlot = slotIt->second;
+        surface.materialSlot = m_materials.slot(buildSurface.materialName);
         surface.startIndex = buildSurface.startIndex;
         surface.count = buildSurface.count;
         m_surfaces.push_back(std::move(surface));
@@ -245,8 +197,28 @@ bool MapMesh::updateLightmapTexture(const std::vector<uint16_t>& halfRgb, std::s
     }
     
     uploadLightmapTexture(halfRgb.data());
-    m_revision = s_nextRevision++;   // RenderScene перестроит статику с новым хэндлом текстуры
+    
+    // RenderScene перестроит статику с новым хэндлом текстуры
+    m_revision = NextGeometryRevision();
     error.clear();
     
     return true;
 }
+
+bool MapMesh::buildFromLevel(const LevelDocument& level, const LightmapUnwrapSettings& settings)
+{
+    return buildFrom(level.basePath, [&](const MapMeshBuilder::TextureDimensionsResolver& resolve,
+                                         MapMeshBuildResult& out, std::string& error)
+                     {
+        return LevelCooker::cook(level, settings, resolve, out, error);
+    });
+}
+
+//bool MapMesh::buildFromMapAsset(const MapAsset& mapData, const LightmapUnwrapSettings& settings)
+//{
+//    return buildFrom(mapData.m_basepath, [&](const MapMeshBuilder::TextureDimensionsResolver& resolve,
+//                                             MapMeshBuildResult& out, std::string& error)
+//                     {
+//        return MapMeshBuilder::build(mapData, settings, resolve, out, error);
+//    });
+//}

@@ -212,7 +212,7 @@ void InspectorPanel::DrawNormalEntityComponents(Entity* entity)
         if (ImGui::MenuItem("Camera"))          { m_entity->addComponent<CameraComponent>(); }
         if (ImGui::MenuItem("Movement"))        { m_entity->addComponent<MovementComponent>(); }
         if (ImGui::MenuItem("Collision"))       { m_entity->addComponent<CollisionComponent>(); }
-        if (ImGui::MenuItem("TrenchBroom Map")) { m_entity->addComponent<MapComponent>(); }
+        if (ImGui::MenuItem("World Static"))    { m_entity->addComponent<MapComponent>(); }
         
         if (ImGui::BeginMenu("Scripts"))
         {
@@ -252,7 +252,7 @@ void InspectorPanel::ProcessAssetInInspector(AssetDragPayload* data)
     if (data->type == AssetType_Map)
     {
         auto mapComponent = m_entity->addComponent<MapComponent>();
-        mapComponent->loadTrenchBroomMap(data->path);
+        mapComponent->importTrenchBroomMap(data->path, true);
     }
     else if (data->type == AssetType_Audio)
     {
