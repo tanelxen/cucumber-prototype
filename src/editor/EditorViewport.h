@@ -1,0 +1,69 @@
+//
+//  EditorViewport.h
+//  Cucumber
+//
+//  Один "глаз" редактора: своя камера, своя цель рендера, свои флаги.
+//  Панелей можно создавать сколько угодно. Заменяет Viewport + CameraController для редактора.
+//
+
+#pragma once
+
+#include "EditorCamera.h"
+#include "renderer/RenderTarget.h"
+#include "renderer/ViewDesc.h"
+
+#include <vector>
+
+enum class ShadeMode
+{
+    Shaded,
+    Wireframe
+};
+
+// То, что UIManager раз в кадр сообщает всем видам редактора (общее для панелей, не настройка конкретного вида)
+struct EditorViewContext
+{
+    uint32_t wireframeLines = 0;    // LevelWireframe::sync
+    float gridStep = 8.0f;          // шаг сетки документа (MapComponent::gridSize)
+};
+
+class EditorViewport
+{
+public:
+    explicit EditorViewport(uint32_t id) : m_id(id) {}
+
+    uint32_t id() const { return m_id; }
+
+    EditorCamera& camera() { return m_camera; }
+    const EditorCamera& camera() const { return m_camera; }
+    RenderTarget& target() { return m_target; }
+    const RenderTarget& target() const { return m_target; }
+
+    glm::ivec2 size() const { return { m_target.width(), m_target.height() }; }
+    float aspect() const { return float(m_target.width()) / float(m_target.height()); }
+
+    // Панель сообщает желаемый размер из ImGui (во время draw).
+    // Реальный ресайз происходит в applyPendingSize() в начале СЛЕДУЮЩЕГО кадра, до рендера.
+    void requestSize(int width, int height, float scale);
+    void applyPendingSize();
+
+    // Добавляет редакторский вид этого вьюпорта.
+    void produceEditorView(std::vector<ViewDesc>& out, const EditorViewContext& context = {});
+
+    bool drawGrid = true;
+    bool drawGizmos = false;
+    bool drawSkybox = true;
+    bool drawEditOverlay = false;
+    
+    ShadeMode shadeMode = ShadeMode::Shaded;
+
+private:
+    uint32_t m_id;
+    EditorCamera m_camera;
+    RenderTarget m_target;
+
+    bool m_hasPending = false;
+    int m_pendingW = 1;
+    int m_pendingH = 1;
+    float m_pendingScale = 1.0f;
+};

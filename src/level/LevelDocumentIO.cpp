@@ -307,6 +307,5 @@ bool LevelDocumentIO::Load(const std::filesystem::path& path, LevelDocument& out
 
     if (!FromString(buffer.str(), out, error)) return false;
 
-    out.basePath = path.parent_path();
     return true;
 }

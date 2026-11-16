@@ -19,234 +19,133 @@ add_subdirectory( vendor/glfw )
 add_subdirectory( vendor/imgui )
 add_subdirectory( vendor/ImGuizmo )
 
-set(SRC_COMMON
-        src/main.cpp
-        
-        src/Application.cpp
-        src/Application.h
-        src/ProjectManager.cpp
-        src/ProjectManager.h
-        src/Input.cpp
-        src/Input.h
+set(SRC_CORE
+    src/core/main.cpp
+    src/core/Application.cpp
+    src/core/Application.h
+    src/core/ProjectManager.cpp
+    src/core/ProjectManager.h
+    src/core/Input.cpp
+    src/core/Input.h
+    src/core/UID.cpp
+    src/core/UID.h
+    src/core/SpatialGrid.h
+    src/core/Bounds.h
+)
 
-        src/ModelLoader.cpp
-        src/ModelLoader.h
-        src/Skeleton.h
-        src/Animation.h
-        
-        vendor/tinyfiledialogs.c
-        
-        src/AudioSystem.h
-        
-        src/ScriptEngine.cpp
-        src/ScriptEngine.h
-        src/AngelScriptBackend.cpp
-        src/AngelScriptRuntime.cpp
-        src/AngelScriptRuntime.h
-        src/ScriptRuntime.h
-        
-        src/UID.cpp
-        src/UID.h
-        
-        src/PhysicsCommon.h
-        
-        src/PhysicsSystem.cpp
-        src/PhysicsSystem.h
-        src/PhysicsContactListener.cpp
-        src/PhysicsContactListener.h
-        
-        src/TextureManager.cpp
-        src/TextureManager.h
-        src/TextureLibrary.cpp
-        src/TextureLibrary.h
-        
-        src/Bounds.h
-        src/SpatialGrid.h
-        
-        src/MapPhysicsBody.cpp
-        src/MapPhysicsBody.h
+set(SRC_ASSETS
+     src/assets/ModelLoader.cpp
+     src/assets/ModelLoader.h
+     src/assets/Skeleton.h
+     src/assets/Animation.h
+     src/assets/TextureManager.cpp
+     src/assets/TextureManager.h
+     src/assets/MapAsset.cpp
+     src/assets/MapAsset.h
+     src/assets/MapImporter.cpp
+     src/assets/MapImporter.h
+     vendor/tinyfiledialogs.c
 )
 
 set(SRC_SCENE
-        src/World.cpp
-        src/World.h
-        src/Entity.cpp
-        src/Entity.h
-        src/ExposedProperty.h
-        src/SceneSerializer.cpp
-        src/SceneSerializer.h
-        src/SceneManager.cpp
-        src/SceneManager.h
-        src/CameraManager.cpp
-        src/CameraManager.h
-        src/SceneExtractor.cpp
-        src/SceneExtractor.h
+    src/scene/World.cpp
+    src/scene/World.h
+    src/scene/Entity.cpp
+    src/scene/Entity.h
+    src/scene/ExposedProperty.h
+    src/scene/SceneSerializer.cpp
+    src/scene/SceneSerializer.h
+    src/scene/SceneManager.cpp
+    src/scene/SceneManager.h
+    src/scene/CameraManager.cpp
+    src/scene/CameraManager.h
+    src/scene/SceneExtractor.cpp
+    src/scene/SceneExtractor.h
 )
 
 set(SRC_COMPONENTS
-        src/Component.h
-        src/AnimatorComponent.cpp
-        src/AnimatorComponent.h
-        src/AudioComponent.cpp
-        src/AudioComponent.h
-        src/MeshComponent.cpp
-        src/MeshComponent.h
-        src/TransformComponent.cpp
-        src/TransformComponent.h
-        src/ScriptComponent.cpp
-        src/ScriptComponent.h
-        src/CameraComponent.cpp
-        src/CameraComponent.h
-        src/MovementComponent.cpp
-        src/MovementComponent.h
-        src/CollisionComponent.cpp
-        src/CollisionComponent.h
-        src/MapComponent.cpp
-        src/MapComponent.h
-        src/RigidbodyComponent.cpp
-        src/RigidbodyComponent.h
-        src/LightComponent.cpp
-        src/LightComponent.h
+    src/components/Component.h
+    src/components/AnimatorComponent.cpp
+    src/components/AnimatorComponent.h
+    src/components/AudioComponent.cpp
+    src/components/AudioComponent.h
+    src/components/MeshComponent.cpp
+    src/components/MeshComponent.h
+    src/components/TransformComponent.cpp
+    src/components/TransformComponent.h
+    src/components/ScriptComponent.cpp
+    src/components/ScriptComponent.h
+    src/components/CameraComponent.cpp
+    src/components/CameraComponent.h
+    src/components/MovementComponent.cpp
+    src/components/MovementComponent.h
+    src/components/CollisionComponent.cpp
+    src/components/CollisionComponent.h
+    src/components/MapComponent.cpp
+    src/components/MapComponent.h
+    src/components/RigidbodyComponent.cpp
+    src/components/RigidbodyComponent.h
+    src/components/LightComponent.cpp
+    src/components/LightComponent.h
 )
 
 set(SRC_RENDERER
-        src/RenderDevice.cpp
-        src/RenderDevice.h
-        src/VertexArray.cpp
-        src/VertexArray.h
-        src/GpuBuffer.cpp
-        src/GpuBuffer.h
-        src/VertexBuffer.cpp
-        src/VertexBuffer.h
-        src/VertexLayout.cpp
-        src/VertexLayout.h
-        src/IndexBuffer.cpp
-        src/IndexBuffer.h
-        src/RenderTarget.cpp
-        src/RenderTarget.h
-        src/Texture.cpp
-        src/Texture.h
-        src/Mesh.cpp
-        src/Mesh.h
-        src/Shader.cpp
-        src/Shader.h
-        src/ShaderVariant.cpp
-        src/ShaderVariant.h
-        src/GizmoRender.cpp
-        src/GizmoRender.h
-        src/SpriteRenderer.cpp
-        src/SpriteRenderer.h
-        src/ParticleSystem.cpp
-        src/ParticleSystem.h
-        src/DecalManager.cpp
-        src/DecalManager.h
+    src/renderer/RenderDevice.cpp
+    src/renderer/RenderDevice.h
+    src/renderer/VertexArray.cpp
+    src/renderer/VertexArray.h
+    src/renderer/GpuBuffer.cpp
+    src/renderer/GpuBuffer.h
+    src/renderer/VertexBuffer.cpp
+    src/renderer/VertexBuffer.h
+    src/renderer/VertexLayout.cpp
+    src/renderer/VertexLayout.h
+    src/renderer/IndexBuffer.cpp
+    src/renderer/IndexBuffer.h
+    src/renderer/RenderTarget.cpp
+    src/renderer/RenderTarget.h
+    src/renderer/Texture.cpp
+    src/renderer/Texture.h
+    src/renderer/Mesh.cpp
+    src/renderer/Mesh.h
+    src/renderer/Shader.cpp
+    src/renderer/Shader.h
+    src/renderer/ShaderVariant.cpp
+    src/renderer/ShaderVariant.h
+    src/renderer/GizmoRender.cpp
+    src/renderer/GizmoRender.h
+    src/renderer/SpriteRenderer.cpp
+    src/renderer/SpriteRenderer.h
+    src/renderer/ParticleSystem.cpp
+    src/renderer/ParticleSystem.h
+    src/renderer/DecalManager.cpp
+    src/renderer/DecalManager.h
         
-        src/Renderer.cpp
-        src/Renderer.h
-        src/IViewProvider.h
-        src/GameViewProducer.cpp
-        src/GameViewProducer.h
-        src/ViewDesc.h
-        src/RenderScene.cpp
-        src/RenderScene.h
-        src/ViewBuilder.cpp
-        src/ViewBuilder.h
-        src/ShadowSystem.cpp
-        src/ShadowSystem.h
-        src/ShadowTypes.h
+    src/renderer/Renderer.cpp
+    src/renderer/Renderer.h
+    src/renderer/IViewProvider.h
+    src/renderer/GameViewProducer.cpp
+    src/renderer/GameViewProducer.h
+    src/renderer/ViewDesc.h
+    src/renderer/RenderScene.cpp
+    src/renderer/RenderScene.h
+    src/renderer/ViewBuilder.cpp
+    src/renderer/ViewBuilder.h
+    src/renderer/ShadowSystem.cpp
+    src/renderer/ShadowSystem.h
+    src/renderer/ShadowTypes.h
         
-        src/renderer/OverlayRender.cpp
-        src/renderer/OverlayRender.h
+    src/renderer/OverlayRender.cpp
+    src/renderer/OverlayRender.h
 )
 
 set(SRC_GameUI
-        src/GameUI.cpp
-        src/GameUI.h
-        src/GameUIScreen.cpp
-        src/GameUIScreen.h
-        src/GameUI_AS.cpp
-        src/GameUI_AS.h
-)
-
-set(SRC_PANELS
-        src/UIManager.cpp
-        src/UIManager.h
-
-        src/ViewportPanel.cpp
-        src/ViewportPanel.h
-        src/InspectorPanel.cpp
-        src/InspectorPanel.h
-        src/ComponentInspector.cpp
-        src/ComponentInspector.h
-        src/AssetsPanel.cpp
-        src/AssetsPanel.h
-        src/HierarchyPanel.cpp
-        src/HierarchyPanel.h
-        
-        src/EditorCamera.cpp
-        src/EditorCamera.h
-        src/EditorViewport.cpp
-        src/EditorViewport.h
-        
-        src/TextureBrowserPanel.cpp
-        src/TextureBrowserPanel.h
-        src/TexturingPanel.cpp
-        src/TexturingPanel.h
-        
-        src/EntityFactory.cpp
-        src/EntityFactory.h
-        src/ViewportPicking.cpp
-        src/ViewportPicking.h
-        
-        src/EditorWidgets.cpp
-        src/EditorWidgets.h
-        src/LevelEditInput.cpp
-        src/LevelEditInput.h
-        src/ViewportAssetDrop.cpp
-        src/ViewportAssetDrop.h
-        src/ViewportGizmo.cpp
-        src/ViewportGizmo.h
-        src/ViewportImageRect.h
-        src/ViewportMouse.cpp
-        src/ViewportMouse.h
-        src/ViewportToolbar.cpp
-        src/ViewportToolbar.h
-)
-
-set(SRC_TRENCHBROOM
-        src/trenchbroom/MapAsset.cpp
-        src/trenchbroom/MapAsset.h
-        src/trenchbroom/MapMesh.cpp
-        src/trenchbroom/MapMesh.h
-
-        src/trenchbroom/LightmapBaker.cpp
-        src/trenchbroom/LightmapBaker.h
-        src/trenchbroom/BakeLights.cpp
-        src/trenchbroom/BakeLights.h
-        src/trenchbroom/LightmapBakeService.cpp
-        src/trenchbroom/LightmapBakeService.h
-        src/trenchbroom/LightmapCache.cpp
-        src/trenchbroom/LightmapCache.h
-        src/trenchbroom/LightmapController.cpp
-        src/trenchbroom/LightmapController.h
-        src/trenchbroom/Parallel.h
-        src/trenchbroom/Half.h
-
-        src/trenchbroom/LevelCooker.cpp
-        src/trenchbroom/LevelCooker.h
-        src/trenchbroom/MapImporter.cpp
-        src/trenchbroom/MapImporter.h
-        src/trenchbroom/MapMeshBuilder.h
-        
-        src/trenchbroom/CookCommon.h
-        src/trenchbroom/EditGeometry.cpp
-        src/trenchbroom/EditGeometry.h
-        src/trenchbroom/LevelEditMesh.cpp
-        src/trenchbroom/LevelEditMesh.h
-        
-        src/trenchbroom/GeometryRevision.h
-        src/trenchbroom/ISurfaceGeometry.h
-        src/trenchbroom/MaterialTable.h
+    src/ui/GameUI.cpp
+    src/ui/GameUI.h
+    src/ui/GameUIScreen.cpp
+    src/ui/GameUIScreen.h
+    src/ui/GameUI_AS.cpp
+    src/ui/GameUI_AS.h
 )
 
 set(SRC_GEOMETRY
@@ -265,6 +164,22 @@ set(SRC_LEVEL
     src/level/VertexTool.h
     src/level/EditMath.cpp
     src/level/EditMath.h
+    
+    src/level/MapMesh.cpp
+    src/level/MapMesh.h
+
+    src/level/LevelCooker.cpp
+    src/level/LevelCooker.h
+    
+    src/level/CookCommon.h
+    src/level/EditGeometry.cpp
+    src/level/EditGeometry.h
+    src/level/LevelEditMesh.cpp
+    src/level/LevelEditMesh.h
+    
+    src/level/GeometryRevision.h
+    src/level/ISurfaceGeometry.h
+    src/level/MaterialTable.h
     
     src/level/LevelDocument.cpp
     src/level/LevelDocument.h
@@ -295,43 +210,131 @@ set(SRC_LEVEL
     
     src/level/LevelWireframe.cpp
     src/level/LevelWireframe.h
-    
-    src/LevelEditState.cpp
-    src/LevelEditState.h
-    src/LevelFiles.cpp
-    src/LevelFiles.h
 )
 
-set(SRC_IMGUI
-        vendor/imgui/backends/imgui_impl_glfw.cpp
-        vendor/imgui/backends/imgui_impl_opengl3.cpp
-        #src/imguiStyling.cpp
+set(SRC_LIGHTMAP
+    src/lightmap/BakeLights.cpp
+    src/lightmap/BakeLights.h
+    src/lightmap/LightmapBaker.cpp
+    src/lightmap/LightmapBaker.h
+    src/lightmap/LightmapBakeService.cpp
+    src/lightmap/LightmapBakeService.h
+    src/lightmap/LightmapCache.cpp
+    src/lightmap/LightmapCache.h
+    src/lightmap/LightmapController.cpp
+    src/lightmap/LightmapController.h
+    src/lightmap/Parallel.h
+    src/lightmap/Half.h
+)
+
+set(SRC_SCRIPTING
+    src/scripting/ScriptEngine.cpp
+    src/scripting/ScriptEngine.h
+    src/scripting/AngelScriptBackend.cpp
+    src/scripting/AngelScriptRuntime.cpp
+    src/scripting/AngelScriptRuntime.h
+    src/scripting/ScriptRuntime.h
+)
+
+set(SRC_PHYSICS
+    src/physics/MapPhysicsBody.cpp
+    src/physics/MapPhysicsBody.h
+    src/physics/PhysicsCommon.h
+    src/physics/PhysicsContactListener.cpp
+    src/physics/PhysicsContactListener.h
+    src/physics/PhysicsSystem.cpp
+    src/physics/PhysicsSystem.h
+)
+
+set(SRC_AUDIO
+    src/audio/AudioSystem.h
+)
+
+set(SRC_EDITOR
+    src/editor/TextureLibrary.cpp
+    src/editor/TextureLibrary.h
+    
+    src/editor/UIManager.cpp
+    src/editor/UIManager.h
+
+    src/editor/ViewportPanel.cpp
+    src/editor/ViewportPanel.h
+    src/editor/InspectorPanel.cpp
+    src/editor/InspectorPanel.h
+    src/editor/ComponentInspector.cpp
+    src/editor/ComponentInspector.h
+    src/editor/AssetsPanel.cpp
+    src/editor/AssetsPanel.h
+    src/editor/HierarchyPanel.cpp
+    src/editor/HierarchyPanel.h
+    
+    src/editor/EditorCamera.cpp
+    src/editor/EditorCamera.h
+    src/editor/EditorViewport.cpp
+    src/editor/EditorViewport.h
+    
+    src/editor/TextureBrowserPanel.cpp
+    src/editor/TextureBrowserPanel.h
+    src/editor/TexturingPanel.cpp
+    src/editor/TexturingPanel.h
+    
+    src/editor/EntityFactory.cpp
+    src/editor/EntityFactory.h
+    src/editor/ViewportPicking.cpp
+    src/editor/ViewportPicking.h
+    
+    src/editor/EditorWidgets.cpp
+    src/editor/EditorWidgets.h
+    src/editor/LevelEditInput.cpp
+    src/editor/LevelEditInput.h
+    src/editor/ViewportAssetDrop.cpp
+    src/editor/ViewportAssetDrop.h
+    src/editor/ViewportGizmo.cpp
+    src/editor/ViewportGizmo.h
+    src/editor/ViewportImageRect.h
+    src/editor/ViewportMouse.cpp
+    src/editor/ViewportMouse.h
+    src/editor/ViewportToolbar.cpp
+    src/editor/ViewportToolbar.h
+    
+    src/editor/LevelEditState.cpp
+    src/editor/LevelEditState.h
+    src/editor/LevelFiles.cpp
+    src/editor/LevelFiles.h
+
+    vendor/imgui/backends/imgui_impl_glfw.cpp
+    vendor/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 add_executable( ${PROJECT_NAME}
-        ${SRC_COMMON}
-        ${SRC_SCENE}
-        ${SRC_COMPONENTS}
-        ${SRC_RENDERER}
-        ${SRC_PANELS}
-        ${SRC_GameUI}
-        ${SRC_TRENCHBROOM}
-        ${SRC_GEOMETRY}
-        ${SRC_LEVEL}
-        ${SRC_IMGUI}
+    ${SRC_CORE}
+    ${SRC_ASSETS}
+    ${SRC_SCENE}
+    ${SRC_COMPONENTS}
+    ${SRC_RENDERER}
+    ${SRC_GameUI}
+    ${SRC_GEOMETRY}
+    ${SRC_LEVEL}
+    ${SRC_LIGHTMAP}
+    ${SRC_SCRIPTING}
+    ${SRC_PHYSICS}
+    ${SRC_AUDIO}
+    ${SRC_EDITOR}
 )
 
-source_group("Common" FILES ${SRC_COMMON})
+source_group("Core" FILES ${SRC_CORE})
+source_group("Assets" FILES ${SRC_ASSETS})
 source_group("Scene" FILES ${SRC_SCENE})
 source_group("Components" FILES ${SRC_COMPONENTS})
 source_group("Renderer" FILES ${SRC_RENDERER})
-source_group("Panels" FILES ${SRC_PANELS})
-source_group("Trenchbroom" FILES ${SRC_TRENCHBROOM})
 source_group("Geometry" FILES ${SRC_GEOMETRY})
 source_group("Level" FILES ${SRC_LEVEL})
-source_group("Quake 3" FILES ${SRC_Q3})
+source_group("Lightmap" FILES ${SRC_LIGHTMAP})
+source_group("Scripting" FILES ${SRC_SCRIPTING})
+source_group("Physics" FILES ${SRC_PHYSICS})
+source_group("Audio" FILES ${SRC_AUDIO})
 source_group("Game UI" FILES ${SRC_GameUI})
-source_group("imgui" FILES ${SRC_IMGUI})
+source_group("Editor" FILES ${SRC_EDITOR})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_XYZW_ONLY)
 

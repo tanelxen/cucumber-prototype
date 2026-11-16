@@ -5,10 +5,10 @@
 
 #include "LevelWireframe.h"
 
-#include "MapComponent.h"
+#include "components/MapComponent.h"
 #include "level/LevelDocument.h"
-#include "trenchbroom/LevelEditMesh.h"
-#include "trenchbroom/MapMesh.h"
+#include "level/LevelEditMesh.h"
+#include "level/MapMesh.h"
 
 namespace
 {

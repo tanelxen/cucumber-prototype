@@ -3,7 +3,6 @@
 //  Cucumber
 //
 //  Авторитетная модель статической геометрии уровня (то, что правит редактор и что лежит в .cmap.json).
-//  Не знает ни про OpenGL, ни про UI, ни про рендер.
 //
 //  Решения формата v1:
 //   - Солид это ВЫПУКЛОЕ тело: общие вершины + грани как петли индексов. Плоскости не хранятся, они выводятся (Ньюэлл).
@@ -15,7 +14,7 @@
 
 #pragma once
 
-#include "Bounds.h"
+#include "core/Bounds.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -62,9 +61,6 @@ struct LevelDocument
     uint32_t version = kCurrentVersion;
     std::vector<std::string> materials;   // пути материалов (как в .map, относительно каталога текстур)
     std::vector<Solid> solids;
-
-    // Не сериализуется: каталог документа (нужен, чтобы найти scripts/ с шейдерами материалов)
-    std::filesystem::path basePath;
     
     // откуда импортирован (путь относительно assets), пусто для уровней, созданных в редакторе
     std::string sourceMap;

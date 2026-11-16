@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "Bounds.h"
+#include "core/Bounds.h"
 #include "LevelDocument.h"
 
 #include <string>

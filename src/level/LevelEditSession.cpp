@@ -5,7 +5,7 @@
 
 #include "LevelEditSession.h"
 
-#include "UIManager.h"
+#include "editor/UIManager.h"
 #include "BlockTool.h"
 #include "LevelClipboard.h"
 #include "SelectTool.h"

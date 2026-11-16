@@ -12,7 +12,8 @@
 
 #pragma once
 
-#include "ViewDesc.h"
+//#include "ViewDesc.h"
+struct CameraData;
 
 class LevelEditSession;
 
